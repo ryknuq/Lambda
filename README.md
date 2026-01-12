@@ -1,6 +1,6 @@
 # Lambda - An Open Source HVH Project
 
-[![Discord](https://img.shields.io/discord/YOUR_SERVER_ID?color=7289DA&label=Discord&logo=discord&logoColor=white)](https://discord.gg/nfA3tDtzd4)
+[![Discord](https://img.shields.io/discord/1199819619037364295?color=7289DA&label=Discord&logo=discord&logoColor=white)](https://discord.gg/nfA3tDtzd4)
 [![License](https://img.shields.io/badge/License-AGPL%20v3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
 An open-source, community-driven cheat project for CS:GO, focused exclusively on the HVH scene.
