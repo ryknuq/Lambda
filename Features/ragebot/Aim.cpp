@@ -25,7 +25,23 @@ void aim::run(CUserCmd* cmd)
     should_stop = false;
 
     if (!cfg.ragebot.enable)
+    {
+        // Clear player records when ragebot is disabled to prevent memory accumulation
+        for (auto i = 1; i < m_globals()->m_maxclients; i++)
+            player_records[i].clear();
         return;
+    }
+
+    // Limit player records size to prevent memory leak
+    for (auto i = 1; i < m_globals()->m_maxclients; i++)
+    {
+        if (player_records[i].size() > 64)
+        {
+            // Keep only the most recent 32 records
+            while (player_records[i].size() > 32)
+                player_records[i].pop_back();
+        }
+    }
 
     automatic_revolver(cmd);
     prepare_targets();
@@ -708,11 +724,17 @@ float aim::bodyscale(player_t* e) //
     if (cfg.ragebot.weapon[g_ctx.globals.current_weapon].static_point_scale)
         return std::clamp(cfg.ragebot.weapon[g_ctx.globals.current_weapon].body_scale / 100.f, 0.f, 0.75f);
 
-    auto factor = [](float x, float min, float max) {
-        return 1.f - 1.f / (1.f + pow(2.f, (-([](float x, float min, float max) {
-            return ((x - min) * 2.f) / (max - min) - 1.f;
-            }(x, min, max)) / 0.115f)));
-        }(e->m_vecOrigin().DistTo(g_ctx.globals.eye_pos), 0.f, weapon_range / 4.f);
+    // Calculate dynamic body scale based on distance
+    auto distance = e->m_vecOrigin().DistTo(g_ctx.globals.eye_pos);
+    auto max_distance = weapon_range / 4.f;
+    
+    float factor = 0.f;
+    if (distance < max_distance)
+    {
+        // Sigmoid curve for smooth scale transition
+        float normalized = (distance / max_distance);
+        factor = 1.f - 1.f / (1.f + pow(2.f, -(normalized * 2.f - 1.f) / 0.115f));
+    }
 
     if (g_ctx.globals.weapon->is_sniper() && g_ctx.globals.scoped)
         factor = 0.f;
@@ -1122,6 +1144,13 @@ void aim::fire(CUserCmd* cmd)
     {
         *final_target.record, final_target.data, final_target.distance
     };
+
+    // Limit shots array to prevent unbounded memory growth
+    const int MAX_SHOTS = 256;
+    if (g_ctx.shots.size() >= MAX_SHOTS)
+    {
+        g_ctx.shots.erase(g_ctx.shots.begin());
+    }
 
     auto shot = &g_ctx.shots.emplace_back();
     shot->last_target = last_target_index;

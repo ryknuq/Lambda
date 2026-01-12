@@ -53,6 +53,8 @@ void lagcompensation::fsn(ClientFrameStage_t stage) // Паста
 			player_records[i].emplace_front(adjust_data());
 			update_player_animations(e);
 
+			// IMPORTANT: Limit record size to prevent unbounded memory growth
+			// Keep max 32 records per player
 			while (player_records[i].size() > 32)
 				player_records[i].pop_back();
 		}

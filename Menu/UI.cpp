@@ -479,7 +479,6 @@ void c_menu::rage_tab() // rage tab
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
 			ImGui::Checkbox(crypt_str("Enable"), &cfg.ragebot.enable);
-			ImGui::SliderInt(crypt_str("Field of view"), &cfg.ragebot.field_of_view, 1, 180, false, crypt_str("%d°"));
 		}
 		ImGui::EndChild();
 

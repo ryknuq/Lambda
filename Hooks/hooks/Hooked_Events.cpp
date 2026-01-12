@@ -70,7 +70,10 @@ void C_HookedEvents::FireGameEvent(IGameEvent* event)
 				auto beam_draw = m_viewrenderbeams()->CreateBeamRingPoint(info);
 
 				if (beam_draw)
+				{
 					m_viewrenderbeams()->DrawBeam(beam_draw);
+					// Note: Beam is automatically managed by engine, no manual deletion needed
+				}
 			}
 		}
 

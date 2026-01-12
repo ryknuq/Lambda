@@ -22,7 +22,6 @@ item_setting* get_by_definition_index(const int definition_index)
 void C_ConfigManager::setup()
 {
 	setup_item(&cfg.ragebot.enable, false, crypt_str("Ragebot.enable"));
-	setup_item(&cfg.ragebot.field_of_view, 1, crypt_str("Ragebot.fov"));
 	setup_item(&cfg.ragebot.zeus_bot, false, crypt_str("Ragebot.zeus_bot"));
 	setup_item(&cfg.ragebot.knife_bot, false, crypt_str("Ragebot.knife_bot"));
 	setup_item(&cfg.ragebot.double_tap, false, crypt_str("Ragebot.double_tap"));
@@ -584,7 +583,7 @@ void C_ConfigManager::load(std::string config, bool load_script_items)
 					json ja = json::parse(j[crypt_str("value")].get<std::string>().c_str());
 
 					for (json::iterator it = ja.begin(); it != ja.end(); ++it)
-						a.push_back(*it);
+					a.push_back(*it);
 
 					*(key_bind*)item->pointer = key_bind((ButtonCode_t)a[0], (key_bind_mode)a[1]);
 				}
@@ -632,6 +631,13 @@ void C_ConfigManager::remove(std::string config)
 
 	std::string path = file + '\0';
 	std::remove(path.c_str());
+}
+
+void C_ConfigManager::clear_items()
+{
+	for (auto item : items)
+		delete item;
+	items.clear();
 }
 
 void C_ConfigManager::config_files()
