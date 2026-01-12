@@ -814,7 +814,7 @@ std::vector <scan_point> aim::get_points(adjust_data* record, int hitbox, bool f
 
         if (cfg.ragebot.weapon[g_ctx.globals.current_weapon].static_point_scale)
         {
-            player_t* e;
+            player_t* e = record->player;
 
             float h = GetHeadScale(e);
             float b = bodyscale(e);
@@ -1140,8 +1140,7 @@ void aim::fire(CUserCmd* cmd)
 
     last_target_index = final_target.record->i;
     last_shoot_position = g_ctx.globals.eye_pos;
-    last_target[last_target_index] = Last_target
-    {
+    last_target[last_target_index] = Last_target{
         *final_target.record, final_target.data, final_target.distance
     };
 
