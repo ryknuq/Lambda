@@ -43,6 +43,7 @@ public:
 	ImFont* g_last;
 	ImFont* g_cxmenufont;
 	ImFont* g_cxm;
+	ImFont* g_cxm_large;
 	ImFont* g_widgets;
 
 	float public_alpha;

@@ -5,109 +5,65 @@
 void key_binds::update_key_bind(key_bind* key_bind, int key_bind_id)
 {
 	auto is_button_down = util::is_button_down(key_bind->key);
+	bool active = false;
 
 	switch (key_bind->mode)
 	{
-	case HOLD:
-		switch (key_bind_id)
-		{
-		case 2:
-			if (misc::get().recharging_double_tap)
-				break;
-
-			misc::get().double_tap_key = is_button_down;
-
-			if (misc::get().double_tap_key && cfg.ragebot.double_tap_key.key != cfg.antiaim.hide_shots_key.key)
-				misc::get().hide_shots_key = false;
-
-			break;
-		case 12:
-			misc::get().hide_shots_key = is_button_down;
-
-			if (misc::get().hide_shots_key && cfg.antiaim.hide_shots_key.key != cfg.ragebot.double_tap_key.key)
-				misc::get().double_tap_key = false;
-
-			break;
-		case 13:
-			if (is_button_down)
-				antiaim::get().manual_side = SIDE_BACK;
-			else if (antiaim::get().manual_side == SIDE_BACK)
-				antiaim::get().manual_side = SIDE_NONE;
-
-			break;
-		case 14:
-			if (is_button_down)
-				antiaim::get().manual_side = SIDE_LEFT;
-			else if (antiaim::get().manual_side == SIDE_LEFT)
-				antiaim::get().manual_side = SIDE_NONE;
-
-			break;
-		case 15:
-			if (is_button_down)
-				antiaim::get().manual_side = SIDE_RIGHT;
-			else if (antiaim::get().manual_side == SIDE_RIGHT)
-				antiaim::get().manual_side = SIDE_NONE;
-
-			break;
-		default:
-			keys[key_bind_id] = is_button_down;
-			break;
-		}
-
+	case HOLD_ON:
+		active = is_button_down;
+		break;
+	case HOLD_OFF:
+		active = !is_button_down;
 		break;
 	case TOGGLE:
 		if (!key_bind->holding && is_button_down)
 		{
-			switch (key_bind_id)
-			{
-			case 2:
-				if (misc::get().recharging_double_tap)
-					break;
-
-				misc::get().double_tap_key = !misc::get().double_tap_key;
-
-				if (misc::get().double_tap_key && cfg.ragebot.double_tap_key.key != cfg.antiaim.hide_shots_key.key)
-					misc::get().hide_shots_key = false;
-
-				break;
-			case 12:
-				misc::get().hide_shots_key = !misc::get().hide_shots_key;
-
-				if (misc::get().hide_shots_key && cfg.antiaim.hide_shots_key.key != cfg.ragebot.double_tap_key.key)
-					misc::get().double_tap_key = false;
-
-				break;
-			case 13:
-				if (antiaim::get().manual_side == SIDE_BACK)
-					antiaim::get().manual_side = SIDE_NONE;
-				else
-					antiaim::get().manual_side = SIDE_BACK;
-
-				break;
-			case 14:
-				if (antiaim::get().manual_side == SIDE_LEFT)
-					antiaim::get().manual_side = SIDE_NONE;
-				else
-					antiaim::get().manual_side = SIDE_LEFT;
-
-				break;
-			case 15:
-				if (antiaim::get().manual_side == SIDE_RIGHT)
-					antiaim::get().manual_side = SIDE_NONE;
-				else
-					antiaim::get().manual_side = SIDE_RIGHT;
-
-				break;
-			default:
-				keys[key_bind_id] = !keys[key_bind_id];
-				break;
-			}
-
+			keys[key_bind_id] = !keys[key_bind_id];
 			key_bind->holding = true;
 		}
 		else if (key_bind->holding && !is_button_down)
+		{
 			key_bind->holding = false;
+		}
 
+		active = keys[key_bind_id];
+		break;
+
+	case ALWAYS_ON:
+		active = true;
+		break;
+	}
+
+	// Update the global state
+	switch (key_bind_id)
+	{
+	case 2: // Double tap
+		if (misc::get().recharging_double_tap && key_bind->mode != ALWAYS_ON)
+			break;
+
+		misc::get().double_tap_key = active;
+		if (misc::get().double_tap_key && cfg.ragebot.double_tap_key.key != cfg.antiaim.hide_shots_key.key)
+			misc::get().hide_shots_key = false;
+		break;
+	case 12: // Hide shots
+		misc::get().hide_shots_key = active;
+		if (misc::get().hide_shots_key && cfg.antiaim.hide_shots_key.key != cfg.ragebot.double_tap_key.key)
+			misc::get().double_tap_key = false;
+		break;
+	case 13: // Manual back
+		if (active) antiaim::get().manual_side = SIDE_BACK;
+		else if (antiaim::get().manual_side == SIDE_BACK) antiaim::get().manual_side = SIDE_NONE;
+		break;
+	case 14: // Manual left
+		if (active) antiaim::get().manual_side = SIDE_LEFT;
+		else if (antiaim::get().manual_side == SIDE_LEFT) antiaim::get().manual_side = SIDE_NONE;
+		break;
+	case 15: // Manual right
+		if (active) antiaim::get().manual_side = SIDE_RIGHT;
+		else if (antiaim::get().manual_side == SIDE_RIGHT) antiaim::get().manual_side = SIDE_NONE;
+		break;
+	default:
+		keys[key_bind_id] = active;
 		break;
 	}
 
@@ -119,11 +75,10 @@ void key_binds::initialize_key_binds()
 	for (auto i = 0; i < 23; i++)
 	{
 		keys[i] = false;
-
 		if (i == 2 || i >= 12 && i <= 17)
 			mode[i] = TOGGLE;
 		else
-			mode[i] = HOLD;
+			mode[i] = HOLD_ON;
 	}
 }
 

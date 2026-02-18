@@ -86,6 +86,7 @@ void lagcompensation::extrapolate(player_t* player, Vector& origin, Vector& velo
 	static auto sv_gravity = m_cvar()->FindVar(crypt_str("sv_gravity"));
 	static auto sv_jump_impulse = m_cvar()->FindVar(crypt_str("sv_jump_impulse"));
 
+	// Apply gravity if airborne
 	if (!(flags & FL_ONGROUND))
 		velocity.z -= (m_globals()->m_frametime * sv_gravity->GetFloat());
 	else if (wasonground)
@@ -108,8 +109,10 @@ void lagcompensation::extrapolate(player_t* player, Vector& origin, Vector& velo
 
 	if (trace.fraction != 1.f)
 	{
+		// Multi-bounce collision resolution (up to 2 bounces)
 		for (int i = 0; i < 2; i++)
 		{
+			// Remove velocity in collision normal direction
 			velocity -= trace.plane.normal * velocity.Dot(trace.plane.normal);
 
 			const float dot = velocity.Dot(trace.plane.normal);
@@ -120,6 +123,7 @@ void lagcompensation::extrapolate(player_t* player, Vector& origin, Vector& velo
 				velocity.z -= dot * trace.plane.normal.z;
 			}
 
+			// Continue movement from collision point
 			end = trace.endpos + (velocity * (m_globals()->m_intervalpertick * (1.f - trace.fraction)));
 
 			ray.Init(trace.endpos, end, mins, max);
@@ -134,13 +138,44 @@ void lagcompensation::extrapolate(player_t* player, Vector& origin, Vector& velo
 	end = trace.endpos;
 	end.z -= 2.f;
 
+	// Ground check
 	ray.Init(origin, end, mins, max);
 	m_trace()->TraceRay(ray, MASK_PLAYERSOLID, &filter, &trace);
 
-	flags &= ~(1 << 0);
+	flags &= ~FL_ONGROUND;
 
+	// Valid ground surface check (slope > 0.7 = 45°)
 	if (trace.DidHit() && trace.plane.normal.z > 0.7f)
-		flags |= (1 << 0);
+		flags |= FL_ONGROUND;
+}
+
+// Enhanced extrapolation with multiple tick simulation
+void lagcompensation::extrapolation(player_t* player, Vector& origin, Vector& velocity, int& flags, bool on_ground)
+{
+	// Don't extrapolate if already accurate
+	if (player->m_flSimulationTime() >= m_globals()->m_curtime)
+		return;
+	
+	// Calculate ticks to extrapolate
+	float time_delta = m_globals()->m_curtime - player->m_flSimulationTime();
+	int ticks_to_extrapolate = TIME_TO_TICKS(time_delta);
+	
+	// Limit extrapolation to reasonable amount (prevent extreme prediction)
+	static auto sv_maxunlag = m_cvar()->FindVar(crypt_str("sv_maxunlag"));
+	int max_ticks = TIME_TO_TICKS(sv_maxunlag->GetFloat());
+	
+	if (ticks_to_extrapolate > max_ticks || ticks_to_extrapolate < 1)
+		return;
+	
+	// Clamp to prevent server rejection (max 64 ticks = ~1 second)
+	ticks_to_extrapolate = math::clamp(ticks_to_extrapolate, 1, 64);
+	
+	// Simulate physics for each tick
+	for (int i = 0; i < ticks_to_extrapolate; ++i)
+	{
+		bool was_on_ground = (flags & FL_ONGROUND) != 0;
+		extrapolate(player, origin, velocity, flags, was_on_ground);
+	}
 }
 
 bool lagcompensation::valid(int i, player_t* e)

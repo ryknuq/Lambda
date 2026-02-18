@@ -28,8 +28,8 @@ void C_ConfigManager::setup()
 	setup_item(&cfg.ragebot.slow_teleport, false, crypt_str("Ragebot.slow_teleport"));
 	setup_item(&cfg.ragebot.double_tap_key, key_bind(TOGGLE), crypt_str("Ragebot.double_tap_key"));
 	setup_item(&cfg.ragebot.autoscope, false, crypt_str("Ragebot.autoscope"));
-	setup_item(&cfg.ragebot.safe_point_key, key_bind(HOLD), crypt_str("Ragebot.safe_point_key"));
-	setup_item(&cfg.ragebot.body_aim_key, key_bind(HOLD), crypt_str("Ragebot.body_aim_key"));
+	setup_item(&cfg.ragebot.safe_point_key, key_bind(HOLD_ON), crypt_str("Ragebot.safe_point_key"));
+	setup_item(&cfg.ragebot.body_aim_key, key_bind(HOLD_ON), crypt_str("Ragebot.body_aim_key"));
 	setup_item(&cfg.ragebot.pitch_antiaim_correction, false, crypt_str("Ragebot.pitch_antiaim_correction"));
 	setup_item(&cfg.ragebot.anti_exploit, false, crypt_str("Ragebot.anti_exploit"));
 	setup_item(&cfg.ragebot.roll_resolver, 0, crypt_str("Ragebot.idi"));
@@ -46,7 +46,7 @@ void C_ConfigManager::setup()
 		setup_item(&cfg.ragebot.weapon[i].hitchance_amount, 1, std::to_string(i) + crypt_str("Ragebot.hitchance_amount"));
 		setup_item(&cfg.ragebot.weapon[i].minimum_visible_damage, 1, std::to_string(i) + crypt_str("Ragebot.minimum_visible_damage"));
 		setup_item(&cfg.ragebot.weapon[i].minimum_damage, 1, std::to_string(i) + crypt_str("Ragebot.minimum_damage"));
-		setup_item(&cfg.ragebot.weapon[i].damage_override_key, key_bind(HOLD), std::to_string(i) + crypt_str("Ragebot.damage_override_key"));
+		setup_item(&cfg.ragebot.weapon[i].damage_override_key, key_bind(HOLD_ON), std::to_string(i) + crypt_str("Ragebot.damage_override_key"));
 		setup_item(&cfg.ragebot.weapon[i].minimum_override_damage, 1, std::to_string(i) + crypt_str("Ragebot.minimum_override_damage"));
 		setup_item(&cfg.ragebot.weapon[i].hitboxes, 9, std::to_string(i) + crypt_str("Ragebot.hitboxes"));
 		setup_item(&cfg.ragebot.weapon[i].static_point_scale, false, std::to_string(i) + crypt_str("Ragebot.static_point_scale"));
@@ -282,17 +282,17 @@ void C_ConfigManager::setup()
 	setup_item(&cfg.misc.trail_color, Color(255, 255, 255), crypt_str("Misc.trail_color"));
 	setup_item(&cfg.misc.lightingonshot, false, crypt_str("Misc.lightingonshot"));
 
-	setup_item(&cfg.misc.automatic_peek, key_bind(HOLD), crypt_str("Misc.automatic_peek"));
+	setup_item(&cfg.misc.automatic_peek, key_bind(HOLD_ON), crypt_str("Misc.automatic_peek"));
 	setup_item(&cfg.misc.automatic_peek_color, Color(255, 255, 255), crypt_str("Misc.automatic_peek_color"));
 
 	setup_item(&cfg.ragebot.defensive_doubletap, false, crypt_str("Misc.defensive_doubletap"));
 	setup_item(&cfg.misc.holo_panel, false, crypt_str("Misc.holo_panel"));
-	setup_item(&cfg.misc.edge_jump, key_bind(HOLD), crypt_str("Misc.edge_jump"));
+	setup_item(&cfg.misc.edge_jump, key_bind(HOLD_ON), crypt_str("Misc.edge_jump"));
 	setup_item(&cfg.misc.noduck, false, crypt_str("Misc.noduck"));
-	setup_item(&cfg.misc.fakeduck_key, key_bind(HOLD), crypt_str("Misc.fakeduck_key"));
+	setup_item(&cfg.misc.fakeduck_key, key_bind(HOLD_ON), crypt_str("Misc.fakeduck_key"));
 	setup_item(&cfg.misc.fast_stop, false, crypt_str("Misc.fast_stop"));
 	setup_item(&cfg.misc.slidewalk, false, crypt_str("Misc.slidewalk"));
-	setup_item(&cfg.misc.slowwalk_key, key_bind(HOLD), crypt_str("Misc.slowwalk_key"));
+	setup_item(&cfg.misc.slowwalk_key, key_bind(HOLD_ON), crypt_str("Misc.slowwalk_key"));
 	setup_item(&cfg.misc.slowwalk_speed, 50, crypt_str("Misc.slowwalk_speed"));
 	setup_item(&cfg.misc.log_output, 2, crypt_str("Misc.log_output"));
 	setup_item(&cfg.misc.events_to_log, 3, crypt_str("Misc.events_to_log"));

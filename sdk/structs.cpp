@@ -614,7 +614,35 @@ Vector player_t::get_shoot_position()
 	auto shoot_position = m_vecOrigin() + m_vecViewOffset();
 
 	if (this != g_ctx.local()) //-V648
+	{
+		// Improved eye position for enemies - account for crouching
+		auto animstate = get_animation_state();
+		if (animstate)
+		{
+			// Check if player is in crouch or hit ground animation
+			if (animstate->m_bInHitGroundAnimation && animstate->m_fDuckAmount > 0.0f)
+			{
+				static auto lookup_bone = reinterpret_cast <int(__thiscall*)(void*, const char*)> (util::FindSignature(crypt_str("client.dll"), crypt_str("55 8B EC 53 56 8B F1 57 83 BE ?? ?? ?? ?? ?? 75 14")));
+				auto head_bone = lookup_bone(this, crypt_str("head_0"));
+
+				if (head_bone != -1)
+				{
+					auto head_position = Vector(m_CachedBoneData().Base()[head_bone][0][3], 
+												  m_CachedBoneData().Base()[head_bone][1][3], 
+												  m_CachedBoneData().Base()[head_bone][2][3] + 1.7f);
+
+					// Lerp between view offset and head position based on duck amount
+					if (head_position.z < shoot_position.z)
+					{
+						auto lerp_factor = math::simple_spline_remap_val_clamped(
+							fabs(shoot_position.z - head_position.z), 4.0f, 10.0f, 0.0f, 1.0f);
+						shoot_position.z = math::lerp2(lerp_factor, shoot_position.z, head_position.z);
+					}
+				}
+			}
+		}
 		return shoot_position;
+	}
 
 	modify_eye_position(shoot_position);
 	return shoot_position;

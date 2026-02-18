@@ -169,6 +169,7 @@ namespace hooks
 		c_menu::get().g_last = io.Fonts->AddFontFromMemoryTTF(idi_nahuj, sizeof(idi_nahuj), 36, NULL, io.Fonts->GetGlyphRangesCyrillic());
 		c_menu::get().g_cxmenufont = io.Fonts->AddFontFromMemoryTTF(MontserratRegular, sizeof(MontserratRegular), 14, NULL, io.Fonts->GetGlyphRangesCyrillic());
 		c_menu::get().g_cxm = io.Fonts->AddFontFromMemoryTTF(MontserratRegular, sizeof(MontserratRegular), 13, NULL, io.Fonts->GetGlyphRangesCyrillic());
+		c_menu::get().g_cxm_large = io.Fonts->AddFontFromMemoryTTF(MontserratRegular, sizeof(MontserratRegular), 30, NULL, io.Fonts->GetGlyphRangesCyrillic());
 		c_menu::get().g_widgets = io.Fonts->AddFontFromMemoryTTF(REFSAN, sizeof(REFSAN), 18, NULL, io.Fonts->GetGlyphRangesCyrillic());
 
 		ImGui_ImplDX9_CreateDeviceObjects();

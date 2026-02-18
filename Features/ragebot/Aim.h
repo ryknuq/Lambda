@@ -169,6 +169,7 @@ class aim : public singleton <aim>
 	adjust_data* get_record(std::deque <adjust_data>* records, bool history);
 	float optimized_mindmg(bool vis, int hl);
 	int get_minimum_damage(bool visible, int health);
+	int get_adaptive_minimum_damage(bool visible, int health, int hitbox);
 	void scan_targets();
 	bool HasMaximumAccuracy();
 	void AutoStop(CUserCmd* cmd);

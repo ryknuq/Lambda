@@ -174,14 +174,10 @@ void draw_keybind(const char* label, key_bind* key_bind, const char* unique_id, 
 
 	switch (key_bind->mode)
 	{
-	case HOLD:
-		hold = true;
-		toggle = false;
-		break;
-	case TOGGLE:
-		toggle = true;
-		hold = false;
-		break;
+	case HOLD_ON: hold = true; toggle = false; break;
+	case HOLD_OFF: hold = false; toggle = false; break;
+	case TOGGLE: toggle = true; hold = false; break;
+	case ALWAYS_ON: hold = false; toggle = false; break;
 	}
 
 	if (cfg.scripts.developer_mode && ImGui::IsItemHovered())
@@ -200,55 +196,19 @@ void draw_keybind(const char* label, key_bind* key_bind, const char* unique_id, 
 
 	if (ImGui::BeginPopup(unique_id))
 	{
-		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 6 * c_menu::get().dpi_scale);
-		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ((ImGui::GetCurrentWindow()->Size.x / 2) - (ImGui::CalcTextSize(crypt_str("Hold")).x / 2)));
-		ImGui::SetCursorPosX(ImGui::GetCursorPosX() - 11);
+		auto set_mode = [&](const char* label, key_bind_mode mode) {
+			bool selected = (key_bind->mode == mode);
+			if (ImGui::Selectable(label, selected))
+			{
+				key_bind->mode = mode;
+				ImGui::CloseCurrentPopup();
+			}
+		};
 
-		if (LabelClick(crypt_str("Hold"), &hold, unique_id))
-		{
-			if (hold)
-			{
-				toggle = false;
-				key_bind->mode = HOLD;
-			}
-			else if (toggle)
-			{
-				hold = false;
-				key_bind->mode = TOGGLE;
-			}
-			else
-			{
-				toggle = false;
-				key_bind->mode = HOLD;
-			}
-
-			ImGui::CloseCurrentPopup();
-		}
-
-		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ((ImGui::GetCurrentWindow()->Size.x / 2) - (ImGui::CalcTextSize(crypt_str("Toggle")).x / 2)));
-		ImGui::SetCursorPosX(ImGui::GetCursorPosX() - 11);
-		ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 9 * c_menu::get().dpi_scale);
-
-		if (LabelClick(crypt_str("Toggle"), &toggle, unique_id))
-		{
-			if (toggle)
-			{
-				hold = false;
-				key_bind->mode = TOGGLE;
-			}
-			else if (hold)
-			{
-				toggle = false;
-				key_bind->mode = HOLD;
-			}
-			else
-			{
-				hold = false;
-				key_bind->mode = TOGGLE;
-			}
-
-			ImGui::CloseCurrentPopup();
-		}
+		set_mode(crypt_str("Always On"), ALWAYS_ON);
+		set_mode(crypt_str("Toggle"), TOGGLE);
+		set_mode(crypt_str("Hold On"), HOLD_ON);
+		set_mode(crypt_str("Hold Off"), HOLD_OFF);
 
 		ImGui::EndPopup();
 	}
@@ -415,7 +375,61 @@ bool LabelClick2(const char* label, bool* v, const char* unique_id)
 
 void c_menu::menu_setup(ImGuiStyle& style)
 {
-	ImGui::StyleColorsClassic();
+	// Apply new dark color scheme
+	auto& c = style.Colors;
+
+	// Window / background
+	c[ImGuiCol_WindowBg]             = ImVec4(0.047f, 0.047f, 0.047f, 1.f); // #0C0C0C
+	c[ImGuiCol_ChildBg]              = ImVec4(0.086f, 0.086f, 0.086f, 1.f); // #161616
+	c[ImGuiCol_PopupBg]              = ImVec4(0.086f, 0.086f, 0.086f, 0.97f);
+	c[ImGuiCol_Border]               = ImVec4(0.18f, 0.18f, 0.18f, 1.f);
+	c[ImGuiCol_BorderShadow]         = ImVec4(0.f, 0.f, 0.f, 0.f);
+
+	// Frames (inputs, combos, sliders)
+	c[ImGuiCol_FrameBg]              = ImVec4(0.12f, 0.12f, 0.12f, 1.f);
+	c[ImGuiCol_FrameBgHovered]       = ImVec4(0.16f, 0.16f, 0.16f, 1.f);
+	c[ImGuiCol_FrameBgActive]        = ImVec4(0.20f, 0.20f, 0.20f, 1.f);
+
+	// Title bar (unused but set for consistency)
+	c[ImGuiCol_TitleBg]              = ImVec4(0.047f, 0.047f, 0.047f, 1.f);
+	c[ImGuiCol_TitleBgActive]        = ImVec4(0.047f, 0.047f, 0.047f, 1.f);
+	c[ImGuiCol_TitleBgCollapsed]     = ImVec4(0.047f, 0.047f, 0.047f, 1.f);
+
+	// Scrollbar
+	c[ImGuiCol_ScrollbarBg]          = ImVec4(0.08f, 0.08f, 0.08f, 1.f);
+	c[ImGuiCol_ScrollbarGrab]        = ImVec4(0.357f, 0.549f, 1.f, 0.5f);
+	c[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.357f, 0.549f, 1.f, 0.7f);
+	c[ImGuiCol_ScrollbarGrabActive]  = ImVec4(0.357f, 0.549f, 1.f, 1.f);
+
+	// Checkmark + slider grab = accent blue
+	c[ImGuiCol_CheckMark]            = ImVec4(0.357f, 0.549f, 1.f, 1.f);
+	c[ImGuiCol_SliderGrab]           = ImVec4(0.357f, 0.549f, 1.f, 0.85f);
+	c[ImGuiCol_SliderGrabActive]     = ImVec4(0.357f, 0.549f, 1.f, 1.f);
+
+	// Buttons
+	c[ImGuiCol_Button]               = ImVec4(0.14f, 0.14f, 0.14f, 1.f);
+	c[ImGuiCol_ButtonHovered]        = ImVec4(0.20f, 0.20f, 0.20f, 1.f);
+	c[ImGuiCol_ButtonActive]         = ImVec4(0.357f, 0.549f, 1.f, 0.6f);
+
+	// Header (combo dropdowns, selectables)
+	c[ImGuiCol_Header]               = ImVec4(0.357f, 0.549f, 1.f, 0.25f);
+	c[ImGuiCol_HeaderHovered]        = ImVec4(0.357f, 0.549f, 1.f, 0.35f);
+	c[ImGuiCol_HeaderActive]         = ImVec4(0.357f, 0.549f, 1.f, 0.5f);
+
+	// Separator
+	c[ImGuiCol_Separator]            = ImVec4(0.18f, 0.18f, 0.18f, 1.f);
+	c[ImGuiCol_SeparatorHovered]     = ImVec4(0.357f, 0.549f, 1.f, 0.5f);
+	c[ImGuiCol_SeparatorActive]      = ImVec4(0.357f, 0.549f, 1.f, 1.f);
+
+	// Text
+	c[ImGuiCol_Text]                 = ImVec4(0.85f, 0.85f, 0.85f, 1.f);
+	c[ImGuiCol_TextDisabled]         = ImVec4(0.35f, 0.35f, 0.35f, 1.f);
+
+	// Resize grip
+	c[ImGuiCol_ResizeGrip]           = ImVec4(0.357f, 0.549f, 1.f, 0.2f);
+	c[ImGuiCol_ResizeGripHovered]    = ImVec4(0.357f, 0.549f, 1.f, 0.5f);
+	c[ImGuiCol_ResizeGripActive]     = ImVec4(0.357f, 0.549f, 1.f, 0.9f);
+
 	ImGui::SetNextWindowSize(ImVec2(width, height), ImGuiCond_Once);
 	ImGui::SetNextWindowBgAlpha(min(style.Alpha, 0.94f));
 
@@ -474,16 +488,16 @@ void c_menu::rage_tab() // rage tab
 {
 	if (rg_tab == 0)
 	{
-		ImGui::SetCursorPos(ImVec2(80, 80));
-		ImGui::MenuChild("General", ImVec2(310, 350));
+		ImGui::SetCursorPos(ImVec2(74, 90));
+		ImGui::MenuChild("General", ImVec2(410, 280));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
 			ImGui::Checkbox(crypt_str("Enable"), &cfg.ragebot.enable);
 		}
 		ImGui::EndChild();
 
-		ImGui::SetCursorPos(ImVec2(410, 80));
-		ImGui::MenuChild("Other", ImVec2(310, 350));
+		ImGui::SetCursorPos(ImVec2(496, 90));
+		ImGui::MenuChild("Other", ImVec2(410, 280));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
 			ImGui::Checkbox(crypt_str("Automatic scope"), &cfg.ragebot.autoscope);
@@ -492,15 +506,17 @@ void c_menu::rage_tab() // rage tab
 		}
 		ImGui::EndChild();
 
-		ImGui::SetCursorPos(ImVec2(410, 450));
-		ImGui::MenuChild("Exploits", ImVec2(310, 125));
+		ImGui::SetCursorPos(ImVec2(496, 380));
+		ImGui::MenuChild("Exploits", ImVec2(410, 165));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
 			ImGui::Checkbox(crypt_str("DT"), &cfg.ragebot.double_tap);
 			if (cfg.ragebot.double_tap)
 			{
 				ImGui::SetCursorPosX(9);
+				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.55f, 0.55f, 1.0f)); // Secondary color
 				ImGui::Text(crypt_str("DT KEY"));
+				ImGui::PopStyleColor();
 				ImGui::SameLine();
 				draw_keybind(crypt_str(""), &cfg.ragebot.double_tap_key, crypt_str("##HOTKEY_DOUBLETAP"));
 			}
@@ -509,19 +525,21 @@ void c_menu::rage_tab() // rage tab
 			if (cfg.antiaim.hide_shots)
 			{
 				ImGui::SetCursorPosX(9);
+				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.55f, 0.55f, 1.0f));
 				ImGui::Text(crypt_str("HS KEY"));
+				ImGui::PopStyleColor();
 				ImGui::SameLine();
 				draw_keybind(crypt_str(""), &cfg.antiaim.hide_shots_key, crypt_str("##HOTKEY_HIDESHOTS"));
 			}
 		}
 		ImGui::EndChild();
 
-		ImGui::SetCursorPos(ImVec2(80, 450));
-		ImGui::MenuChild("Main", ImVec2(310, 125));
+		ImGui::SetCursorPos(ImVec2(74, 380));
+		ImGui::MenuChild("Main", ImVec2(410, 165));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
-			ImGui::Checkbox(crypt_str("Defensive"), &cfg.ragebot.lag_exploit); // working
-			ImGui::Checkbox(crypt_str("Anti exploit"), &cfg.ragebot.anti_exploit); // working
+			ImGui::Checkbox(crypt_str("Defensive"), &cfg.ragebot.lag_exploit);
+			ImGui::Checkbox(crypt_str("Anti exploit"), &cfg.ragebot.anti_exploit);
 		}
 		ImGui::EndChild();
 	}
@@ -529,8 +547,8 @@ void c_menu::rage_tab() // rage tab
 	{
 		const char* rage_weapon[8] = { crypt_str("Heavy Pistols"), crypt_str("Pistols"), crypt_str("SMG"), crypt_str("Rifles"), crypt_str("Auto Sniper"), crypt_str("Scout"), crypt_str("AWP"), crypt_str("Heavy") };
 
-		ImGui::SetCursorPos(ImVec2(80, 80));
-		ImGui::MenuChild("Settings", ImVec2(310, 450));
+		ImGui::SetCursorPos(ImVec2(74, 90));
+		ImGui::MenuChild("Settings", ImVec2(410, 460));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
 			ImGui::Combo(crypt_str("Weapon"), &hooks::rage_weapon, rage_weapon, ARRAYSIZE(rage_weapon));
@@ -554,9 +572,9 @@ void c_menu::rage_tab() // rage tab
 		}
 		ImGui::EndChild();
 
-		ImGui::SetCursorPos(ImVec2(410, 80));
+		ImGui::SetCursorPos(ImVec2(496, 90));
 
-		ImGui::MenuChild("Extra", ImVec2(310, 450));
+		ImGui::MenuChild("Extra", ImVec2(410, 460));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
 			ImGui::Checkbox(crypt_str("Auto Stop"), &cfg.ragebot.weapon[hooks::rage_weapon].autostop);
@@ -597,8 +615,8 @@ void c_menu::rage_tab() // rage tab
 void c_menu::aa_tab() // antiaim tab
 {
 	static auto type = 0;
-	ImGui::SetCursorPos(ImVec2(80, 80));
-	ImGui::MenuChild("General", ImVec2(310, 450));
+	ImGui::SetCursorPos(ImVec2(74, 90));
+	ImGui::MenuChild("General", ImVec2(410, 460));
 	{
 		ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
 		ImGui::Checkbox(crypt_str("Enable"), &cfg.antiaim.enable);
@@ -615,9 +633,9 @@ void c_menu::aa_tab() // antiaim tab
 				if (cfg.antiaim.desync)
 				{
 					ImGui::SetCursorPosX(9);
-					ImGui::PushFont(c_menu::get().MenuFontRender);
+					ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.55f, 0.55f, 1.0f));
 					ImGui::Text("Invert desync");
-					ImGui::PopFont();
+					ImGui::PopStyleColor();
 					ImGui::SameLine();
 					draw_keybind(crypt_str("Invert desync"), &cfg.antiaim.flip_desync, crypt_str("##HOTKEY_INVERT_DESYNC"));
 				}
@@ -637,24 +655,23 @@ void c_menu::aa_tab() // antiaim tab
 		}
 
 		ImGui::SetCursorPosX(9);
-		ImGui::PushFont(c_menu::get().g_cxmenufont);
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.55f, 0.55f, 1.0f));
 		ImGui::Text("Manual back");
-		ImGui::PopFont();
+		ImGui::PopStyleColor();
 		ImGui::SameLine();
 		draw_keybind(crypt_str("Manual back"), &cfg.antiaim.manual_back, crypt_str("##HOTKEY_INVERT_BACK"));
 
 		ImGui::SetCursorPosX(9);
-		ImGui::PushFont(c_menu::get().g_cxmenufont);
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.55f, 0.55f, 1.0f));
 		ImGui::Text("Manual left");
-		ImGui::PopFont();
+		ImGui::PopStyleColor();
 		ImGui::SameLine();
 		draw_keybind(crypt_str("Manual left"), &cfg.antiaim.manual_left, crypt_str("##HOTKEY_INVERT_LEFT"));
 
-
 		ImGui::SetCursorPosX(9);
-		ImGui::PushFont(c_menu::get().g_cxmenufont);
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.55f, 0.55f, 1.0f));
 		ImGui::Text("Manual right");
-		ImGui::PopFont();
+		ImGui::PopStyleColor();
 		ImGui::SameLine();
 		draw_keybind(crypt_str("Manual right"), &cfg.antiaim.manual_right, crypt_str("##HOTKEY_INVERT_RIGHT"));
 
@@ -670,9 +687,9 @@ void c_menu::aa_tab() // antiaim tab
 		draw_combo(crypt_str("Walk-type"), cfg.antiaim.walk_type, walktype, ARRAYSIZE(walktype));
 
 		ImGui::SetCursorPosX(9);
-		ImGui::PushFont(c_menu::get().g_cxmenufont);
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.55f, 0.55f, 1.0f));
 		ImGui::Text("Auto peek");
-		ImGui::PopFont();
+		ImGui::PopStyleColor();
 		ImGui::SameLine();
 		draw_keybind(crypt_str(""), &cfg.misc.automatic_peek, crypt_str("##AUTOPEEK__HOTKEY"));
 
@@ -686,9 +703,9 @@ void c_menu::aa_tab() // antiaim tab
 	}
 	ImGui::EndChild();
 
-	ImGui::SetCursorPos(ImVec2(410, 80));
+	ImGui::SetCursorPos(ImVec2(496, 90));
 
-	ImGui::MenuChild("Extra", ImVec2(310, 450));
+	ImGui::MenuChild("Extra", ImVec2(410, 460));
 	{
 		ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
 		draw_combo(crypt_str("Desync"), cfg.antiaim.type[type].desync, desync, ARRAYSIZE(desync));
@@ -748,8 +765,8 @@ void c_menu::visuals_tab() // players + visuals
 
 	if (vis_tab == 0)
 	{
-		ImGui::SetCursorPos(ImVec2(80, 80));
-		ImGui::MenuChild("Esp", ImVec2(310, 450));
+		ImGui::SetCursorPos(ImVec2(74, 90));
+		ImGui::MenuChild("Esp", ImVec2(410, 460));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
 
@@ -763,7 +780,9 @@ void c_menu::visuals_tab() // players + visuals
 			if (cfg.player.type[player].health)
 			{
 				ImGui::SetCursorPosX(9);
+				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.55f, 0.55f, 1.0f));
 				ImGui::Text("Color");
+				ImGui::PopStyleColor();
 				ImGui::SameLine();
 				ImGui::ColorEdit(crypt_str("##healthcolor"), &cfg.player.type[player].health_color, ALPHA);
 			}
@@ -787,7 +806,9 @@ void c_menu::visuals_tab() // players + visuals
 			if (cfg.player.type[player].weapon[WEAPON_ICON] || cfg.player.type[player].weapon[WEAPON_TEXT])
 			{
 				ImGui::SetCursorPosX(9);
+				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.55f, 0.55f, 1.0f));
 				ImGui::Text(crypt_str("Color"));
+				ImGui::PopStyleColor();
 				ImGui::SameLine();
 				ImGui::ColorEdit(crypt_str("##weapcolor"), &cfg.player.type[player].weapon_color, ALPHA);
 			}
@@ -820,9 +841,9 @@ void c_menu::visuals_tab() // players + visuals
 		}
 		ImGui::EndChild();
 
-		ImGui::SetCursorPos(ImVec2(410, 80));
+		ImGui::SetCursorPos(ImVec2(496, 90));
 
-		ImGui::MenuChild("Chams", ImVec2(310, 450));
+		ImGui::MenuChild("Chams", ImVec2(410, 460));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
 
@@ -868,20 +889,20 @@ void c_menu::visuals_tab() // players + visuals
 					{
 						ImGui::ColorEdit(crypt_str("##chamsvisible"), &cfg.player.type[player].chams_color, ALPHA);
 						ImGui::SameLine();
-						ImGui::PushFont(c_menu::get().MenuFontRender);
 						ImGui::SetCursorPosX(9);
+						ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.55f, 0.55f, 1.0f));
 						ImGui::Text(crypt_str("Visible "));
-						ImGui::PopFont();
+						ImGui::PopStyleColor();
 					}
 
 					if (cfg.player.type[player].chams[PLAYER_CHAMS_VISIBLE] && cfg.player.type[player].chams[PLAYER_CHAMS_INVISIBLE])
 					{
 						ImGui::ColorEdit(crypt_str("##chamsinvisible"), &cfg.player.type[player].xqz_color, ALPHA);
 						ImGui::SameLine();
-						ImGui::PushFont(c_menu::get().MenuFontRender);
 						ImGui::SetCursorPosX(9);
-						ImGui::Text(crypt_str("Invisible "));;
-						ImGui::PopFont();
+						ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.55f, 0.55f, 1.0f));
+						ImGui::Text(crypt_str("Invisible "));
+						ImGui::PopStyleColor();
 					}
 
 					if (cfg.player.type[player].chams_type != 6)
@@ -943,8 +964,8 @@ void c_menu::visuals_tab() // players + visuals
 	}
 	else if (vis_tab == 1)
 	{
-		ImGui::SetCursorPos(ImVec2(80, 80));
-		ImGui::MenuChild("World", ImVec2(310, 450));
+		ImGui::SetCursorPos(ImVec2(74, 90));
+		ImGui::MenuChild("World", ImVec2(410, 460));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
 			ImGui::Checkbox(crypt_str("Rain"), &cfg.esp.rain);
@@ -1011,9 +1032,9 @@ void c_menu::visuals_tab() // players + visuals
 		}
 		ImGui::EndChild();
 
-		ImGui::SetCursorPos(ImVec2(410, 80));
+		ImGui::SetCursorPos(ImVec2(496, 90));
 
-		ImGui::MenuChild("Render", ImVec2(310, 450));
+		ImGui::MenuChild("Render", ImVec2(410, 460));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
 			ImGui::Checkbox(crypt_str("Enabled"), &cfg.player.enable);
@@ -1023,8 +1044,9 @@ void c_menu::visuals_tab() // players + visuals
 			//ImGui::Checkbox(crypt_str("Thirdperson"), &cfg.esp);
 
 			ImGui::SetCursorPosX(9);
+			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.55f, 0.55f, 1.0f));
 			ImGui::Text("Thirdperson");
-			//ImGui::PopFont();
+			ImGui::PopStyleColor();
 			ImGui::SameLine();
 			draw_keybind(crypt_str("Thirdperson"), &cfg.misc.thirdperson_toggle, crypt_str("##TPKEY__HOTKEY"));
 
@@ -1154,8 +1176,8 @@ void c_menu::misc_tab() // misc
 {
 	if (mi_tab == 0)
 	{
-		ImGui::SetCursorPos(ImVec2(80, 80));
-		ImGui::MenuChild("Movement", ImVec2(310, 450));
+		ImGui::SetCursorPos(ImVec2(74, 90));
+		ImGui::MenuChild("Movement", ImVec2(410, 460));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
 			ImGui::Checkbox("Bunnyhop", &cfg.misc.bunnyhop);
@@ -1193,9 +1215,9 @@ void c_menu::misc_tab() // misc
 		}
 		ImGui::EndChild();
 
-		ImGui::SetCursorPos(ImVec2(410, 80));
+		ImGui::SetCursorPos(ImVec2(496, 90));
 
-		ImGui::MenuChild("Extra", ImVec2(310, 450));
+		ImGui::MenuChild("Extra", ImVec2(410, 460));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
 			ImGui::Checkbox(crypt_str("Unlock inventory access"), &cfg.misc.inventory_access);
@@ -1224,8 +1246,8 @@ void c_menu::misc_tab() // misc
 	}
 	else if (mi_tab == 1)
 	{
-		ImGui::SetCursorPos(ImVec2(80, 80));
-		ImGui::MenuChild("Info", ImVec2(310, 450));
+		ImGui::SetCursorPos(ImVec2(74, 90));
+		ImGui::MenuChild("Info", ImVec2(410, 460));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
 			ImGui::Checkbox(crypt_str("Watermark"), &cfg.menu.watermark);
@@ -1249,9 +1271,9 @@ void c_menu::misc_tab() // misc
 		}
 		ImGui::EndChild();
 
-		ImGui::SetCursorPos(ImVec2(410, 80));
+		ImGui::SetCursorPos(ImVec2(496, 90));
 
-		ImGui::MenuChild("Extra", ImVec2(310, 450));
+		ImGui::MenuChild("Extra", ImVec2(410, 460));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
 			ImGui::Checkbox(crypt_str("Clantag"), &cfg.misc.clantag_spammer);
@@ -1279,8 +1301,8 @@ void c_menu::settings_tab() // cfg + lua
 		static std::string selected_name = "";
 		static char config_name[30] = "\0";
 
-		ImGui::SetCursorPos(ImVec2(80, 80));
-		ImGui::MenuChild("Config List", ImVec2(310, 450));
+		ImGui::SetCursorPos(ImVec2(74, 90));
+		ImGui::MenuChild("Config List", ImVec2(410, 460));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
 			ImGui::InputText(crypt_str("Config Name"), config_name, sizeof(config_name));
@@ -1310,9 +1332,9 @@ void c_menu::settings_tab() // cfg + lua
 		}
 		ImGui::EndChild();
 
-		ImGui::SetCursorPos(ImVec2(410, 80));
+		ImGui::SetCursorPos(ImVec2(496, 90));
 
-		ImGui::MenuChild("Config Settings", ImVec2(310, 450));
+		ImGui::MenuChild("Config Settings", ImVec2(410, 460));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
 			if ((ImGui::CustomButton(crypt_str("Create new..."), crypt_str("##CreateConfig"), ImVec2(265, 30), true, c_menu::get().settingicons, "3")))
@@ -1420,16 +1442,16 @@ void c_menu::skins_tab() // skins
 	static int seed = 0;
 	bool stat_trak = false;
 	static float wear = 0.0f;
-	ImGui::SetCursorPos(ImVec2(80, 80));
-	ImGui::MenuChild("Deployed", ImVec2(310, 450));
+	ImGui::SetCursorPos(ImVec2(74, 90));
+	ImGui::MenuChild("Deployed", ImVec2(410, 460));
 	{
 
 	}
 	ImGui::EndChild();
 
-	ImGui::SetCursorPos(ImVec2(410, 80));
+	ImGui::SetCursorPos(ImVec2(496, 90));
 
-	ImGui::MenuChild("Extra", ImVec2(310, 450));
+	ImGui::MenuChild("Extra", ImVec2(410, 460));
 	{
 		ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
 		auto& selected_entry = cfg.skins.skinChanger[c_menu::get().current_profile];
@@ -1447,125 +1469,111 @@ void c_menu::skins_tab() // skins
 
 void c_menu::subtabs()
 {
-	if (tab_static == 2)
+	// Subtab bar background strip (drawn in content area, y=50..85)
+	auto wpos = ImGui::GetWindowPos();
+	auto wdl  = ImGui::GetWindowDrawList();
+
+	// Separator line below subtab bar
+	wdl->AddLine(
+		ImVec2(wpos.x + 62, wpos.y + 85),
+		ImVec2(wpos.x + 916, wpos.y + 85),
+		ImColor(40, 40, 40), 1.f);
+
+	if (tab_static == 2) // Visuals
 	{
-		ImGui::SetCursorPos(ImVec2{ 70 , -1 });
-		ImGui::PushFont(g_last);
-		if (ImGui::subtab("P", "", vis_tab == 0))
-			vis_tab = 0;
+		ImGui::SetCursorPos(ImVec2{ 68, 54 });
+		ImGui::PushFont(g_last); // P, W icons
+		if (ImGui::subtab("P", "", vis_tab == 0)) vis_tab = 0;
 		ImGui::PopFont();
 
-		ImGui::SetCursorPos(ImVec2{ 120 , -1 });
+		ImGui::SetCursorPos(ImVec2{ 152, 54 });
 		ImGui::PushFont(g_last);
-		if (ImGui::subtab("W", "", vis_tab == 1))
-			vis_tab = 1;
+		if (ImGui::subtab("W", "", vis_tab == 1)) vis_tab = 1;
 		ImGui::PopFont();
 	}
-	else if (tab_static == 0)
+	else if (tab_static == 0) // Rage
 	{
-		ImGui::SetCursorPos(ImVec2{ 70 , -1 });
+		ImGui::SetCursorPos(ImVec2{ 68, 54 });
 		ImGui::PushFont(g_icons);
-		if (ImGui::subtab("F", "", rg_tab == 0))
-			rg_tab = 0;
+		if (ImGui::subtab("F", "", rg_tab == 0)) rg_tab = 0;
 		ImGui::PopFont();
 
-		ImGui::SetCursorPos(ImVec2{ 120 , -1 });
+		ImGui::SetCursorPos(ImVec2{ 152, 54 });
 		ImGui::PushFont(g_icons);
-		if (ImGui::subtab("Z", "", rg_tab == 1))
-			rg_tab = 1;
+		if (ImGui::subtab("Z", "", rg_tab == 1)) rg_tab = 1;
 		ImGui::PopFont();
 	}
-	else if (tab_static == 3)
+	else if (tab_static == 3) // Misc
 	{
-		ImGui::SetCursorPos(ImVec2{ 70 , -1 });
+		ImGui::SetCursorPos(ImVec2{ 68, 54 });
 		ImGui::PushFont(g_icons);
-		if (ImGui::subtab("A", "", mi_tab == 0))
-			mi_tab = 0;
+		if (ImGui::subtab("A", "", mi_tab == 0)) mi_tab = 0;
 		ImGui::PopFont();
 
-		ImGui::SetCursorPos(ImVec2{ 120 , -1 });
-		ImGui::PushFont(g_last);
-		if (ImGui::subtab("M", "", mi_tab == 1))
-			mi_tab = 1;
+		ImGui::SetCursorPos(ImVec2{ 152, 54 });
+		ImGui::PushFont(g_icons);
+		if (ImGui::subtab("M", "", mi_tab == 1)) mi_tab = 1;
 		ImGui::PopFont();
 	}
-	else if (tab_static == 4)
+	else if (tab_static == 4) // Settings
 	{
-		ImGui::SetCursorPos(ImVec2{ 70 , -1 });
+		ImGui::SetCursorPos(ImVec2{ 68, 54 });
 		ImGui::PushFont(g_icons);
-		if (ImGui::subtab("A", "", lua_tab == 0))
-			lua_tab = 0;
+		if (ImGui::subtab("A", "", lua_tab == 0)) lua_tab = 0;
 		ImGui::PopFont();
 
-		ImGui::SetCursorPos(ImVec2{ 120 , -1 });
+		ImGui::SetCursorPos(ImVec2{ 152, 54 });
 		ImGui::PushFont(g_icons);
-		if (ImGui::subtab("V", "", lua_tab == 1))
-			lua_tab = 1;
+		if (ImGui::subtab("V", "", lua_tab == 1)) lua_tab = 1;
 		ImGui::PopFont();
 	}
 };
 
 void c_menu::tabs()
 {
+	// Sidebar tabs - vertically centered in the sidebar (x=0..60)
+	// 6 tabs, each 44px tall, with 8px spacing = 6*44 + 5*8 = 304px total
+	// Center in (560 - 50 = 510px) content height: start_y = 50 + (510 - 304) / 2 = 153
+	const float tab_start_y = 153.f;
+	const float tab_h = 44.f;
+	const float tab_gap = 8.f;
+
 	ImGui::PushFont(g_icons);
-	ImGui::SetCursorPosY(90);
-	ImGui::SetCursorPosX(7);
-	ImGui::BeginGroup();
-	{
-		if (ImGui::tab("F", "", !tab_static)) tab_static = 0;
-	}
-	ImGui::EndGroup();
 
-	ImGui::SetCursorPosY(140);
-	ImGui::SetCursorPosX(7);
-	ImGui::BeginGroup();
+	for (int i = 0; i < 6; i++)
 	{
-		if (ImGui::tab("D", "", tab_static == 1)) tab_static = 1;
+		ImGui::SetCursorPos(ImVec2(0, tab_start_y + i * (tab_h + tab_gap)));
+		ImGui::BeginGroup();
+		const char* icons[] = { "F", "D", "G", "A", "V", "C" };
+		if (ImGui::tab(icons[i], "", tab_static == i)) tab_static = i;
+		ImGui::EndGroup();
 	}
-	ImGui::EndGroup();
 
-	ImGui::SetCursorPosY(190);
-	ImGui::SetCursorPosX(7);
-	ImGui::BeginGroup();
-	{
-		if (ImGui::tab("G", "", tab_static == 2)) tab_static = 2;
-	}
-	ImGui::EndGroup();
-
-	ImGui::SetCursorPosY(240);
-	ImGui::SetCursorPosX(7);
-	ImGui::BeginGroup();
-	{
-		if (ImGui::tab("A", "", tab_static == 3)) tab_static = 3;
-	}
-	ImGui::EndGroup();
-
-	ImGui::SetCursorPosY(290);
-	ImGui::SetCursorPosX(7);
-	ImGui::BeginGroup();
-	{
-		if (ImGui::tab("V", "", tab_static == 4)) tab_static = 4;
-	}
-	ImGui::EndGroup();
-
-	ImGui::SetCursorPosY(340);
-	ImGui::SetCursorPosX(7);
-	ImGui::BeginGroup();
-	{
-		if (ImGui::tab("C", "", tab_static == 5)) tab_static = 5;
-	}
-	ImGui::EndGroup();
 	ImGui::PopFont();
 
+	// Tab alpha animation
+	static float tab_alpha = 1.0f;
+	static int last_tab = -1;
+	if (last_tab != tab_static)
+	{
+		tab_alpha = 0.0f;
+		last_tab = tab_static;
+	}
+	tab_alpha = ImClamp(tab_alpha + (4.0f * ImGui::GetIO().DeltaTime), 0.0f, 1.0f);
+	
+	ImGui::PushStyleVar(ImGuiStyleVar_Alpha, tab_alpha * ImGui::GetStyle().Alpha);
+	
 	switch (tab_static)
 	{
-	case 0:     rage_tab();       break;
-	case 1:     aa_tab();       break;
-	case 2:     visuals_tab();     break;
-	case 3:     misc_tab();     break;
-	case 4:     settings_tab();     break;
-	case 5:     skins_tab();     break;
+	case 0: rage_tab();     break;
+	case 1: aa_tab();       break;
+	case 2: visuals_tab();  break;
+	case 3: misc_tab();     break;
+	case 4: settings_tab(); break;
+	case 5: skins_tab();    break;
 	}
+
+	ImGui::PopStyleVar();
 }
 
 void c_menu::draw(bool is_open)
@@ -1579,64 +1587,82 @@ void c_menu::draw(bool is_open)
 		return;
 
 	auto& ss = ImGui::GetStyle();
-	ss.FrameRounding = 6;
-	ss.ChildRounding = 10;
-	ss.PopupRounding = 5;
-	ss.ScrollbarRounding = 0;
-	ss.ScrollbarSize = 5;
-	ss.FramePadding = ImVec2(2, 1);
+	ss.FrameRounding = 5;
+	ss.ChildRounding = 8;
+	ss.PopupRounding = 6;
+	ss.ScrollbarRounding = 3;
+	ss.ScrollbarSize = 3; // Minimalist scrollbar
+	ss.WindowRounding = 18; 
+	ss.WindowBorderSize = 0;
+	ss.FramePadding = ImVec2(6, 3);
+	ss.Colors[ImGuiCol_ScrollbarBg] = ImColor(0, 0, 0, 0); // Transparent background
+	ss.Colors[ImGuiCol_ScrollbarGrab] = ImColor(255, 255, 255, 30); // Subtle grab
+	ss.Colors[ImGuiCol_ScrollbarGrabHovered] = ImColor(255, 255, 255, 50);
+	ss.Colors[ImGuiCol_ScrollbarGrabActive] = ImColor(91, 140, 255, 150);
 
-	auto s = ImVec2{}, p = ImVec2{}, gs = ImVec2{ 916, 646 };
-	ImGui::SetNextWindowSize(ImVec2(gs));
-	if (ImGui::Begin(("Lambda"), nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar))
+	// Window: 916 x 646
+	ImGui::SetNextWindowSize(ImVec2(916, 560));
+	if (ImGui::Begin(("Lambda"), nullptr,
+		ImGuiWindowFlags_NoDecoration |
+		ImGuiWindowFlags_NoScrollWithMouse |
+		ImGuiWindowFlags_NoScrollbar))
 	{
-		s = ImVec2(ImGui::GetWindowSize().x - ImGui::GetStyle().WindowPadding.x * 2, ImGui::GetWindowSize().y - ImGui::GetStyle().WindowPadding.y * 2);
-		p = ImVec2(ImGui::GetWindowPos().x + ImGui::GetStyle().WindowPadding.x, ImGui::GetWindowPos().y + ImGui::GetStyle().WindowPadding.y);
-		auto draw = ImGui::GetWindowDrawList();
+		auto wp  = ImGui::GetWindowPos();
+		auto dl  = ImGui::GetWindowDrawList();
+		float W  = 916.f, H = 560.f;
 
-		float dpi_scale = 1.f;
+		// ── Background layers ──────────────────────────────────────────
 
-		//?????? ???
-		draw->AddRectFilled(ImVec2(p.x, p.y), ImVec2(p.x + 730, p.y + 600), ImColor(29, 29, 29), 10);
-		//??????? ??? ?????
-		draw->AddRectFilled(ImVec2(p.x + 50, p.y), ImVec2(p.x + 730, p.y + 55), ImColor(37, 37, 37), 10, ImDrawCornerFlags_Top);
-		//????? ????
-		draw->AddRectFilled(p, ImVec2(p.x + 55, p.y + 600), ImColor(37, 37, 37), 10, ImDrawCornerFlags_Left);
+		// Outer window bg (whole area) - Round all 4 corners
+		dl->AddRectFilled(wp, wp + ImVec2(W, H), ImColor(12, 12, 12, 255), 18);
 
-		//?????? ????
-		draw->AddRectFilled(ImVec2(p.x, p.y + 580), ImVec2(p.x + 730, p.y + 600), ImColor(25, 25, 25), 10, ImDrawCornerFlags_Bot);
+		// Sidebar background (Bottom-left rounded)
+		dl->AddRectFilled(wp + ImVec2(0, 50), wp + ImVec2(64, H), ImColor(18, 18, 22, 240), 18, ImDrawCornerFlags_BotLeft);
+		
+		// Subtle right border for sidebar
+		dl->AddLine(wp + ImVec2(64, 50), wp + ImVec2(64, H), ImColor(45, 45, 45, 100), 1.0f);
 
-		ImGui::SetCursorPos(ImVec2(-1, -1));
-		ImGui::Image(logo, ImVec2(ImVec2(75.f * dpi_scale, 75.f * dpi_scale)));
+		// Full-width header strip (Top rounded)
+		dl->AddRectFilled(wp, wp + ImVec2(W, 50), ImColor(20, 20, 20, 255), 18, ImDrawCornerFlags_Top);
+
+		// Header bottom separator (full width)
+		dl->AddLine(wp + ImVec2(0, 50), wp + ImVec2(W, 50), ImColor(35, 35, 35), 1.f);
+
+		// Sidebar overlay (Bottom-left rounded)
+		dl->AddRectFilled(wp + ImVec2(0, 51), wp + ImVec2(60, H), ImColor(18, 18, 18, 255), 18, ImDrawCornerFlags_BotLeft);
+
+		// Sidebar right border (below header only)
+		dl->AddLine(wp + ImVec2(60, 51), wp + ImVec2(60, H), ImColor(32, 32, 32), 1.f);
+
+		// Content area bg (Bottom-right rounded)
+		dl->AddRectFilled(wp + ImVec2(61, 51), wp + ImVec2(W, H), ImColor(16, 16, 16), 18, ImDrawCornerFlags_BotRight);
 
 
+
+
+
+
+		// ── Header text ───────────────────────────────────────────────
+		ImGui::PushFont(g_cxm_large);
+		ImVec2 title_size = ImGui::CalcTextSize("Lambda");
+		dl->AddText(wp + ImVec2(16, 12), ImColor(220, 220, 220), "Lambda");
+		ImGui::PopFont();
+		
 		ImGui::PushFont(g_cxm);
-		std::string Welcome = "Welcome to : ";
-		draw->AddText(ImVec2(p.x + 510, p.y + 583), ImColor(100, 100, 100), Welcome.c_str());
+		// Level subtitle to baseline (Lambda 30px -> ~24px baseline, subtitle 16px -> ~12px baseline)
+		// Snapped closer (6px offset)
+		dl->AddText(wp + ImVec2(16 + title_size.x + 6, 25), ImColor(80, 80, 80), "for Counter-Strike: Global Offensive");
 		ImGui::PopFont();
 
-		std::string USER = "Semxxz";
-
-		ImGui::PushFont(g_cxm);
-		draw->AddText(ImVec2(p.x + 585, p.y + 583), ImColor(100, 125, 200), USER.c_str());
-		ImGui::PopFont();
-
-		ImGui::PushFont(g_cxm);
-		std::string day = "  | Till : LT";
-		draw->AddText(ImVec2(p.x + 630, p.y + 583), ImColor(100, 100, 100), day.c_str());
-		ImGui::PopFont();
 
 
-		ImGui::PushFont(g_cxm);
-		std::string Lambda = "Lambda for Counter Strike: Global Offensive";
-		draw->AddText(ImVec2(p.x + 5, p.y + 583), ImColor(100, 100, 100), Lambda.c_str());
-		ImGui::PopFont();
-
+		// ── Render subtabs and tabs ───────────────────────────────────
 		{
+			ImGui::PushFont(g_cxm);
 			subtabs();
 			tabs();
+			ImGui::PopFont();
 		}
-
 	}
 	ImGui::End();
 }

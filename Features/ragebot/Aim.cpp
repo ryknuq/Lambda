@@ -387,6 +387,48 @@ int aim::get_minimum_damage(bool visible, int health)
     return minimum_damage;
 }
 
+int aim::get_adaptive_minimum_damage(bool visible, int health, int hitbox)
+{
+    auto min_dmg = get_minimum_damage(visible, health);
+    
+    // Count active enemies
+    int active_enemies = 0;
+    for (auto& target : targets)
+    {
+        if (target.e && target.e->valid(true, false))
+            active_enemies++;
+    }
+    
+    // If we can kill in one shot to body, require lethal damage
+    // This prevents wasting time on low damage shots when one-tap is available
+    bool can_lethal = false;
+    for (auto& target : scanned_targets)
+    {
+        if (target.data.damage >= target.health && target.data.hitbox >= HITBOX_PELVIS && target.data.hitbox <= HITBOX_UPPER_CHEST)
+        {
+            can_lethal = true;
+            break;
+        }
+    }
+    
+    if (can_lethal && min_dmg < health)
+        return health + 1;
+    
+    // If target is low HP, reduce requirement to actual HP
+    if (health < min_dmg && health > 1)
+        min_dmg = health;
+    
+    // Head shots should require higher damage to avoid limb hits
+    if (hitbox == HITBOX_HEAD && min_dmg < health)
+        min_dmg = min(health, min_dmg * 2);
+    
+    // Multiple enemies = prioritize higher damage for faster kills
+    if (active_enemies > 1)
+        min_dmg = min(health, (int)(min_dmg * 1.5f));
+    
+    return min_dmg;
+}
+
 void aim::scan_targets()
 {
     if (targets.empty())
@@ -531,98 +573,189 @@ void aim::scan(adjust_data* record, scan_data& data, const Vector& shoot_positio
     auto minimum_damage = get_minimum_damage(false, record->player->m_iHealth());
     auto minimum_visible_damage = get_minimum_damage(true, record->player->m_iHealth());
 
-    std::vector <scan_point> points;
+    // EXTRAPOLATION: Check if lag compensation might break
+    bool should_extrapolate = false;
+	Vector extrapolated_origin = record->origin;
+	Vector extrapolated_velocity = record->velocity;
+	int extrapolated_flags = record->flags;
+	
+	if (cfg.ragebot.enable)
+	{
+		auto net_channel = m_engine()->GetNetChannelInfo();
+		if (net_channel)
+		{
+			// Check if record is too old (lag comp might break)
+			float time_delta = m_globals()->m_curtime - record->simulation_time;
+			float latency = net_channel->GetLatency(FLOW_OUTGOING) + net_channel->GetLatency(FLOW_INCOMING);
+			
+			static auto sv_maxunlag = m_cvar()->FindVar(crypt_str("sv_maxunlag"));
+			float max_unlag = sv_maxunlag ? sv_maxunlag->GetFloat() : 0.2f;
+			
+			// Extrapolate if record is close to unlag limit (within 200ms window)
+			if (time_delta > (max_unlag - 0.2f) && time_delta < max_unlag)
+			{
+				should_extrapolate = true;
+				
+				// Perform extrapolation
+				extrapolated_origin = record->origin;
+				extrapolated_velocity = record->velocity;
+				extrapolated_flags = record->flags;
+				
+				lagcompensation::get().extrapolation(
+					record->player,
+					extrapolated_origin,
+					extrapolated_velocity,
+					extrapolated_flags,
+					(record->flags & FL_ONGROUND) != 0
+				);
+			}
+		}
+	}
 
-    for (auto& hitbox : hitboxes)
-    {
-        auto current_points = get_points(record, hitbox);
+	std::vector <scan_point> points;
 
-        for (auto& point : current_points)
-        {
-            if (!record->bot)
-            {
-                auto safe = 1.0f;
+	// Pre-check direct visibility to optimize point generation
+	Vector target_center = should_extrapolate ? 
+		extrapolated_origin + Vector(0, 0, 64.0f) : // Approximate chest height
+		record->player->hitbox_position_matrix(HITBOX_CHEST, record->matrixes_data.main);
+	
+	bool target_visible = util::visible(shoot_position, target_center, record->player, g_ctx.local());
+	
+	for (auto& hitbox : hitboxes)
+	{
+		auto current_points = get_points(record, hitbox, true);
 
-                if (record->matrixes_data.zero[0].GetOrigin() == record->matrixes_data.first[0].GetOrigin() || record->matrixes_data.zero[0].GetOrigin() == record->matrixes_data.second[0].GetOrigin() || record->matrixes_data.first[0].GetOrigin() == record->matrixes_data.second[0].GetOrigin())
-                    safe = 0.0f;
-                else if (!hitbox_intersection(record->player, record->matrixes_data.zero, hitbox, shoot_position, point.point, &safe))
-                    safe = 0.0f;
-                else if (!hitbox_intersection(record->player, record->matrixes_data.first, hitbox, shoot_position, point.point, &safe))
-                    safe = 0.0f;
-                else if (!hitbox_intersection(record->player, record->matrixes_data.second, hitbox, shoot_position, point.point, &safe))
-                    safe = 0.0f;
+		// If extrapolating, offset all points by the delta
+		if (should_extrapolate)
+		{
+			Vector position_delta = extrapolated_origin - record->origin;
+			for (auto& point : current_points)
+			{
+				point.point += position_delta;
+			}
+		}
 
-                point.safe = safe;
-            }
-            else
-                point.safe = 1.0f;
+		for (auto& point : current_points)
+		{
+			if (!record->bot)
+			{
+				auto safe = 1.0f;
 
-            if (!(key_binds::get().get_key_bind_state(3)) || cfg.ragebot.weapon[g_ctx.globals.current_weapon].prefer_safe_points || point.safe)
-            {
-                points.emplace_back(point);
-            };
-        }
-    }
+				if (record->matrixes_data.zero[0].GetOrigin() == record->matrixes_data.first[0].GetOrigin() || record->matrixes_data.zero[0].GetOrigin() == record->matrixes_data.second[0].GetOrigin() || record->matrixes_data.first[0].GetOrigin() == record->matrixes_data.second[0].GetOrigin())
+					safe = 0.0f;
+				else if (!hitbox_intersection(record->player, record->matrixes_data.zero, hitbox, shoot_position, point.point, &safe))
+					safe = 0.0f;
+				else if (!hitbox_intersection(record->player, record->matrixes_data.first, hitbox, shoot_position, point.point, &safe))
+					safe = 0.0f;
+				else if (!hitbox_intersection(record->player, record->matrixes_data.second, hitbox, shoot_position, point.point, &safe))
+					safe = 0.0f;
 
-    if (points.empty())
-        return;
+				point.safe = safe;
+			}
+			else
+				point.safe = 1.0f;
 
-    auto body_hitboxes = true;
+			if (!(key_binds::get().get_key_bind_state(3)) || cfg.ragebot.weapon[g_ctx.globals.current_weapon].prefer_safe_points || point.safe)
+			{
+				points.emplace_back(point);
+			};
+		}
+	}
 
-    for (auto& point : points)
-    {
-        if (body_hitboxes && (point.hitbox < HITBOX_PELVIS || point.hitbox > HITBOX_UPPER_CHEST))
-        {
-            body_hitboxes = false;
+	if (points.empty())
+		return;
 
-            if (key_binds::get().get_key_bind_state(22))
-                break;
+	// Sort points: prioritize center for visible, edges for wallbangs
+	if (!target_visible)
+	{
+		// Wallbang - prioritize edge points that might avoid thick materials
+		std::sort(points.begin(), points.end(), [](const scan_point& a, const scan_point& b) {
+			return !a.center && b.center; // Non-center points first
+		});
+	}
 
-            if (best_damage >= record->player->m_iHealth())
-                break;
+	auto body_hitboxes = true;
 
-            if (cfg.ragebot.weapon[g_ctx.globals.current_weapon].prefer_body_aim && best_damage >= 1)
-                break;
-        }
+	for (auto& point : points)
+	{
+		if (body_hitboxes && (point.hitbox < HITBOX_PELVIS || point.hitbox > HITBOX_UPPER_CHEST))
+		{
+			body_hitboxes = false;
 
-        auto fire_data = autowall::get().wall_penetration(shoot_position, point.point, record->player);
+			if (key_binds::get().get_key_bind_state(22))
+				break;
 
-        if (!fire_data.valid)
-            continue;
+			if (best_damage >= record->player->m_iHealth())
+				break;
 
-        if (fire_data.damage < 1)
-            continue;
+			if (cfg.ragebot.weapon[g_ctx.globals.current_weapon].prefer_body_aim && best_damage >= 1)
+				break;
+		}
 
-        if (!fire_data.visible && !cfg.ragebot.enable)
-            continue;
+		auto fire_data = autowall::get().wall_penetration(shoot_position, point.point, record->player);
 
-        auto current_minimum_damage = fire_data.visible ? minimum_visible_damage : minimum_damage;
+		if (!fire_data.valid)
+			continue;
 
-        if (fire_data.damage >= current_minimum_damage && fire_data.damage >= best_damage)
-        {
-            if (!should_stop)
-            {
-                should_stop = true;
+		if (fire_data.damage < 1)
+			continue;
 
-                if (cfg.ragebot.weapon[g_ctx.globals.current_weapon].autostop_modifiers[AUTOSTOP_LETHAL] && fire_data.damage < record->player->m_iHealth())
-                    should_stop = false;
-                else if (cfg.ragebot.weapon[g_ctx.globals.current_weapon].autostop_modifiers[AUTOSTOP_VISIBLE] && !fire_data.visible)
-                    should_stop = false;
-                else if (cfg.ragebot.weapon[g_ctx.globals.current_weapon].autostop_modifiers[AUTOSTOP_CENTER] && !point.center)
-                    should_stop = false;
-            }
+		if (!fire_data.visible && !cfg.ragebot.enable)
+			continue;
 
-            if (force_safe_points && !point.safe)
-                continue;
+		// Use adaptive minimum damage for smarter target selection
+		auto current_minimum_damage = fire_data.visible ? 
+			get_adaptive_minimum_damage(true, record->player->m_iHealth(), point.hitbox) : 
+			get_adaptive_minimum_damage(false, record->player->m_iHealth(), point.hitbox);
 
-            best_damage = fire_data.damage;
+		// Multi-point optimization: prefer points with better penetration characteristics
+		bool is_better_point = false;
+		
+		if (fire_data.damage >= current_minimum_damage)
+		{
+			if (fire_data.damage > best_damage)
+				is_better_point = true;
+			else if (fire_data.damage == best_damage)
+			{
+				// Same damage - prefer visible over wallbang
+				if (fire_data.visible && !target_visible)
+					is_better_point = true;
+				// Prefer center points for visible shots (more stable)
+				else if (fire_data.visible && point.center)
+				 is_better_point = true;
+				// Prefer edge points for wallbangs (less material penetration)
+				else if (!fire_data.visible && !point.center)
+					is_better_point = true;
+			}
+		}
 
-            data.point = point;
-            data.visible = fire_data.visible;
-            data.damage = fire_data.damage;
-            data.hitbox = fire_data.hitbox;
-        }
-    }
+		if (is_better_point && fire_data.damage >= best_damage)
+		{
+			if (!should_stop)
+			{
+				should_stop = true;
+
+				if (cfg.ragebot.weapon[g_ctx.globals.current_weapon].autostop_modifiers[AUTOSTOP_LETHAL] && fire_data.damage < record->player->m_iHealth())
+					should_stop = false;
+				else if (cfg.ragebot.weapon[g_ctx.globals.current_weapon].autostop_modifiers[AUTOSTOP_VISIBLE] && !fire_data.visible)
+					should_stop = false;
+				else if (cfg.ragebot.weapon[g_ctx.globals.current_weapon].autostop_modifiers[AUTOSTOP_CENTER] && !point.center)
+					should_stop = false;
+			}
+
+			if (force_safe_points && !point.safe)
+				continue;
+
+			best_damage = fire_data.damage;
+
+			data.point = point;
+			data.visible = fire_data.visible;
+			data.damage = fire_data.damage;
+			data.hitbox = fire_data.hitbox;
+			
+			target_visible = fire_data.visible;
+		}
+	}
 }
 
 std::vector <int> aim::get_hitboxes(adjust_data* record)
@@ -875,6 +1008,21 @@ std::vector <scan_point> aim::get_points(adjust_data* record, int hitbox, bool f
             points.emplace_back(scan_point(Vector(bbox->bbmax.x, bbox->bbmax.y, bbox->bbmax.z - final_radius), hitbox, false));
 
             points.emplace_back(scan_point(Vector(center.x, bbox->bbmax.y - final_radius, center.z), hitbox, true));
+            
+            // Multi-point optimization: add extra edge points for penetration shots
+            // These points help find angles that penetrate less material
+            if (from_aim)
+            {
+                // Diagonal edge points
+                points.emplace_back(scan_point(Vector(bbox->bbmax.x + final_radius * 0.5f, bbox->bbmax.y, bbox->bbmax.z + final_radius * 0.5f), hitbox, false));
+                points.emplace_back(scan_point(Vector(bbox->bbmax.x + final_radius * 0.5f, bbox->bbmax.y, bbox->bbmax.z - final_radius * 0.5f), hitbox, false));
+                points.emplace_back(scan_point(Vector(bbox->bbmax.x - final_radius * 0.5f, bbox->bbmax.y, bbox->bbmax.z + final_radius * 0.5f), hitbox, false));
+                points.emplace_back(scan_point(Vector(bbox->bbmax.x - final_radius * 0.5f, bbox->bbmax.y, bbox->bbmax.z - final_radius * 0.5f), hitbox, false));
+                
+                // Left/right edge points for better wallbang coverage
+                points.emplace_back(scan_point(Vector(bbox->bbmax.x + final_radius, bbox->bbmax.y, center.z), hitbox, false));
+                points.emplace_back(scan_point(Vector(bbox->bbmax.x - final_radius, bbox->bbmax.y, center.z), hitbox, false));
+            }
         }
         else if (hitbox == HITBOX_RIGHT_CALF || hitbox == HITBOX_LEFT_CALF)
         {
@@ -929,13 +1077,19 @@ bool IsTickValid(float simTime)
     if (!nci)
         return false;
 
-    auto LerpTicks = TIME_TO_TICKS(lerp_ratio);
+    auto lerpTicks = TIME_TO_TICKS(lerp_ratio);
 
-    int predCmdArrivTick = m_globals()->m_tickcount + 1 + TIME_TO_TICKS(nci->GetAvgLatency(FLOW_INCOMING) + nci->GetAvgLatency(FLOW_OUTGOING));
+    int predCmdArrivTick = m_globals()->m_tickcount + 1 + 
+        TIME_TO_TICKS(nci->GetAvgLatency(FLOW_INCOMING) + 
+                      nci->GetAvgLatency(FLOW_OUTGOING));
 
-    float flCorrect = math::clamp(lerp_ratio + nci->GetLatency(FLOW_OUTGOING), 0.f, 1.f) - TICKS_TO_TIME(predCmdArrivTick + LerpTicks - (TIME_TO_TICKS(simTime) + TIME_TO_TICKS(lerp_ratio)));
+    float outgoingLatency = nci->GetLatency(FLOW_OUTGOING);
+    float clampedLatency = math::clamp(lerp_ratio + outgoingLatency, 0.f, 1.f);
 
-    return abs(flCorrect) < 0.2f;
+    int timeDelta = TIME_TO_TICKS(simTime) + TIME_TO_TICKS(lerp_ratio);
+    float correction = clampedLatency - TICKS_TO_TIME(predCmdArrivTick + lerpTicks - timeDelta);
+
+    return abs(correction) < 0.2f;
 }
 
 bool aim::calculate_hitchance(const Vector& aim_angle, player_t* ent, int& final_hitchance)
@@ -1136,7 +1290,38 @@ void aim::fire(CUserCmd* cmd)
 
     cmd->m_viewangles = aim_angle;
     cmd->m_buttons |= IN_ATTACK;
-    cmd->m_tickcount = TIME_TO_TICKS(final_target.record->simulation_time + util::get_interpolation());
+    
+    // Tick-accurate backtracking calculation
+    if (net_channel_info)
+    {
+        static auto cl_interp_ratio = m_cvar()->FindVar(crypt_str("cl_interp_ratio"));
+        static auto sv_client_min_interp_ratio = m_cvar()->FindVar(crypt_str("sv_client_min_interp_ratio"));
+        static auto sv_client_max_interp_ratio = m_cvar()->FindVar(crypt_str("sv_client_max_interp_ratio"));
+        
+        auto lerp_ratio = math::clamp(cl_interp_ratio->GetFloat(), 
+                                       sv_client_min_interp_ratio->GetFloat(), 
+                                       sv_client_max_interp_ratio->GetFloat());
+        
+        auto lerpTicks = TIME_TO_TICKS(lerp_ratio);
+        
+        int predCmdArrivTick = m_globals()->m_tickcount + 1 + 
+            TIME_TO_TICKS(net_channel_info->GetAvgLatency(FLOW_INCOMING) + 
+                          net_channel_info->GetAvgLatency(FLOW_OUTGOING));
+        
+        float outgoingLatency = net_channel_info->GetLatency(FLOW_OUTGOING);
+        float clampedLatency = math::clamp(lerp_ratio + outgoingLatency, 0.f, 1.f);
+        
+        int timeDelta = TIME_TO_TICKS(final_target.record->simulation_time) + lerpTicks;
+        float correction = clampedLatency - TICKS_TO_TIME(predCmdArrivTick + lerpTicks - timeDelta);
+        
+        // Use tick-corrected value instead of simple interpolation
+        cmd->m_tickcount = predCmdArrivTick - TIME_TO_TICKS(correction);
+    }
+    else
+    {
+        // Fallback to old method if no network channel
+        cmd->m_tickcount = TIME_TO_TICKS(final_target.record->simulation_time + util::get_interpolation());
+    }
 
     last_target_index = final_target.record->i;
     last_shoot_position = g_ctx.globals.eye_pos;
@@ -1263,20 +1448,27 @@ int aim::hitchance(const Vector& aim_angle)
     math::fast_vec_normalize(right);
     math::fast_vec_normalize(up);
 
+    // Use weapon's actual calculated inaccuracy instead of static values
+    auto real_inaccuracy = g_ctx.globals.weapon->get_inaccuracy();
+    
+    // Edge case: ladder movement has special inaccuracy
+    if (g_ctx.local()->get_move_type() == MOVETYPE_LADDER)
+        real_inaccuracy = max(real_inaccuracy, weapon_info->flInaccuracyLadder);
+
     auto is_special_weapon = g_ctx.globals.weapon->m_iItemDefinitionIndex() == WEAPON_AWP || g_ctx.globals.weapon->m_iItemDefinitionIndex() == WEAPON_G3SG1 || g_ctx.globals.weapon->m_iItemDefinitionIndex() == WEAPON_SCAR20 || g_ctx.globals.weapon->m_iItemDefinitionIndex() == WEAPON_SSG08;
-    auto inaccuracy = weapon_info->flInaccuracyStand;
+    auto base_inaccuracy = weapon_info->flInaccuracyStand;
 
     if (g_ctx.local()->m_fFlags() & FL_DUCKING)
     {
         if (is_special_weapon)
-            inaccuracy = weapon_info->flInaccuracyCrouchAlt;
+            base_inaccuracy = weapon_info->flInaccuracyCrouchAlt;
         else
-            inaccuracy = weapon_info->flInaccuracyCrouch;
+            base_inaccuracy = weapon_info->flInaccuracyCrouch;
     }
     else if (is_special_weapon)
-        inaccuracy = weapon_info->flInaccuracyStandAlt;
+        base_inaccuracy = weapon_info->flInaccuracyStandAlt;
 
-    if (g_ctx.globals.inaccuracy - 0.000001f < inaccuracy)
+    if (real_inaccuracy - 0.000001f < base_inaccuracy)
         final_hitchance = 101;
     else
     {
@@ -1326,7 +1518,7 @@ int aim::hitchance(const Vector& aim_angle)
 
             direction.x = forward.x + right.x * spread_x + up.x * spread_y;
             direction.y = forward.y + right.y * spread_x + up.y * spread_y;
-            direction.z = forward.z + right.z * spread_x + up.z * spread_y; //-V778
+            direction.z = forward.z + right.z * spread_x + up.z * spread_y;
 
             auto end = g_ctx.globals.eye_pos + direction * weapon_info->flRange;
 

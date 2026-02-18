@@ -6,17 +6,19 @@
 
 enum key_bind_mode
 {
-	HOLD,
-	TOGGLE
+	HOLD_ON,
+	HOLD_OFF,
+	TOGGLE,
+	ALWAYS_ON
 };
 
 struct key_bind
 {
 	ButtonCode_t key = KEY_NONE;
-	key_bind_mode mode = HOLD;
+	key_bind_mode mode = HOLD_ON;
 	bool holding = false;
 
-	key_bind(key_bind_mode mode = HOLD)
+	key_bind(key_bind_mode mode = HOLD_ON)
 	{
 		this->mode = mode;
 	}

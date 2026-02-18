@@ -8,15 +8,22 @@ Vector player_t::get_eye_pos() { // Get eye position of the player
 }
 
 // Инициализация данных для resolver'а
-void resolver::initialize(player_t* player, adjust_data* record, const float& goal_feet_yaw, const float& pitch)
+void resolver::initialize(player_t* e, adjust_data* record, const float& goal_feet_yaw, const float& pitch)
 {
-    this->player = player;
+    this->player = e;
     this->player_record = record;
+    
+    // Track previous record for delta analysis
+    auto records = &player_records[e->EntIndex()];
+    if (records->size() >= 2)
+        this->previous_player_record = &records->at(1);
+    else
+        this->previous_player_record = nullptr;
 
     original_goal_feet_yaw = math::normalize_yaw(goal_feet_yaw);
     original_pitch = math::normalize_pitch(pitch);
 
-    side = 	RESOLVER_ORIGINAL;
+    side = RESOLVER_ORIGINAL;
     fake = false;
 }
 
@@ -30,7 +37,7 @@ void resolver::reset()
 }
 
 // Основная функция определения и применения углов
-void resolver::resolve() // купите пиво, иначе работать не будет
+void resolver::resolve()
 {
     if (!player || !player->is_alive())
         return;
@@ -39,60 +46,146 @@ void resolver::resolve() // купите пиво, иначе работать �
     if (!anim_state)
         return;
 
-    // Устанавливаем начальную сторону
-    player_record->side = RESOLVER_FIRST;
+    player_record->side = RESOLVER_ORIGINAL;
 
-    // Проверка на валидность игрока для резолвера
+    // Check validity - skip teammates, ladder, noclip
     if (player->m_iTeamNum() == g_ctx.local()->m_iTeamNum() ||
         player->get_move_type() == MOVETYPE_LADDER ||
         player->get_move_type() == MOVETYPE_NOCLIP)
     {
-        player_record->side = RESOLVER_FIRST;
+        player_record->side = RESOLVER_ORIGINAL;
         return;
     }
 
-    // Инициализация угла для вычислений
-    float foot_yaw = 0.0f;
-    BuildMoveYaw(player, foot_yaw);
-
-    // Обновляем слои анимации для цикла и yaw
-    auto anim_layers = player->get_animlayers();
-    anim_layers[ANIMATION_LAYER_MOVEMENT_MOVE].m_flCycle = player_record->layers[ANIMATION_LAYER_MOVEMENT_MOVE].m_flCycle;
-    anim_layers[ANIMATION_LAYER_WHOLE_BODY].m_flCycle = player_record->layers[ANIMATION_LAYER_WHOLE_BODY].m_flCycle;
-
-    // Определение видимости с левой и правой стороны
+    // Get velocity and movement state
+    float velocity_2d = player->m_vecVelocity().Length2D();
+    bool is_moving = velocity_2d > 0.1f;
+    
+    // Analyze animation layers for better detection
+    auto layers = player->get_animlayers();
+    
+    // Layer 6 = movement, Layer 12 = lean
+    float move_weight = layers[ANIMATION_LAYER_MOVEMENT_MOVE].m_flWeight;
+    float lean_weight = layers[ANIMATION_LAYER_LEAN].m_flWeight;
+    float adjust_weight = layers[ANIMATION_LAYER_ADJUST].m_flWeight; // LBY break layer
+    
+    // Build movement yaw
+    float move_yaw = 0.0f;
+    BuildMoveYaw(player, move_yaw);
+    
+    // MOVING RESOLVER - Priority for moving targets
+    if (is_moving && move_weight > 0.1f)
+    {
+        player_record->moving_resolver_active = true;
+        
+        // Calculate velocity angle
+        float velocity_yaw = atan2(-player->m_vecVelocity().y, -player->m_vecVelocity().x) * (180.0f / M_PI);
+        velocity_yaw = math::normalize_yaw(velocity_yaw);
+        
+        // Check animation layer delta to detect strafing
+        float layer_delta = 0.0f;
+        if (previous_player_record && previous_player_record->valid())
+        {
+            layer_delta = layers[ANIMATION_LAYER_MOVEMENT_STRAFECHANGE].m_flCycle - 
+                          previous_player_record->layers[ANIMATION_LAYER_MOVEMENT_STRAFECHANGE].m_flCycle;
+        }
+        
+        // Detect strafe direction from layer analysis
+        bool strafing_left = layer_delta > 0.01f && lean_weight < -0.2f;
+        bool strafing_right = layer_delta > 0.01f && lean_weight > 0.2f;
+        
+        if (strafing_left)
+        {
+            player_record->side = RESOLVER_LEFT;
+            anim_state->m_flGoalFeetYaw = math::normalize_yaw(velocity_yaw - 35.0f);
+        }
+        else if (strafing_right)
+        {
+            player_record->side = RESOLVER_RIGHT;
+            anim_state->m_flGoalFeetYaw = math::normalize_yaw(velocity_yaw + 35.0f);
+        }
+        else
+        {
+            // Not strafing - use velocity-based resolution
+            player_record->side = RESOLVER_ORIGINAL;
+            anim_state->m_flGoalFeetYaw = velocity_yaw;
+        }
+        
+        update_animation_layers(player);
+        return;
+    }
+    
+    // STANDING RESOLVER - For stationary targets
+    player_record->moving_resolver_active = false;
+    
+    // Check for LBY update (layer 3 weight spike)
+    bool lby_updating = adjust_weight > 0.9f;
+    
+    // Shot history - learn from previous misses
+    int miss_count = g_ctx.globals.missed_shots[player->EntIndex()];
+    
+    // Bruteforce on consecutive misses (after 2+ misses)
+    if (miss_count >= 2)
+    {
+        // Cycle through resolver modes
+        static int bruteforce_cycle = 0;
+        bruteforce_cycle = (bruteforce_cycle + 1) % 4;
+        
+        switch (bruteforce_cycle)
+        {
+        case 0:
+            player_record->side = RESOLVER_ZERO;
+            anim_state->m_flGoalFeetYaw = player->m_angEyeAngles().y;
+            break;
+        case 1:
+            player_record->side = RESOLVER_LEFT;
+            anim_state->m_flGoalFeetYaw = math::normalize_yaw(player->m_angEyeAngles().y - 60.0f);
+            break;
+        case 2:
+            player_record->side = RESOLVER_RIGHT;
+            anim_state->m_flGoalFeetYaw = math::normalize_yaw(player->m_angEyeAngles().y + 60.0f);
+            break;
+        case 3:
+            player_record->side = RESOLVER_LOW_FIRST;
+            anim_state->m_flGoalFeetYaw = math::normalize_yaw(player->m_angEyeAngles().y - 30.0f);
+            break;
+        }
+        
+        update_animation_layers(player);
+        return;
+    }
+    
+    // Freestanding - check both sides for visibility
     bool left_visible = util::visible(g_ctx.globals.eye_pos,
-        player->hitbox_position_matrix(HITBOX_HEAD, player_record->leftmatrixes),
+        player->hitbox_position_matrix(HITBOX_HEAD, player_record->matrixes_data.first),
         player,
         g_ctx.local());
 
     bool right_visible = util::visible(g_ctx.globals.eye_pos,
-        player->hitbox_position_matrix(HITBOX_HEAD, player_record->rightmatrixes),
+        player->hitbox_position_matrix(HITBOX_HEAD, player_record->matrixes_data.second),
         player,
         g_ctx.local());
 
-    // Устанавливаем сторону по видимости или расстоянию
+    // Priority: Visible side
     if (left_visible != right_visible)
     {
         player_record->side = left_visible ? RESOLVER_LEFT : RESOLVER_RIGHT;
+        float delta = left_visible ? -58.0f : 58.0f;
+        anim_state->m_flGoalFeetYaw = math::normalize_yaw(player->m_angEyeAngles().y + delta);
     }
     else
     {
-        // Определение стороны по расстоянию до головы
-        float left_dist = g_ctx.globals.eye_pos.DistTo(player->hitbox_position_matrix(HITBOX_HEAD, player_record->leftmatrixes));
-        float right_dist = g_ctx.globals.eye_pos.DistTo(player->hitbox_position_matrix(HITBOX_HEAD, player_record->rightmatrixes));
+        // Both sides visible or both occluded - use distance heuristic
+        float left_dist = g_ctx.globals.eye_pos.DistTo(
+            player->hitbox_position_matrix(HITBOX_HEAD, player_record->matrixes_data.first));
+        float right_dist = g_ctx.globals.eye_pos.DistTo(
+            player->hitbox_position_matrix(HITBOX_HEAD, player_record->matrixes_data.second));
+        
         player_record->side = (left_dist < right_dist) ? RESOLVER_LEFT : RESOLVER_RIGHT;
+        float delta = (left_dist < right_dist) ? -58.0f : 58.0f;
+        anim_state->m_flGoalFeetYaw = math::normalize_yaw(player->m_angEyeAngles().y + delta);
     }
-
-    // Устанавливаем конечный угол GoalFeetYaw на основе выбранной стороны
-    if (player_record->side == RESOLVER_LEFT)
-        anim_state->m_flGoalFeetYaw = math::normalize_yaw(foot_yaw - 60.0f);
-    else if (player_record->side == RESOLVER_RIGHT)
-        anim_state->m_flGoalFeetYaw = math::normalize_yaw(foot_yaw + 60.0f);
-    else
-        anim_state->m_flGoalFeetYaw = foot_yaw; // Исходный угол при неопределенной стороне
-
-    // Настройка слоев анимации в зависимости от стороны и состояния игрока
+    
     update_animation_layers(player);
 }
 

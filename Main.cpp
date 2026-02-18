@@ -113,7 +113,7 @@ DWORD WINAPI main(PVOID base)
 	SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 
 	for (size_t i = 0; i < g_ctx.signatures.size(); ++i) {
-		std::cout << "INdex " << g_ctx.indexes[i] << ": " << g_ctx.signatures[i] << std::endl;
+		std::cout << g_ctx.indexes[i] << ": " << g_ctx.signatures[i] << std::endl;
 	}
 
 	setup_sounds();
