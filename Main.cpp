@@ -138,7 +138,6 @@ DWORD WINAPI main(PVOID base)
 	LogFunctionCall("setup_hook");
 	Netvars::Netvars();
 	LogFunctionCall("setup_netvars");
-	LogFunctionCall("Fixed");
 
 	std::this_thread::sleep_for(std::chrono::milliseconds(100));
 

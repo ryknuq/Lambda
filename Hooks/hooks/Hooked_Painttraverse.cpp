@@ -37,6 +37,10 @@ void __fastcall hooks::hooked_painttraverse(void* ecx, void* edx, vgui::VPANEL p
 	static auto original_fn = panel_hook->get_func_address <PaintTraverse_t>(41);
 	g_ctx.local((player_t*)m_entitylist()->GetClientEntity(m_engine()->GetLocalPlayer()), true);
 
+	// Global frame cache update - MUST BE FIRST for UI alignment
+	m_engine()->GetScreenSize(g_ctx.globals.screen_width, g_ctx.globals.screen_height);
+	g_ctx.globals.world_to_screen_matrix = math::world_to_screen_matrix();
+
 	static auto set_console = true;
 
 	if (set_console)

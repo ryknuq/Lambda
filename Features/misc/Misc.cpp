@@ -1137,7 +1137,7 @@ void misc::double_tap_defensive(CUserCmd* m_pcmd)
 		// Check prediction for each choked command tick
 		for (int next_chock = 1; next_chock <= m_clientstate()->iChokedCommands; ++next_chock)
 		{
-			predicted_eye_pos *= next_chock;  // Update the predicted position
+			predicted_eye_pos += (engineprediction::get().backup_data.velocity * m_globals()->m_intervalpertick) * next_chock;  // Update the predicted position
 
 			// Perform wall penetration check
 			auto fire_data = autowall::get().wall_penetration(predicted_eye_pos, e->hitbox_position_matrix(HITBOX_HEAD, record->matrixes_data.first), e);

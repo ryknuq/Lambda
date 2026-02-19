@@ -399,16 +399,35 @@ void __stdcall hooks::hooked_fsn(ClientFrameStage_t stage)
 					}
 					else
 					{
-						// BRANCH 4: RESOLVER or CORRECTION MISS
+						// BRANCH 4: RESOLVER / BACKTRACK FAILURE / CORRECTION MISS
 						std::string miss_reason = crypt_str("Resolver");
 						int miss_reason_idx = 4;
 
-						if (current_shot->shot_info.target_animation_sequence > 0 &&
+						bool is_bot = false;
+						auto player = (player_t*)m_entitylist()->GetClientEntity(current_shot->last_target);
+						if (player)
+						{
+							player_info_t info;
+							if (m_engine()->GetPlayerInfo(current_shot->last_target, &info) && info.fakeplayer)
+								is_bot = true;
+						}
+
+						if (!is_bot && current_shot->shot_info.target_animation_sequence > 0 &&
 							current_shot->shot_info.target_animation_cycle > 0.0f)
 						{
 							miss_reason = crypt_str("Correction");
 							miss_reason_idx = 3;
 							current_shot->shot_info.correction_failed = true;
+						}
+						else if (current_shot->shot_info.backtrack_ticks > 0)
+						{
+							miss_reason = crypt_str("Backtrack failure");
+							miss_reason_idx = 4;
+						}
+						else if (is_bot)
+						{
+							miss_reason = crypt_str("Spread");
+							miss_reason_idx = 0;
 						}
 
 						current_shot->shot_info.result = miss_reason;
@@ -428,7 +447,7 @@ void __stdcall hooks::hooked_fsn(ClientFrameStage_t stage)
 								<< crypt_str(" | Dist: ") << std::fixed << std::setprecision(0) << current_shot->shot_info.distance_to_target << crypt_str("u")
 								<< crypt_str(" | Lat: ") << current_shot->shot_info.network_latency_ms << crypt_str("ms");
 
-							if (miss_reason == crypt_str("Resolver"))
+							if (miss_reason == crypt_str("Resolver") || miss_reason == crypt_str("Backtrack failure"))
 							{
 								std::string side_name = crypt_str("Unknown");
 								if (current_shot->side == RESOLVER_LEFT)

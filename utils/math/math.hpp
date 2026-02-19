@@ -54,7 +54,7 @@ namespace math {
 	Vector cross_product(const Vector& a, const Vector& b);
 	float dot_product(const Vector& a, const Vector& b);
 	bool world_to_screen(const Vector& origin, Vector& screen);
-	const matrix3x4_t& world_to_screen_matrix();
+	const VMatrix& world_to_screen_matrix();
 	__forceinline bool screen_transform(const Vector& in, Vector& out);
 	bool WorldToScreen(const Vector& in, Vector& out);
 	void SmoothAngle(Vector& From, Vector& To, float Percent);

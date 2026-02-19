@@ -37,6 +37,9 @@ public:
 
 void playeresp::paint_traverse()
 {
+	if (!g_ctx.local())
+		return;
+
 	static auto alpha = 1.0f;
 	c_dormant_esp::get().start();
 
@@ -54,7 +57,10 @@ void playeresp::paint_traverse()
 	static auto FindHudElement = (DWORD(__thiscall*)(void*, const char*))util::FindSignature(crypt_str("client.dll"), crypt_str("55 8B EC 53 8B 5D 08 56 57 8B F9 33 F6 39 77 28"));
 	static auto hud_ptr = *(DWORD**)(util::FindSignature(crypt_str("client.dll"), crypt_str("81 25 ? ? ? ? ? ? ? ? 8B 01")) + 0x2);
 
-	auto radar_base = FindHudElement(hud_ptr, "CCSGO_HudRadar");
+	static DWORD radar_base = 0;
+	if (!radar_base && FindHudElement && hud_ptr)
+		radar_base = FindHudElement(hud_ptr, "CCSGO_HudRadar");
+
 	auto hud_radar = (CCSGO_HudRadar*)(radar_base - 0x14);
 
 	for (auto i = 1; i < m_globals()->m_maxclients; i++)
@@ -165,56 +171,40 @@ void playeresp::paint_traverse()
 void playeresp::draw_skeleton(player_t* e, Color color, matrix3x4_t matrix[MAXSTUDIOBONES])
 {
 	auto model = e->GetModel();
-
-	if (!model)
-		return;
+	if (!model) return;
 
 	auto studio_model = m_modelinfo()->GetStudioModel(model);
+	if (!studio_model) return;
 
-	if (!studio_model)
-		return;
-
-	auto get_bone_position = [&](int bone) -> Vector
-	{
+	auto get_bone_position = [&](int bone) -> Vector {
 		return Vector(matrix[bone][0][3], matrix[bone][1][3], matrix[bone][2][3]);
 	};
 
-	auto upper_direction = get_bone_position(7) - get_bone_position(6);
-	auto breast_bone = get_bone_position(6) + upper_direction * 0.5f;
+	static int bone_segments[][2] = {
+		{ 8, 7 }, { 7, 6 }, { 6, 5 }, { 5, 4 }, { 4, 3 }, { 3, 0 }, // Spine
+		{ 7, 13 }, { 13, 14 }, { 14, 15 }, // Left arm
+		{ 7, 39 }, { 39, 40 }, { 40, 41 }, // Right arm
+		{ 0, 70 }, { 70, 71 }, { 71, 72 }, // Left leg
+		{ 0, 77 }, { 77, 78 }, { 78, 79 }  // Right leg
+	};
 
-	for (auto i = 0; i < studio_model->numbones; i++)
-	{
-		auto bone = studio_model->pBone(i);
+	// Cache bone positions for this player to avoid redundant math
+	Vector cached_bone_pos[MAXSTUDIOBONES];
+	bool bone_pos_valid[MAXSTUDIOBONES] = { false };
 
-		if (!bone)
-			continue;
+	auto get_cached_w2s = [&](int bone, Vector& screen) -> bool {
+		if (bone < 0 || bone >= MAXSTUDIOBONES) return false;
+		if (!bone_pos_valid[bone]) {
+			cached_bone_pos[bone] = get_bone_position(bone);
+			bone_pos_valid[bone] = true;
+		}
+		return math::WorldToScreen(cached_bone_pos[bone], screen);
+	};
 
-		if (bone->parent == -1)
-			continue;
-
-		if (!(bone->flags & BONE_USED_BY_HITBOX))
-			continue;
-
-		auto child = get_bone_position(i);
-		auto parent = get_bone_position(bone->parent);
-
-		auto delta_child = child - breast_bone;
-		auto delta_parent = parent - breast_bone;
-
-		if (delta_parent.Length() < 9.0f && delta_child.Length() < 9.0f)
-			parent = breast_bone;
-
-		if (i == 5)
-			child = breast_bone;
-
-		if (fabs(delta_child.z) < 5.0f && delta_parent.Length() < 5.0f && delta_child.Length() < 5.0f || i == 6)
-			continue;
-
-		auto schild = ZERO;
-		auto sparent = ZERO;
-
-		if (math::WorldToScreen(child, schild) && math::WorldToScreen(parent, sparent))
-			g_Render->DrawLine(schild.x, schild.y, sparent.x, sparent.y, color);
+	for (const auto& segment : bone_segments) {
+		Vector screen1, screen2;
+		if (get_cached_w2s(segment[0], screen1) && get_cached_w2s(segment[1], screen2))
+			g_Render->DrawLine(screen1.x, screen1.y, screen2.x, screen2.y, color);
 	}
 }
 

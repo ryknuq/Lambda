@@ -9,7 +9,7 @@ void c_dormant_esp::start()
 	if (!m_utlCurSoundList.Count())
 		return;
 
-	for (auto i = 0; i < m_utlCurSoundList.Count(); i++)
+	for (auto i = 0; i < m_utlCurSoundList.Count() && i < 32; i++)
 	{
 		auto& sound = m_utlCurSoundList[i];
 

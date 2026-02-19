@@ -471,7 +471,7 @@ namespace math
 	}
 	//--------------------------------------------------------------------------------
 	
-	const matrix3x4_t& world_to_screen_matrix()
+	const VMatrix& world_to_screen_matrix()
 	{
 		static uintptr_t view_matrix = 0;
 		if (!view_matrix)
@@ -479,7 +479,7 @@ namespace math
 			view_matrix = (uintptr_t)util::FindSignature("client.dll", "0F 10 05 ? ? ? ? 8D 85 ? ? ? ? B9");
 			view_matrix = *reinterpret_cast<uintptr_t*>(view_matrix + 0x3) + 176;
 		}
-		return *reinterpret_cast<matrix3x4_t*>(view_matrix);
+		return *reinterpret_cast<VMatrix*>(view_matrix);
 	}
 
 	bool screen_transform(const Vector& in, Vector& out)
@@ -507,28 +507,23 @@ namespace math
 
 	bool WorldToScreen(const Vector& in, Vector& out)
 	{
-		const auto result = screen_transform(in, out);
+		if (screen_transform(in, out))
+		{
+			int w, h;
+			m_engine()->GetScreenSize(w, h);
 
-		int w, h;
-		m_engine()->GetScreenSize(w, h);
+			out.x = (w / 2.0f) + (out.x * w) / 2.0f;
+			out.y = (h / 2.0f) - (out.y * h) / 2.0f;
 
-		out.x = (w / 2.0f) + (out.x * w) / 2.0f;
-		out.y = (h / 2.0f) - (out.y * h) / 2.0f;
+			return true;
+		}
 
-		return result;
+		return false;
 	}
-	//--------------------------------------------------------------------------------
+
 	bool world_to_screen(const Vector& in, Vector& out)
 	{
-		const auto result = screen_transform(in, out);
-
-		int w, h;
-		m_engine()->GetScreenSize(w, h);
-
-		out.x = (w / 2.0f) + (out.x * w) / 2.0f;
-		out.y = (h / 2.0f) - (out.y * h) / 2.0f;
-
-		return result;
+		return WorldToScreen(in, out);
 	}
 
 	//--------------------------------------------------------------------------------

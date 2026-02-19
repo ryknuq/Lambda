@@ -526,7 +526,7 @@ namespace util
 			ud_rate = cl_ud_rate->GetInt();
 
 		if (min_ud_rate && max_ud_rate)
-			ud_rate = max_ud_rate->GetInt();
+			ud_rate = math::clamp(ud_rate, (int)min_ud_rate->GetFloat(), (int)max_ud_rate->GetFloat());
 
 		float ratio = 1.f;
 		static auto cl_interp_ratio = m_cvar()->FindVar(crypt_str("cl_interp_ratio"));

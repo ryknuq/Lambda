@@ -1,8 +1,8 @@
 #include "VMatrix.hpp"
 
-inline VMatrix::VMatrix( ) { } 
+VMatrix::VMatrix( ) { } 
 
-inline VMatrix::VMatrix(
+VMatrix::VMatrix(
 	float m00, float m01, float m02, float m03,
 	float m10, float m11, float m12, float m13,
 	float m20, float m21, float m22, float m23,
@@ -16,12 +16,12 @@ inline VMatrix::VMatrix(
 }
 
 
-inline VMatrix::VMatrix( const matrix3x4_t& matrix3x4 ) 
+VMatrix::VMatrix( const matrix3x4_t& matrix3x4 ) 
 {
 	Init( matrix3x4 );
 }
 
-inline VMatrix::VMatrix( const Vector& xAxis, const Vector& yAxis, const Vector& zAxis ) 
+VMatrix::VMatrix( const Vector& xAxis, const Vector& yAxis, const Vector& zAxis ) 
 {
 	Init(
 		xAxis.x, yAxis.x, zAxis.x, 0.0f,
@@ -32,7 +32,7 @@ inline VMatrix::VMatrix( const Vector& xAxis, const Vector& yAxis, const Vector&
 }
 
 
-inline void VMatrix::Init(
+void VMatrix::Init(
 	float m00, float m01, float m02, float m03,
 	float m10, float m11, float m12, float m13,
 	float m20, float m21, float m22, float m23,
@@ -59,7 +59,7 @@ inline void VMatrix::Init(
 	m[ 3 ][ 3 ] = m33;
 }
 
-inline void VMatrix::Init( const matrix3x4_t& matrix3x4 )
+void VMatrix::Init( const matrix3x4_t& matrix3x4 )
 {
 	memcpy( m, matrix3x4.Base( ), sizeof( matrix3x4_t ) );
 
@@ -69,66 +69,66 @@ inline void VMatrix::Init( const matrix3x4_t& matrix3x4 )
 	m[ 3 ][ 3 ] = 1.0f;
 }
 
-inline void Vector3DMultiplyPosition( const VMatrix& src1, const Vector& src2, Vector& dst )
+void Vector3DMultiplyPosition( const VMatrix& src1, const Vector& src2, Vector& dst )
 {
 	dst[ 0 ] = src1[ 0 ][ 0 ] * src2.x + src1[ 0 ][ 1 ] * src2.y + src1[ 0 ][ 2 ] * src2.z + src1[ 0 ][ 3 ];
 	dst[ 1 ] = src1[ 1 ][ 0 ] * src2.x + src1[ 1 ][ 1 ] * src2.y + src1[ 1 ][ 2 ] * src2.z + src1[ 1 ][ 3 ];
 	dst[ 2 ] = src1[ 2 ][ 0 ] * src2.x + src1[ 2 ][ 1 ] * src2.y + src1[ 2 ][ 2 ] * src2.z + src1[ 2 ][ 3 ];
 }
 
-inline Vector VMatrix::GetForward( ) const {
+Vector VMatrix::GetForward( ) const {
 	return Vector( m[ 0 ][ 0 ], m[ 1 ][ 0 ], m[ 2 ][ 0 ] );
 }
 
-inline Vector VMatrix::GetLeft( ) const {
+Vector VMatrix::GetLeft( ) const {
 	return Vector( m[ 0 ][ 1 ], m[ 1 ][ 1 ], m[ 2 ][ 1 ] );
 }
 
-inline Vector VMatrix::GetUp( ) const {
+Vector VMatrix::GetUp( ) const {
 	return Vector( m[ 0 ][ 2 ], m[ 1 ][ 2 ], m[ 2 ][ 2 ] );
 }
 
-inline void VMatrix::SetForward( const Vector &vForward ) 
+void VMatrix::SetForward( const Vector &vForward ) 
 {
 	m[ 0 ][ 0 ] = vForward.x;
 	m[ 1 ][ 0 ] = vForward.y;
 	m[ 2 ][ 0 ] = vForward.z;
 }
 
-inline void VMatrix::SetLeft( const Vector &vLeft ) 
+void VMatrix::SetLeft( const Vector &vLeft ) 
 {
 	m[ 0 ][ 1 ] = vLeft.x;
 	m[ 1 ][ 1 ] = vLeft.y;
 	m[ 2 ][ 1 ] = vLeft.z;
 }
 
-inline void VMatrix::SetUp( const Vector &vUp ) 
+void VMatrix::SetUp( const Vector &vUp ) 
 {
 	m[ 0 ][ 2 ] = vUp.x;
 	m[ 1 ][ 2 ] = vUp.y;
 	m[ 2 ][ 2 ] = vUp.z;
 }
 
-inline void VMatrix::GetBasisVectors( Vector &vForward, Vector &vLeft, Vector &vUp ) const 
+void VMatrix::GetBasisVectors( Vector &vForward, Vector &vLeft, Vector &vUp ) const 
 {
 	vForward.Init( m[ 0 ][ 0 ], m[ 1 ][ 0 ], m[ 2 ][ 0 ] );
 	vLeft.Init( m[ 0 ][ 1 ], m[ 1 ][ 1 ], m[ 2 ][ 1 ] );
 	vUp.Init( m[ 0 ][ 2 ], m[ 1 ][ 2 ], m[ 2 ][ 2 ] );
 }
 
-inline void VMatrix::SetBasisVectors( const Vector &vForward, const Vector &vLeft, const Vector &vUp ) 
+void VMatrix::SetBasisVectors( const Vector &vForward, const Vector &vLeft, const Vector &vUp ) 
 {
 	SetForward( vForward );
 	SetLeft( vLeft );
 	SetUp( vUp );
 }
 
-inline Vector VMatrix::GetTranslation( ) const 
+Vector VMatrix::GetTranslation( ) const 
 {
 	return Vector( m[ 0 ][ 3 ], m[ 1 ][ 3 ], m[ 2 ][ 3 ] );
 }
 
-inline Vector& VMatrix::GetTranslation( Vector &vTrans ) const
+Vector& VMatrix::GetTranslation( Vector &vTrans ) const
 {
 	vTrans.x = m[ 0 ][ 3 ];
 	vTrans.y = m[ 1 ][ 3 ];
@@ -136,14 +136,14 @@ inline Vector& VMatrix::GetTranslation( Vector &vTrans ) const
 	return vTrans;
 }
 
-inline void VMatrix::SetTranslation( const Vector &vTrans )
+void VMatrix::SetTranslation( const Vector &vTrans )
 {
 	m[ 0 ][ 3 ] = vTrans.x;
 	m[ 1 ][ 3 ] = vTrans.y;
 	m[ 2 ][ 3 ] = vTrans.z;
 }
 
-inline void VMatrix::PreTranslate( const Vector &vTrans ) 
+void VMatrix::PreTranslate( const Vector &vTrans ) 
 {
 	Vector tmp;
 	Vector3DMultiplyPosition( *this, vTrans, tmp );
@@ -152,35 +152,41 @@ inline void VMatrix::PreTranslate( const Vector &vTrans )
 	m[ 2 ][ 3 ] = tmp.z;
 }
 
-inline void VMatrix::PostTranslate( const Vector &vTrans ) 
+void VMatrix::PostTranslate( const Vector &vTrans ) 
 {
 	m[ 0 ][ 3 ] += vTrans.x;
 	m[ 1 ][ 3 ] += vTrans.y;
 	m[ 2 ][ 3 ] += vTrans.z;
 }
 
-inline const matrix3x4_t& VMatrix::As3x4( ) const 
+const matrix3x4_t& VMatrix::As3x4( ) const 
 {
 	return *( ( const matrix3x4_t* )this );
 }
 
-inline matrix3x4_t& VMatrix::As3x4( ) {
+matrix3x4_t& VMatrix::As3x4( ) {
 	return *( ( matrix3x4_t* )this );
 }
 
-inline void VMatrix::CopyFrom3x4( const matrix3x4_t &m3x4 ) 
+void VMatrix::CopyFrom3x4( const matrix3x4_t &m3x4 ) 
 {
 	memcpy( m, m3x4.Base( ), sizeof( matrix3x4_t ) );
 	m[ 3 ][ 0 ] = m[ 3 ][ 1 ] = m[ 3 ][ 2 ] = 0;
 	m[ 3 ][ 3 ] = 1;
 }
 
-inline void VMatrix::Set3x4( matrix3x4_t& matrix3x4 ) const
+void VMatrix::Set3x4( matrix3x4_t& matrix3x4 ) const
 {
 	memcpy( matrix3x4.Base( ), m, sizeof( matrix3x4_t ) );
 }
 
-inline const VMatrix& VMatrix::operator+=( const VMatrix &other )
+VMatrix& VMatrix::operator=(const VMatrix& mOther)
+{
+	memcpy(m, mOther.m, sizeof(float) * 16);
+	return *this;
+}
+
+const VMatrix& VMatrix::operator+=( const VMatrix &other )
 {
 	for ( int i = 0; i < 4; i++ ) {
 		for ( int j = 0; j < 4; j++ ) {
@@ -191,7 +197,7 @@ inline const VMatrix& VMatrix::operator+=( const VMatrix &other )
 	return *this;
 }
 
-inline VMatrix VMatrix::operator+( const VMatrix &other ) const
+VMatrix VMatrix::operator+( const VMatrix &other ) const
 {
 	VMatrix ret;
 	for ( int i = 0; i < 16; i++ ) {
@@ -200,7 +206,7 @@ inline VMatrix VMatrix::operator+( const VMatrix &other ) const
 	return ret;
 }
 
-inline VMatrix VMatrix::operator-( const VMatrix &other ) const
+VMatrix VMatrix::operator-( const VMatrix &other ) const
 {
 	VMatrix ret;
 
@@ -213,7 +219,7 @@ inline VMatrix VMatrix::operator-( const VMatrix &other ) const
 	return ret;
 }
 
-inline VMatrix VMatrix::operator-( ) const
+VMatrix VMatrix::operator-( ) const
 {
 	VMatrix ret;
 	for ( int i = 0; i < 16; i++ ) {
@@ -222,7 +228,7 @@ inline VMatrix VMatrix::operator-( ) const
 	return ret;
 }
 
-inline Vector VMatrix::operator*( const Vector &vVec ) const
+Vector VMatrix::operator*( const Vector &vVec ) const
 {
 	Vector vRet;
 	vRet.x = m[ 0 ][ 0 ] * vVec.x + m[ 0 ][ 1 ] * vVec.y + m[ 0 ][ 2 ] * vVec.z + m[ 0 ][ 3 ];
@@ -232,7 +238,7 @@ inline Vector VMatrix::operator*( const Vector &vVec ) const
 	return vRet;
 }
 
-inline Vector VMatrix::VMul4x3( const Vector &vVec ) const
+Vector VMatrix::VMul4x3( const Vector &vVec ) const
 {
 	Vector vResult;
 	Vector3DMultiplyPosition( *this, vVec, vResult );
@@ -240,7 +246,7 @@ inline Vector VMatrix::VMul4x3( const Vector &vVec ) const
 }
 
 
-inline Vector VMatrix::VMul4x3Transpose( const Vector &vVec ) const
+Vector VMatrix::VMul4x3Transpose( const Vector &vVec ) const
 {
 	Vector tmp = vVec;
 	tmp.x -= m[ 0 ][ 3 ];
@@ -254,7 +260,7 @@ inline Vector VMatrix::VMul4x3Transpose( const Vector &vVec ) const
 	);
 }
 
-inline Vector VMatrix::VMul3x3( const Vector &vVec ) const 
+Vector VMatrix::VMul3x3( const Vector &vVec ) const 
 {
 	return Vector(
 		m[ 0 ][ 0 ] * vVec.x + m[ 0 ][ 1 ] * vVec.y + m[ 0 ][ 2 ] * vVec.z,
@@ -263,7 +269,7 @@ inline Vector VMatrix::VMul3x3( const Vector &vVec ) const
 	);
 }
 
-inline Vector VMatrix::VMul3x3Transpose( const Vector &vVec ) const
+Vector VMatrix::VMul3x3Transpose( const Vector &vVec ) const
 {
 	return Vector(
 		m[ 0 ][ 0 ] * vVec.x + m[ 1 ][ 0 ] * vVec.y + m[ 2 ][ 0 ] * vVec.z,
@@ -272,7 +278,7 @@ inline Vector VMatrix::VMul3x3Transpose( const Vector &vVec ) const
 	);
 }
 
-inline void VMatrix::V3Mul( const Vector &vIn, Vector &vOut ) const
+void VMatrix::V3Mul( const Vector &vIn, Vector &vOut ) const
 {
 	float rw;
 
@@ -282,7 +288,7 @@ inline void VMatrix::V3Mul( const Vector &vIn, Vector &vOut ) const
 	vOut.z = ( m[ 2 ][ 0 ] * vIn.x + m[ 2 ][ 1 ] * vIn.y + m[ 2 ][ 2 ] * vIn.z + m[ 2 ][ 3 ] ) * rw;
 }
 
-inline void VMatrix::Identity( ) 
+void VMatrix::Identity( ) 
 {
 	m[ 0 ][ 0 ] = 1.0f; m[ 0 ][ 1 ] = 0.0f; m[ 0 ][ 2 ] = 0.0f; m[ 0 ][ 3 ] = 0.0f;
 	m[ 1 ][ 0 ] = 0.0f; m[ 1 ][ 1 ] = 1.0f; m[ 1 ][ 2 ] = 0.0f; m[ 1 ][ 3 ] = 0.0f;
@@ -291,7 +297,7 @@ inline void VMatrix::Identity( )
 }
 
 
-inline bool VMatrix::IsIdentity( ) const
+bool VMatrix::IsIdentity( ) const
 {
 	return
 		m[ 0 ][ 0 ] == 1.0f && m[ 0 ][ 1 ] == 0.0f && m[ 0 ][ 2 ] == 0.0f && m[ 0 ][ 3 ] == 0.0f &&
@@ -300,7 +306,7 @@ inline bool VMatrix::IsIdentity( ) const
 		m[ 3 ][ 0 ] == 0.0f && m[ 3 ][ 1 ] == 0.0f && m[ 3 ][ 2 ] == 0.0f && m[ 3 ][ 3 ] == 1.0f;
 }
 
-inline Vector VMatrix::ApplyRotation( const Vector &vVec ) const
+Vector VMatrix::ApplyRotation( const Vector &vVec ) const
 {
 	return VMul3x3( vVec );
 }

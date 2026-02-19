@@ -389,44 +389,7 @@ int aim::get_minimum_damage(bool visible, int health)
 
 int aim::get_adaptive_minimum_damage(bool visible, int health, int hitbox)
 {
-    auto min_dmg = get_minimum_damage(visible, health);
-    
-    // Count active enemies
-    int active_enemies = 0;
-    for (auto& target : targets)
-    {
-        if (target.e && target.e->valid(true, false))
-            active_enemies++;
-    }
-    
-    // If we can kill in one shot to body, require lethal damage
-    // This prevents wasting time on low damage shots when one-tap is available
-    bool can_lethal = false;
-    for (auto& target : scanned_targets)
-    {
-        if (target.data.damage >= target.health && target.data.hitbox >= HITBOX_PELVIS && target.data.hitbox <= HITBOX_UPPER_CHEST)
-        {
-            can_lethal = true;
-            break;
-        }
-    }
-    
-    if (can_lethal && min_dmg < health)
-        return health + 1;
-    
-    // If target is low HP, reduce requirement to actual HP
-    if (health < min_dmg && health > 1)
-        min_dmg = health;
-    
-    // Head shots should require higher damage to avoid limb hits
-    if (hitbox == HITBOX_HEAD && min_dmg < health)
-        min_dmg = min(health, min_dmg * 2);
-    
-    // Multiple enemies = prioritize higher damage for faster kills
-    if (active_enemies > 1)
-        min_dmg = min(health, (int)(min_dmg * 1.5f));
-    
-    return min_dmg;
+    return get_minimum_damage(visible, health);
 }
 
 void aim::scan_targets()
@@ -451,7 +414,15 @@ void aim::scan_targets()
             target.history_record->adjust_player();
             scan(target.history_record, history_data);
 
-            if (last_data.valid() && last_data.damage > history_data.damage)
+            if (last_data.valid() && history_data.valid())
+            {
+                // Both are valid - prefer model if damage is comparable or backtrack is not clearly better
+                if (last_data.damage >= history_data.damage || (last_data.visible && !history_data.visible))
+                    scanned_targets.emplace_back(scanned_target(target.last_record, last_data));
+                else
+                    scanned_targets.emplace_back(scanned_target(target.history_record, history_data));
+            }
+            else if (last_data.valid())
                 scanned_targets.emplace_back(scanned_target(target.last_record, last_data));
             else if (history_data.valid())
                 scanned_targets.emplace_back(scanned_target(target.history_record, history_data));
@@ -718,13 +689,7 @@ void aim::scan(adjust_data* record, scan_data& data, const Vector& shoot_positio
 			else if (fire_data.damage == best_damage)
 			{
 				// Same damage - prefer visible over wallbang
-				if (fire_data.visible && !target_visible)
-					is_better_point = true;
-				// Prefer center points for visible shots (more stable)
-				else if (fire_data.visible && point.center)
-				 is_better_point = true;
-				// Prefer edge points for wallbangs (less material penetration)
-				else if (!fire_data.visible && !point.center)
+				if (fire_data.visible) // Only prefer if visible when damage is equal
 					is_better_point = true;
 			}
 		}
@@ -1291,37 +1256,8 @@ void aim::fire(CUserCmd* cmd)
     cmd->m_viewangles = aim_angle;
     cmd->m_buttons |= IN_ATTACK;
     
-    // Tick-accurate backtracking calculation
-    if (net_channel_info)
-    {
-        static auto cl_interp_ratio = m_cvar()->FindVar(crypt_str("cl_interp_ratio"));
-        static auto sv_client_min_interp_ratio = m_cvar()->FindVar(crypt_str("sv_client_min_interp_ratio"));
-        static auto sv_client_max_interp_ratio = m_cvar()->FindVar(crypt_str("sv_client_max_interp_ratio"));
-        
-        auto lerp_ratio = math::clamp(cl_interp_ratio->GetFloat(), 
-                                       sv_client_min_interp_ratio->GetFloat(), 
-                                       sv_client_max_interp_ratio->GetFloat());
-        
-        auto lerpTicks = TIME_TO_TICKS(lerp_ratio);
-        
-        int predCmdArrivTick = m_globals()->m_tickcount + 1 + 
-            TIME_TO_TICKS(net_channel_info->GetAvgLatency(FLOW_INCOMING) + 
-                          net_channel_info->GetAvgLatency(FLOW_OUTGOING));
-        
-        float outgoingLatency = net_channel_info->GetLatency(FLOW_OUTGOING);
-        float clampedLatency = math::clamp(lerp_ratio + outgoingLatency, 0.f, 1.f);
-        
-        int timeDelta = TIME_TO_TICKS(final_target.record->simulation_time) + lerpTicks;
-        float correction = clampedLatency - TICKS_TO_TIME(predCmdArrivTick + lerpTicks - timeDelta);
-        
-        // Use tick-corrected value instead of simple interpolation
-        cmd->m_tickcount = predCmdArrivTick - TIME_TO_TICKS(correction);
-    }
-    else
-    {
-        // Fallback to old method if no network channel
-        cmd->m_tickcount = TIME_TO_TICKS(final_target.record->simulation_time + util::get_interpolation());
-    }
+    // Use tick-accurate value for lag compensation
+    cmd->m_tickcount = TIME_TO_TICKS(final_target.record->simulation_time + util::get_interpolation());
 
     last_target_index = final_target.record->i;
     last_shoot_position = g_ctx.globals.eye_pos;

@@ -203,6 +203,9 @@ public:
 			bool m_bIsPrevPeek = false;
 		} m_Peek;
 
+		int screen_width, screen_height;
+		VMatrix world_to_screen_matrix;
+
 		Vector eye_pos = ZERO;
 		Vector start_position = ZERO;
 		Vector dormant_origin[65];

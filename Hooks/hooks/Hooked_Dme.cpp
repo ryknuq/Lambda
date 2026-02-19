@@ -32,40 +32,57 @@ using DrawModelExecute_t = void(__thiscall*)(IVModelRender*, IMatRenderContext*,
 
 void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t& state, const ModelRenderInfo_t& info, matrix3x4_t* bone_to_world)
 {
-	static auto original_fn = modelrender_hook->get_func_address <DrawModelExecute_t> (21);
-	g_ctx.local((player_t*)m_entitylist()->GetClientEntity(m_engine()->GetLocalPlayer()), true);
+	static auto original_fn = modelrender_hook->get_func_address <DrawModelExecute_t>(21);
 
-	if (!cfg.player.enable)
+	if (!cfg.player.enable || !info.pModel || !info.pRenderable)
 		return original_fn(m_modelrender(), ctx, state, info, bone_to_world);
 
-	if (!info.pModel)
-		return original_fn(m_modelrender(), ctx, state, info, bone_to_world);
-
-	if (!info.pRenderable)
-		return original_fn(m_modelrender(), ctx, state, info, bone_to_world);
-
-	auto model_entity = static_cast<player_t *>(m_entitylist()->GetClientEntity(info.entity_index));
+	auto model_entity = static_cast<player_t*>(m_entitylist()->GetClientEntity(info.entity_index));
 	auto name = m_modelinfo()->GetModelName(info.pModel);
 
-	auto is_player = strstr(name, "models/player") && model_entity->is_alive() && (cfg.player.type[ENEMY].chams[PLAYER_CHAMS_VISIBLE] || cfg.player.type[TEAM].chams[PLAYER_CHAMS_VISIBLE] || cfg.player.type[LOCAL].chams[PLAYER_CHAMS_VISIBLE] || cfg.player.fake_chams_enable || cfg.player.backtrack_chams);
-	auto is_weapon = strstr(name, "weapons/v_") && !strstr(name, "arms") && cfg.esp.weapon_chams;
-	//auto is_arms = strstr(name, "arms") && cfg.esp.arms_chams;
-	//auto is_sleeve = strstr(name, "sleeve") && cfg.esp.arms_chams;
-	auto weapon_on_back = strstr(name, "_dropped.mdl") && strstr(name, "models/weapons/w") && !strstr(name, "arms") && !strstr(name, "ied_dropped") && cfg.esp.attachment_chams;
-	auto weapon_enemy_hands = strstr(name, "models/weapons/w") && !strstr(name, "arms") && !strstr(name, "ied_dropped") && cfg.esp.attachment_chams;
-	auto defuse_kit = strstr(name, "defuser") && !strstr(name, "arms") && !strstr(name, "ied_dropped") && cfg.esp.attachment_chams;
+	// Bugfix: Exclude shadows from Chams
+	if (strstr(name, "shadow"))
+		return original_fn(m_modelrender(), ctx, state, info, bone_to_world);
+
+	// Optimization: Faster model identification
+	bool is_player = false;
+	if (info.entity_index >= 1 && info.entity_index <= m_globals()->m_maxclients) {
+		if (model_entity && model_entity->is_alive() && (cfg.player.type[ENEMY].chams[PLAYER_CHAMS_VISIBLE] || cfg.player.type[TEAM].chams[PLAYER_CHAMS_VISIBLE] || cfg.player.type[LOCAL].chams[PLAYER_CHAMS_VISIBLE] || cfg.player.fake_chams_enable || cfg.player.backtrack_chams))
+			is_player = true;
+	}
+
+	bool is_weapon = false;
+	bool weapon_on_back = false;
+	bool weapon_enemy_hands = false;
+	bool defuse_kit = false;
+
+	// Only do string searches if it's NOT a player
+	if (!is_player) {
+		if (name[7] == 'w' && name[8] == 'e') { // weapons/
+			if (name[15] == 'v' && name[16] == '_' && cfg.esp.weapon_chams) is_weapon = true;
+			else if (strstr(name, "models/weapons/w") && cfg.esp.attachment_chams) {
+				if (strstr(name, "_dropped.mdl")) weapon_on_back = true;
+				else weapon_enemy_hands = true;
+			}
+		}
+		else if (name[7] == 'd' && name[8] == 'e' && cfg.esp.attachment_chams) { // defuser
+			if (strstr(name, "defuser")) defuse_kit = true;
+		}
+	}
 
 	if (m_modelrender()->IsForcedMaterialOverride() && !is_weapon && !weapon_on_back && !weapon_enemy_hands && !defuse_kit)
 		return original_fn(m_modelrender(), ctx, state, info, bone_to_world);
 
-	m_renderview()->SetColorModulation(1.0f, 1.0f, 1.0f); 
-
+	m_renderview()->SetColorModulation(1.0f, 1.0f, 1.0f);
 	if (!is_player && !is_weapon && !weapon_on_back && !weapon_enemy_hands && !defuse_kit)
 		return original_fn(m_modelrender(), ctx, state, info, bone_to_world);
 
-	static IMaterial* materials[] =
+	static bool initialized = false;
+	static IMaterial* materials[11];
+
+	if (!initialized)
 	{
-		CreateMaterial(true, crypt_str(R"#("VertexLitGeneric"
+		materials[0] = CreateMaterial(true, crypt_str(R"#("VertexLitGeneric"
         {
             "$basetexture"    "vgui/white"
             "$envmap"       "env_cubemap"
@@ -78,8 +95,8 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
             "$znearer"        "0"
             "$wireframe"    "0"
         }
-        )#")),
-		CreateMaterial(false, crypt_str(R"#("UnlitGeneric"
+        )#"));
+		materials[1] = CreateMaterial(false, crypt_str(R"#("UnlitGeneric"
             {
                 "$basetexture"                "vgui/white"
                 "$ignorez"                    "0"
@@ -93,10 +110,10 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
                 "$flat"                        "1"
                 "$wireframe"                "0"
             }
-        )#")),
-		m_materialsystem()->FindMaterial(crypt_str("models/inventory_items/dogtags/dogtags_outline"), nullptr), //-V807
-		m_materialsystem()->FindMaterial(crypt_str("models/inventory_items/cologne_prediction/cologne_prediction_glass"), nullptr),
-				CreateMaterial(true, crypt_str(R"#("VertexLitGeneric" {
+        )#"));
+		materials[2] = m_materialsystem()->FindMaterial(crypt_str("models/inventory_items/dogtags/dogtags_outline"), nullptr);
+		materials[3] = m_materialsystem()->FindMaterial(crypt_str("models/inventory_items/cologne_prediction/cologne_prediction_glass"), nullptr);
+		materials[4] = CreateMaterial(true, crypt_str(R"#("VertexLitGeneric" {
             "$basetexture"                    "vgui/white"
             "$envmap"                        "env_cubemap"
             "$envmaptint"                   "[.10 .10 .10]"
@@ -122,8 +139,8 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
                 "$alpha" "1"
                 "$wireframe"                "0"
             }
-        )#")),
-		CreateMaterial(true, crypt_str(R"#("VertexLitGeneric"
+        )#"));
+		materials[5] = CreateMaterial(true, crypt_str(R"#("VertexLitGeneric"
             {
                 "$additive" "0.5"
                 "$envmap" "models/effects/cube_white"
@@ -134,8 +151,8 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
                 "$alpha" "1"
                 "$wireframe"                "0"
             }
-        )#")),
-		CreateMaterial(true, crypt_str(R"#("VertexLitGeneric"
+        )#"));
+		materials[6] = CreateMaterial(true, crypt_str(R"#("VertexLitGeneric"
             {
                 "$additive" "1"
                 "$envmap" "models/effects/cube_white"
@@ -145,8 +162,8 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
                 "$alpha" "0.8"
                 "$wireframe"                "1"
             }
-        )#")),
-		CreateMaterial(true, crypt_str(R"#("VertexLitGeneric"
+        )#"));
+		materials[7] = CreateMaterial(true, crypt_str(R"#("VertexLitGeneric"
             {
             "$basetexture" "models/effects/cube_white"
             "$additive"                    "1"
@@ -156,9 +173,10 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
             "$envmapfresnelminmaxexp"    "[0.0 1.0 2.0]"
             "$alpha"                    "0.99"
         }
-        )#")),
-		m_materialsystem()->FindMaterial(crypt_str("models/inventory_items/trophy_majors/velvet"), nullptr),
-	};
+        )#"));
+		materials[8] = m_materialsystem()->FindMaterial(crypt_str("models/inventory_items/trophy_majors/velvet"), nullptr);
+		initialized = true;
+	}
 
 	auto called_original = false;
 
