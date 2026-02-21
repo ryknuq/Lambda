@@ -13,7 +13,7 @@
 
 #pragma comment (lib, "d3d9.lib")
 #pragma comment (lib, "d3dx9.lib")
-#pragma comment(lib, "freetype.lib")
+// #pragma comment(lib, "freetype.lib")
 
 #include "windowsx.h"
 #include <shlobj.h>
@@ -138,7 +138,7 @@ namespace hooks
 
 		// new
 		D3DXCreateTextureFromFileInMemoryEx(pDevice, mn, sizeof(mn), 35, 35, D3DX_DEFAULT, D3DUSAGE_DYNAMIC, D3DFMT_UNKNOWN, D3DPOOL_DEFAULT, D3DX_DEFAULT, D3DX_DEFAULT, 0, NULL, NULL, &c_menu::get().nigga);
-		D3DXCreateTextureFromFileInMemoryEx(pDevice, nu, sizeof(nu), 45, 45, D3DX_DEFAULT, D3DUSAGE_DYNAMIC, D3DFMT_UNKNOWN, D3DPOOL_DEFAULT, D3DX_DEFAULT, D3DX_DEFAULT, 0, NULL, NULL, &c_menu::get().divine);
+		D3DXCreateTextureFromFileInMemoryEx(pDevice, nu, sizeof(nu), 45, 45, D3DX_DEFAULT, D3DUSAGE_DYNAMIC, D3DFMT_UNKNOWN, D3DPOOL_DEFAULT, D3DX_DEFAULT, D3DX_DEFAULT, 0, NULL, NULL, &c_menu::get().lambda);
 
 		// Menu fonts
 		c_menu::get().futura_small = io.Fonts->AddFontFromMemoryTTF((void*)futuramediumc, sizeof(futuramediumc), 15.f, &m_config, ranges);

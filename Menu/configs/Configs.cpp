@@ -399,7 +399,7 @@ void C_ConfigManager::setup_item(std::string* pointer, const std::string& value,
 
 void C_ConfigManager::save(std::string config)
 {
-	std::string file = crypt_str("C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive\\Lambda\\") + config;
+	std::string file = crypt_str("C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive\\Lambda\\configs\\") + config;
 	json allJson;
 
 	for (auto it : items)
@@ -504,7 +504,7 @@ void C_ConfigManager::load(std::string config, bool load_script_items)
 			return nullptr;
 		};
 
-	std::string file = crypt_str("C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive\\Lambda\\") + config;
+	std::string file = crypt_str("C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive\\Lambda\\configs\\") + config;
 
 	std::string data;
 
@@ -627,7 +627,7 @@ void C_ConfigManager::load(std::string config, bool load_script_items)
 
 void C_ConfigManager::remove(std::string config)
 {
-	std::string file = crypt_str("C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive\\Lambda\\") + config;
+	std::string file = crypt_str("C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive\\Lambda\\configs\\") + config;
 
 	std::string path = file + '\0';
 	std::remove(path.c_str());
@@ -642,7 +642,7 @@ void C_ConfigManager::clear_items()
 
 void C_ConfigManager::config_files()
 {
-	std::string file = crypt_str("C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive\\Lambda\\");
+	std::string file = crypt_str("C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive\\Lambda\\configs\\");
 
 	// Create directory if it doesn't exist
 	CreateDirectory(file.c_str(), NULL);

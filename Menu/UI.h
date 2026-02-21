@@ -34,7 +34,7 @@ public:
 
 	// NEW
 	IDirect3DTexture9* nigga = nullptr;
-	IDirect3DTexture9* divine = nullptr;
+	IDirect3DTexture9* lambda = nullptr;
 
 	IDirect3DDevice9* device;
 

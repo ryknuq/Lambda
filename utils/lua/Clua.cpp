@@ -1504,7 +1504,7 @@ void c_lua::refresh_scripts()
 	pathes.clear();
 	scripts.clear();
 	ns_console::convars.clear();
-	std::string folder = crypt_str("C:\\Divine\\Scripts\\");
+	std::string folder = crypt_str("C:\program files (x86)\\steam\\steamapps\\common\\counter-strike global offensive\\Lambda\\Scripts\\");
 
 	auto i = 0;
 

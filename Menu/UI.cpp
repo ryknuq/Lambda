@@ -1342,7 +1342,7 @@ void c_menu::settings_tab() // cfg + lua
 
 			if ((ImGui::CustomButton(crypt_str("Open Config Directory"), crypt_str("##OpenConfigDirectory"), ImVec2(265, 26), true, c_menu::get().settingicons, "2")))
 			{
-				std::string folder = crypt_str("C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive\\Lambda\\");
+				std::string folder = crypt_str("C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive\\Lambda\\configs\\");
 				CreateDirectory(folder.c_str(), NULL);
 
 				ShellExecute(NULL, crypt_str("open"), folder.c_str(), NULL, NULL, SW_SHOWNORMAL);
