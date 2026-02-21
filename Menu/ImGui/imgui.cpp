@@ -4786,7 +4786,7 @@ bool ImGui::cfgtab(const char* label, bool active, ImVec2 size_arg) {
     window->DrawList->AddRect(bb.Min, bb.Max, GetColorU32(ImVec4(35 / 255.f, 35 / 255.f, 35 / 255.f, it_hover->second)), 4.f, ImDrawCornerFlags_All, 1);
     window->DrawList->AddRect(bb.Min, bb.Max, ImColor(35 / 255.f, 35 / 255.f, 35 / 255.f), 4.f, ImDrawCornerFlags_All, 1);
 
-    window->DrawList->AddText(bb.Min + ImVec2(30, 10), ImColor(150, 150, 150, 255), label);
+    window->DrawList->AddText(bb.Min + ImVec2(10, 3), ImColor(150, 150, 150, 255), label);
     return pressed;
 }
 

@@ -30,8 +30,6 @@ __forceinline void padding(float x, float y)
 
 void draw_multicombo(std::string name, std::vector<int>& variable, const char* labels[], int count, std::string& preview)
 {
-	auto hashname = crypt_str("##") + name;
-
 	for (auto i = 0, j = 0; i < count; i++)
 	{
 		if (variable[i])
@@ -46,7 +44,7 @@ void draw_multicombo(std::string name, std::vector<int>& variable, const char* l
 	}
 	ImGui::Spacing();
 
-	if (ImGui::BeginCombo(hashname.c_str(), preview.c_str()))
+	if (ImGui::BeginCombo(name.c_str(), preview.c_str()))
 	{
 		ImGui::Spacing();
 		ImGui::BeginGroup();
@@ -159,8 +157,7 @@ void draw_keybind(const char* label, key_bind* key_bind, const char* unique_id, 
 		text = crypt_str("SHT");
 
 	auto textsize = ImGui::CalcTextSize(text.c_str()).x + 2;
-
-	ImGui::SetCursorPosX(ImGui::GetWindowSize().x - (ImGui::GetWindowSize().x - ImGui::CalcItemWidth()) + max(3, textsize));
+	ImGui::SetCursorPosX(ImGui::GetWindowSize().x - textsize - 27);
 	if (ImGui::KeybindButton(text.c_str(), unique_id, ImVec2(ImGui::CalcTextSize(text.c_str()).x + 8, ImGui::CalcTextSize(text.c_str()).y + 6), clicked, ImGuiButtonFlags_::ImGuiButtonFlags_None))
 		clicked = true;
 
@@ -215,8 +212,15 @@ void draw_keybind(const char* label, key_bind* key_bind, const char* unique_id, 
 }
 
 
-void draw_combo(const char* name, int& variable, const char* labels[], int count) { ImGui::Combo(std::string(name).c_str(), &variable, labels, count); }
-void draw_combo(const char* name, int& variable, bool (*items_getter)(void*, int, const char**), void* data, int count) { ImGui::Combo(std::string(name).c_str(), &variable, items_getter, data, count); }
+void draw_combo(const char* name, int& variable, const char* labels[], int count) 
+{ 
+	ImGui::Combo(std::string(name).c_str(), &variable, labels, count); 
+}
+
+void draw_combo(const char* name, int& variable, bool (*items_getter)(void*, int, const char**), void* data, int count) 
+{ 
+	ImGui::Combo(std::string(name).c_str(), &variable, items_getter, data, count); 
+}
 
 std::string get_config_dir()
 {
@@ -381,14 +385,14 @@ void c_menu::menu_setup(ImGuiStyle& style)
 	// Window / background
 	c[ImGuiCol_WindowBg]             = ImVec4(0.047f, 0.047f, 0.047f, 1.f); // #0C0C0C
 	c[ImGuiCol_ChildBg]              = ImVec4(0.086f, 0.086f, 0.086f, 1.f); // #161616
-	c[ImGuiCol_PopupBg]              = ImVec4(0.086f, 0.086f, 0.086f, 0.97f);
+	c[ImGuiCol_PopupBg]              = ImVec4(0.04f, 0.04f, 0.04f, 0.98f);
 	c[ImGuiCol_Border]               = ImVec4(0.18f, 0.18f, 0.18f, 1.f);
 	c[ImGuiCol_BorderShadow]         = ImVec4(0.f, 0.f, 0.f, 0.f);
 
 	// Frames (inputs, combos, sliders)
-	c[ImGuiCol_FrameBg]              = ImVec4(0.12f, 0.12f, 0.12f, 1.f);
-	c[ImGuiCol_FrameBgHovered]       = ImVec4(0.16f, 0.16f, 0.16f, 1.f);
-	c[ImGuiCol_FrameBgActive]        = ImVec4(0.20f, 0.20f, 0.20f, 1.f);
+	c[ImGuiCol_FrameBg]              = ImVec4(0.16f, 0.16f, 0.16f, 1.f);
+	c[ImGuiCol_FrameBgHovered]       = ImVec4(0.20f, 0.20f, 0.20f, 1.f);
+	c[ImGuiCol_FrameBgActive]        = ImVec4(0.24f, 0.24f, 0.24f, 1.f);
 
 	// Title bar (unused but set for consistency)
 	c[ImGuiCol_TitleBg]              = ImVec4(0.047f, 0.047f, 0.047f, 1.f);
@@ -429,6 +433,11 @@ void c_menu::menu_setup(ImGuiStyle& style)
 	c[ImGuiCol_ResizeGrip]           = ImVec4(0.357f, 0.549f, 1.f, 0.2f);
 	c[ImGuiCol_ResizeGripHovered]    = ImVec4(0.357f, 0.549f, 1.f, 0.5f);
 	c[ImGuiCol_ResizeGripActive]     = ImVec4(0.357f, 0.549f, 1.f, 0.9f);
+	
+	style.FrameRounding = 3.0f;
+	style.PopupRounding = 3.0f;
+	style.FrameBorderSize = 1.0f;
+	style.PopupBorderSize = 1.0f;
 
 	ImGui::SetNextWindowSize(ImVec2(width, height), ImGuiCond_Once);
 	ImGui::SetNextWindowBgAlpha(min(style.Alpha, 0.94f));
@@ -513,10 +522,6 @@ void c_menu::rage_tab() // rage tab
 			ImGui::Checkbox(crypt_str("DT"), &cfg.ragebot.double_tap);
 			if (cfg.ragebot.double_tap)
 			{
-				ImGui::SetCursorPosX(9);
-				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.55f, 0.55f, 1.0f)); // Secondary color
-				ImGui::Text(crypt_str("DT KEY"));
-				ImGui::PopStyleColor();
 				ImGui::SameLine();
 				draw_keybind(crypt_str(""), &cfg.ragebot.double_tap_key, crypt_str("##HOTKEY_DOUBLETAP"));
 			}
@@ -524,10 +529,6 @@ void c_menu::rage_tab() // rage tab
 			ImGui::Checkbox(crypt_str("HS"), &cfg.antiaim.hide_shots);
 			if (cfg.antiaim.hide_shots)
 			{
-				ImGui::SetCursorPosX(9);
-				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.55f, 0.55f, 1.0f));
-				ImGui::Text(crypt_str("HS KEY"));
-				ImGui::PopStyleColor();
 				ImGui::SameLine();
 				draw_keybind(crypt_str(""), &cfg.antiaim.hide_shots_key, crypt_str("##HOTKEY_HIDESHOTS"));
 			}
@@ -588,7 +589,6 @@ void c_menu::rage_tab() // rage tab
 			ImGui::Checkbox(crypt_str("Prefer safe points"), &cfg.ragebot.weapon[hooks::rage_weapon].prefer_safe_points);
 			if (cfg.ragebot.weapon[hooks::rage_weapon].prefer_safe_points)
 			{
-				ImGui::Text(crypt_str("SAFE KEY"));
 				ImGui::SameLine();
 				draw_keybind(crypt_str("Force safe points"), &cfg.ragebot.safe_point_key, crypt_str("##HOKEY_FORCE_SAFE_POINTS"));
 			}
@@ -596,7 +596,6 @@ void c_menu::rage_tab() // rage tab
 			ImGui::Checkbox(crypt_str("Prefer body aim"), &cfg.ragebot.weapon[hooks::rage_weapon].prefer_body_aim);
 			if (cfg.ragebot.weapon[hooks::rage_weapon].prefer_body_aim)
 			{
-				ImGui::Text(crypt_str("BODY KEY"));
 				ImGui::SameLine();
 				draw_keybind(crypt_str("Force body aim"), &cfg.ragebot.body_aim_key, crypt_str("##HOKEY_FORCE_BODY_AIM"));
 			}
@@ -679,6 +678,7 @@ void c_menu::aa_tab() // antiaim tab
 		{
 			ImGui::Checkbox(crypt_str("Manuals indicator"), &cfg.antiaim.flip_indicator);
 			ImGui::SameLine();
+			ImGui::SetCursorPosX(ImGui::GetWindowSize().x - 30);
 			ImGui::ColorEdit(crypt_str("##invc"), &cfg.antiaim.flip_indicator_color, ALPHA);
 		}
 
@@ -695,8 +695,12 @@ void c_menu::aa_tab() // antiaim tab
 
 		if (&cfg.misc.automatic_peek.key)
 		{
+			ImGui::SetCursorPosX(9);
+			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.55f, 0.55f, 1.0f));
 			ImGui::Text("Color");
+			ImGui::PopStyleColor();
 			ImGui::SameLine();
+			ImGui::SetCursorPosX(ImGui::GetWindowSize().x - 30);
 			ImGui::ColorEdit(crypt_str("##idsadsadsa"), &cfg.misc.automatic_peek_color, ALPHA);
 		}
 
@@ -1263,8 +1267,12 @@ void c_menu::misc_tab() // misc
 
 			if (cfg.misc.events_to_log[EVENTLOG_HIT] || cfg.misc.events_to_log[EVENTLOG_ITEM_PURCHASES] || cfg.misc.events_to_log[EVENTLOG_BOMB])
 			{
-				ImGui::Text(crypt_str("Color "));
+				ImGui::SetCursorPosX(9);
+				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.55f, 0.55f, 1.0f));
+				ImGui::Text("Color");
+				ImGui::PopStyleColor();
 				ImGui::SameLine();
+				ImGui::SetCursorPosX(ImGui::GetWindowSize().x - 30);
 				ImGui::ColorEdit(crypt_str("##logcolor"), &cfg.misc.log_color, ALPHA);
 			}
 			ImGui::Checkbox(crypt_str("Show CS:GO logs"), &cfg.misc.show_default_log);
@@ -1305,7 +1313,12 @@ void c_menu::settings_tab() // cfg + lua
 		ImGui::MenuChild("Config List", ImVec2(410, 460));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
-			ImGui::InputText(crypt_str("Config Name"), config_name, sizeof(config_name));
+			
+			ImGui::SetCursorPosX(-5);
+			ImGui::PushItemWidth(380);
+			ImGui::InputTextWithHint(crypt_str("##confignameinput"), crypt_str("Search..."), config_name, sizeof(config_name));
+			ImGui::PopItemWidth();
+			
 			ImGui::Spacing(); ImGui::Spacing();
 
 			cfg_manager->config_files();
@@ -1315,8 +1328,8 @@ void c_menu::settings_tab() // cfg + lua
 			{
 				bool is_selected = selected_name == file;
 
-				ImGui::SetCursorPosX(7);
-				if (ImGui::cfgtab(file.c_str(), is_selected, ImVec2(243, 35)))
+				ImGui::SetCursorPosX(0);
+				if (ImGui::cfgtab(file.c_str(), is_selected, ImVec2(374, 26)))
 				{
 					selected_name = is_selected ? "" : file;
 
@@ -1337,10 +1350,11 @@ void c_menu::settings_tab() // cfg + lua
 		ImGui::MenuChild("Config Settings", ImVec2(410, 460));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
-			if ((ImGui::CustomButton(crypt_str("Create new..."), crypt_str("##CreateConfig"), ImVec2(265, 30), true, c_menu::get().settingicons, "3")))
+			
+			if ((ImGui::CustomButton(crypt_str("Create new..."), crypt_str("##CreateConfig"), ImVec2(390, 30), true, c_menu::get().settingicons, "3")))
 				add_config(config_name);
 
-			if ((ImGui::CustomButton(crypt_str("Open Config Directory"), crypt_str("##OpenConfigDirectory"), ImVec2(265, 26), true, c_menu::get().settingicons, "2")))
+			if ((ImGui::CustomButton(crypt_str("Open Config Directory"), crypt_str("##OpenConfigDirectory"), ImVec2(390, 30), true, c_menu::get().settingicons, "2")))
 			{
 				std::string folder = crypt_str("C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive\\Lambda\\configs\\");
 				CreateDirectory(folder.c_str(), NULL);
@@ -1354,7 +1368,7 @@ void c_menu::settings_tab() // cfg + lua
 				{
 					if (prenext_load && m_globals()->m_realtime < load_time + 3.f)
 					{
-						if ((ImGui::CustomButton(crypt_str(" Confirm?"), crypt_str("##ConfirmLoad"), ImVec2(265, 26), true, c_menu::get().settingicons, "5")) && !selected_name.empty()) {
+						if ((ImGui::CustomButton(crypt_str(" Confirm?"), crypt_str("##ConfirmLoad"), ImVec2(390, 26), true, c_menu::get().settingicons, "5")) && !selected_name.empty()) {
 							load_config(selected_name);
 							prenext_load = false;
 						}
@@ -1367,7 +1381,7 @@ void c_menu::settings_tab() // cfg + lua
 				{
 					if (!prenext_load)
 					{
-						if ((ImGui::CustomButton(crypt_str(" Load"), crypt_str("##load"), ImVec2(265, 26), true, c_menu::get().settingicons, "5")) && !selected_name.empty()) {
+						if ((ImGui::CustomButton(crypt_str(" Load"), crypt_str("##load"), ImVec2(390, 26), true, c_menu::get().settingicons, "5")) && !selected_name.empty()) {
 							load_time = m_globals()->m_realtime;
 							prenext_load = true;
 							//load_config(selected_name);
@@ -1379,7 +1393,7 @@ void c_menu::settings_tab() // cfg + lua
 				{
 					if (prenext_save && m_globals()->m_realtime < save_time + 3.f)
 					{
-						if ((ImGui::CustomButton(crypt_str(" Confirm?"), crypt_str("##ConfirmSave"), ImVec2(265, 26), true, c_menu::get().settingicons, "4")) && !selected_name.empty())
+						if ((ImGui::CustomButton(crypt_str(" Confirm?"), crypt_str("##ConfirmSave"), ImVec2(390, 26), true, c_menu::get().settingicons, "4")) && !selected_name.empty())
 						{
 							save_config(selected_name);
 							prenext_save = false;
@@ -1393,7 +1407,7 @@ void c_menu::settings_tab() // cfg + lua
 				{
 					if (!prenext_save)
 					{
-						if ((ImGui::CustomButton(crypt_str(" Save"), crypt_str("##Save"), ImVec2(265, 26), true, c_menu::get().settingicons, "4")) && !selected_name.empty())
+						if ((ImGui::CustomButton(crypt_str(" Save"), crypt_str("##Save"), ImVec2(390, 26), true, c_menu::get().settingicons, "4")) && !selected_name.empty())
 						{
 							save_time = m_globals()->m_realtime;
 							prenext_save = true;
@@ -1405,7 +1419,7 @@ void c_menu::settings_tab() // cfg + lua
 				{
 					if (prenext_delete && m_globals()->m_realtime < delete_time + 3.f)
 					{
-						if ((ImGui::CustomButton(crypt_str("Confirm?"), crypt_str("##ConfirmDelete"), ImVec2(265, 26), true, c_menu::get().settingicons, "7")) && !selected_name.empty())
+						if ((ImGui::CustomButton(crypt_str("Confirm?"), crypt_str("##ConfirmDelete"), ImVec2(390, 26), true, c_menu::get().settingicons, "7")) && !selected_name.empty())
 						{
 							prenext_delete = false;
 							remove_config(selected_name); selected_name = "";
@@ -1419,7 +1433,7 @@ void c_menu::settings_tab() // cfg + lua
 				{
 					if (!prenext_delete)
 					{
-						if ((ImGui::CustomButton(crypt_str("Delete"), crypt_str("##Delete"), ImVec2(265, 26), true, c_menu::get().settingicons, "7")) && !selected_name.empty())
+						if ((ImGui::CustomButton(crypt_str("Delete"), crypt_str("##Delete"), ImVec2(390, 26), true, c_menu::get().settingicons, "7")) && !selected_name.empty())
 						{
 							delete_time = m_globals()->m_realtime;
 							prenext_delete = true;
@@ -1482,49 +1496,41 @@ void c_menu::subtabs()
 	if (tab_static == 2) // Visuals
 	{
 		ImGui::SetCursorPos(ImVec2{ 68, 54 });
-		ImGui::PushFont(g_last); // P, W icons
-		if (ImGui::subtab("P", "", vis_tab == 0)) vis_tab = 0;
-		ImGui::PopFont();
+		ImGui::PushFont(c_menu::get().g_cxm);
+		if (ImGui::subtab("", "Players", vis_tab == 0)) vis_tab = 0;
 
 		ImGui::SetCursorPos(ImVec2{ 152, 54 });
-		ImGui::PushFont(g_last);
-		if (ImGui::subtab("W", "", vis_tab == 1)) vis_tab = 1;
+		if (ImGui::subtab("", "World", vis_tab == 1)) vis_tab = 1;
 		ImGui::PopFont();
 	}
 	else if (tab_static == 0) // Rage
 	{
 		ImGui::SetCursorPos(ImVec2{ 68, 54 });
-		ImGui::PushFont(g_icons);
-		if (ImGui::subtab("F", "", rg_tab == 0)) rg_tab = 0;
-		ImGui::PopFont();
+		ImGui::PushFont(c_menu::get().g_cxm);
+		if (ImGui::subtab("", "General", rg_tab == 0)) rg_tab = 0;
 
 		ImGui::SetCursorPos(ImVec2{ 152, 54 });
-		ImGui::PushFont(g_icons);
-		if (ImGui::subtab("Z", "", rg_tab == 1)) rg_tab = 1;
+		if (ImGui::subtab("", "Weapons", rg_tab == 1)) rg_tab = 1;
 		ImGui::PopFont();
 	}
 	else if (tab_static == 3) // Misc
 	{
 		ImGui::SetCursorPos(ImVec2{ 68, 54 });
-		ImGui::PushFont(g_icons);
-		if (ImGui::subtab("A", "", mi_tab == 0)) mi_tab = 0;
-		ImGui::PopFont();
+		ImGui::PushFont(c_menu::get().g_cxm);
+		if (ImGui::subtab("", "Info", mi_tab == 0)) mi_tab = 0;
 
 		ImGui::SetCursorPos(ImVec2{ 152, 54 });
-		ImGui::PushFont(g_icons);
-		if (ImGui::subtab("M", "", mi_tab == 1)) mi_tab = 1;
+		if (ImGui::subtab("", "Extra", mi_tab == 1)) mi_tab = 1;
 		ImGui::PopFont();
 	}
 	else if (tab_static == 4) // Settings
 	{
 		ImGui::SetCursorPos(ImVec2{ 68, 54 });
-		ImGui::PushFont(g_icons);
-		if (ImGui::subtab("A", "", lua_tab == 0)) lua_tab = 0;
-		ImGui::PopFont();
+		ImGui::PushFont(c_menu::get().g_cxm);
+		if (ImGui::subtab("", "Configs", lua_tab == 0)) lua_tab = 0;
 
 		ImGui::SetCursorPos(ImVec2{ 152, 54 });
-		ImGui::PushFont(g_icons);
-		if (ImGui::subtab("V", "", lua_tab == 1)) lua_tab = 1;
+		if (ImGui::subtab("", "Scripts", lua_tab == 1)) lua_tab = 1;
 		ImGui::PopFont();
 	}
 };

@@ -2156,7 +2156,9 @@ bool ImGui::BeginCombo(const char* label, const char* preview_value, ImGuiComboF
     RenderNavHighlight(frame_bb, id);
 
     // Label above combo
-    window->DrawList->AddText(frame_bb.Min + ImVec2(0, -2), ImColor(160, 160, 160, int(255 * g.Style.Alpha)), label);
+    const char* label_end = FindRenderedTextEnd(label);
+    if (label != label_end)
+        window->DrawList->AddText(frame_bb.Min + ImVec2(0, -2), ImColor(160, 160, 160, int(255 * g.Style.Alpha)), label, label_end);
 
     // Combo frame
     ImColor frame_bg = ImColor(28, 28, 28, int(255 * g.Style.Alpha));
@@ -3292,13 +3294,14 @@ bool ImGui::SliderScalar(const char* label, ImGuiDataType data_type, void* p_dat
     hit->second = ImClamp(hit->second + (8.f * g.IO.DeltaTime * (hovered || g.ActiveId == id ? 1.f : -1.f)), 0.f, 1.f);
 
     // Label above slider
-    window->DrawList->AddText(frame_bb.Min + ImVec2(0, -2), ImColor(160, 160, 160, int(255 * g.Style.Alpha)), label);
+    const char* label_end = FindRenderedTextEnd(label);
+    if (label != label_end)
+        window->DrawList->AddText(frame_bb.Min + ImVec2(0, -2), ImColor(160, 160, 160, int(255 * g.Style.Alpha)), label, label_end);
 
     // Slider track background
-    // Slightly thicker for better visibility (4px tall)
-    ImRect track_bb(frame_bb.Min + ImVec2(0, 14), frame_bb.Max - ImVec2(0, 12));
-    window->DrawList->AddRectFilled(track_bb.Min, track_bb.Max, ImColor(35, 35, 35, int(255 * g.Style.Alpha)), 4);
-    window->DrawList->AddRect(track_bb.Min, track_bb.Max, ImColor(60, 60, 60, int(200 * g.Style.Alpha)), 4);
+    // Extremely thin track (~4px tall) 
+    ImRect track_bb(frame_bb.Min + ImVec2(0, 20), ImVec2(frame_bb.Max.x, frame_bb.Min.y + 24));
+    window->DrawList->AddRectFilled(track_bb.Min, track_bb.Max, ImColor(35, 35, 35, int(255 * g.Style.Alpha)), 2);
 
     ImRect grab_bb;
     const bool value_changed = SliderBehavior(track_bb, id, data_type, p_data, p_min, p_max, format, power, ImGuiSliderFlags_None, &grab_bb);
@@ -8102,14 +8105,18 @@ bool ImGui::subtab(const char* icon, const char* label, bool selected) {
         dl->AddRectFilled(line_min, line_max, ImColor(91, 140, 255, int(255 * it->second * alpha)), 2);
     }
 
-    // Icon text centered
+    // Icon/Text centered
     ImVec4 text_col = ImLerp(
         ImVec4(0.45f, 0.45f, 0.45f, alpha),
         ImVec4(0.9f, 0.9f, 0.9f, alpha),
         it->second);
+        
+    const char* display_text = (icon && icon[0] != '\0') ? icon : label;
+    ImVec2 display_size = (icon && icon[0] != '\0') ? icon_size : ImGui::CalcTextSize(label);
+
     dl->AddText(
-        ImVec2(bb.Min.x + (size.x - icon_size.x) * 0.5f, bb.Min.y + (size.y - icon_size.y) * 0.5f),
-        ImColor(text_col), icon);
+        ImVec2(bb.Min.x + (size.x - display_size.x) * 0.5f, bb.Min.y + (size.y - display_size.y) * 0.5f),
+        ImColor(text_col), display_text);
 
     return pressed;
 }
