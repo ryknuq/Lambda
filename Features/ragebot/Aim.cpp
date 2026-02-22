@@ -1,4 +1,4 @@
-﻿// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java: http://www.viva64.com
 
 /*
@@ -1036,6 +1036,7 @@ bool IsTickValid(float simTime)
     static auto cl_interp_ratio = m_cvar()->FindVar(crypt_str("cl_interp_ratio"));
     static auto sv_client_min_interp_ratio = m_cvar()->FindVar(crypt_str("sv_client_min_interp_ratio"));
     static auto sv_client_max_interp_ratio = m_cvar()->FindVar(crypt_str("sv_client_max_interp_ratio"));
+    static auto sv_maxunlag = m_cvar()->FindVar(crypt_str("sv_maxunlag"));
     auto lerp_ratio = math::clamp(cl_interp_ratio->GetFloat(), sv_client_min_interp_ratio->GetFloat(), sv_client_max_interp_ratio->GetFloat());
     INetChannelInfo* nci = m_engine()->GetNetChannelInfo();
 
@@ -1049,12 +1050,12 @@ bool IsTickValid(float simTime)
                       nci->GetAvgLatency(FLOW_OUTGOING));
 
     float outgoingLatency = nci->GetLatency(FLOW_OUTGOING);
-    float clampedLatency = math::clamp(lerp_ratio + outgoingLatency, 0.f, 1.f);
+    float clampedLatency = math::clamp(lerp_ratio + outgoingLatency, 0.f, sv_maxunlag->GetFloat());
 
     int timeDelta = TIME_TO_TICKS(simTime) + TIME_TO_TICKS(lerp_ratio);
     float correction = clampedLatency - TICKS_TO_TIME(predCmdArrivTick + lerpTicks - timeDelta);
 
-    return abs(correction) < 0.2f;
+    return abs(correction) < sv_maxunlag->GetFloat();
 }
 
 bool aim::calculate_hitchance(const Vector& aim_angle, player_t* ent, int& final_hitchance)

@@ -358,7 +358,7 @@ public:
 		auto curtime = g_ctx.local()->is_alive() ? TICKS_TO_TIME(g_ctx.globals.fixed_tickbase) : m_globals()->m_curtime;
 		auto delta_time = correct - (curtime - simulation_time);
 
-		if (fabs(delta_time) > 0.2f)
+		if (fabs(delta_time) > sv_maxunlag->GetFloat())
 			return false;
 
 		auto extra_choke = 0;

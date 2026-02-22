@@ -1095,7 +1095,7 @@ void misc::break_lc(CUserCmd* m_pcmd) // breaking lc with fakelags
 }
 void misc::double_tap_defensive(CUserCmd* m_pcmd)
 {
-	if (!cfg.ragebot.lag_exploit)
+	if (!cfg.ragebot.defensive_doubletap)
 		return;
 
 	// Ensure player velocity is less than max speed before proceeding

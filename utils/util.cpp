@@ -382,7 +382,8 @@ namespace util
 				return false;
 
 			auto curtime = m_globals()->m_curtime;
-			auto range = 0.2;
+			static auto sv_maxunlag = m_cvar()->FindVar(crypt_str("sv_maxunlag"));
+			auto range = sv_maxunlag->GetFloat();
 
 			if (g_ctx.local()->is_alive())
 				curtime = TICKS_TO_TIME(g_ctx.globals.fixed_tickbase);

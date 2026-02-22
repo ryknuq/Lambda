@@ -1,4 +1,4 @@
-#include <ShlObj_core.h>
+﻿#include <ShlObj_core.h>
 #include <unordered_map>
 #include "UI.h"
 #include "../menu/ImGui/code_editor.h"
@@ -554,7 +554,7 @@ void c_menu::rage_tab() // rage tab
 		ImGui::MenuChild("Main", ImVec2(410, 165));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
-			ImGui::Checkbox(crypt_str("Defensive"), &cfg.ragebot.lag_exploit);
+			ImGui::Checkbox(crypt_str("Defensive"), &cfg.ragebot.defensive_doubletap);
 			ImGui::Checkbox(crypt_str("Anti exploit"), &cfg.ragebot.anti_exploit);
 		}
 		ImGui::EndChild();

@@ -1,4 +1,4 @@
-﻿// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java: http://www.viva64.com
 
 #include "..\hooks.hpp"
@@ -181,7 +181,7 @@ void __stdcall hooks::hooked_createmove(int sequence_number, float input_sample_
 	if (!g_ctx.globals.should_recharge)
 		fakelag::get().Createmove();
 
-	if (cfg.ragebot.lag_exploit)
+	if (cfg.ragebot.defensive_doubletap)
 		misc::get().createmove(m_pcmd);
 
 	g_ctx.globals.aimbot_working = false;
@@ -385,48 +385,75 @@ void __stdcall hooks::hooked_createmove(int sequence_number, float input_sample_
 
 	if (cfg.misc.buybot_enable && g_ctx.globals.should_buy)
 	{
-		--g_ctx.globals.should_buy;
-
-		if (!g_ctx.globals.should_buy)
+		if (g_ctx.local() && g_ctx.local()->is_alive())
 		{
-			std::string buy;
+			const float spawn_time = g_ctx.local()->m_flSpawnTime();
+			const float cur_time = m_globals()->m_curtime;
 
-			switch (cfg.misc.buybot1)
+			// wait at least ~0.25s after spawn before attempting to buy
+			if (cur_time - spawn_time >= 0.25f)
 			{
-			case 1:
-				buy += crypt_str("buy g3sg1; ");
-				break;
-			case 2:
-				buy += crypt_str("buy awp; ");
-				break;
-			case 3:
-				buy += crypt_str("buy ssg08; ");
-				break;
+				--g_ctx.globals.should_buy;
+
+				if (!g_ctx.globals.should_buy)
+				{
+					// extra safety: ensure weapon system appears responsive before issuing buys
+					auto active = g_ctx.local()->m_hActiveWeapon().Get();
+					if (active)
+					{
+						auto info = active->get_csweapon_info();
+						if (!info)
+						{
+							// postpone by a few ticks if weapon scripts are not ready yet
+							g_ctx.globals.should_buy = 2;
+							return;
+						}
+					}
+
+					std::string buy;
+
+					switch (cfg.misc.buybot1)
+					{
+					case 1:
+						// team-correct auto sniper
+						if (g_ctx.local()->m_iTeamNum() == 3)
+							buy += crypt_str("buy scar20; ");
+						else
+							buy += crypt_str("buy g3sg1; ");
+						break;
+					case 2:
+						buy += crypt_str("buy awp; ");
+						break;
+					case 3:
+						buy += crypt_str("buy ssg08; ");
+						break;
+					}
+
+					switch (cfg.misc.buybot2)
+					{
+					case 1:
+						buy += crypt_str("buy elite; ");
+						break;
+					case 2:
+						buy += crypt_str("buy deagle; buy revolver; ");
+						break;
+					}
+
+					if (cfg.misc.buybot3[BUY_ARMOR])
+						buy += crypt_str("buy vesthelm; buy vest; ");
+
+					if (cfg.misc.buybot3[BUY_TASER])
+						buy += crypt_str("buy taser; ");
+
+					if (cfg.misc.buybot3[BUY_GRENADES])
+						buy += crypt_str("buy molotov; buy hegrenade; buy smokegrenade; ");
+
+					if (cfg.misc.buybot3[BUY_DEFUSER])
+						buy += crypt_str("buy defuser; ");
+
+					m_engine()->ExecuteClientCmd(buy.c_str());
+				}
 			}
-
-			switch (cfg.misc.buybot2)
-			{
-			case 1:
-				buy += crypt_str("buy elite; ");
-				break;
-			case 2:
-				buy += crypt_str("buy deagle; buy revolver; ");
-				break;
-			}
-
-			if (cfg.misc.buybot3[BUY_ARMOR])
-				buy += crypt_str("buy vesthelm; buy vest; ");
-
-			if (cfg.misc.buybot3[BUY_TASER])
-				buy += crypt_str("buy taser; ");
-
-			if (cfg.misc.buybot3[BUY_GRENADES])
-				buy += crypt_str("buy molotov; buy hegrenade; buy smokegrenade; ");
-
-			if (cfg.misc.buybot3[BUY_DEFUSER])
-				buy += crypt_str("buy defuser; ");
-
-			m_engine()->ExecuteClientCmd(buy.c_str());
 		}
 	}
 
