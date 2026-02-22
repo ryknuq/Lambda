@@ -1,4 +1,4 @@
-﻿#include <ShlObj_core.h>
+#include <ShlObj_core.h>
 #include <unordered_map>
 #include "UI.h"
 #include "../menu/ImGui/code_editor.h"
@@ -123,7 +123,6 @@ void draw_keybind(const char* label, key_bind* key_bind, const char* unique_id, 
 	if (key_bind->key == KEY_ESCAPE)
 		key_bind->key = KEY_NONE;
 
-
 	auto clicked = false;
 	auto text = (std::string)m_inputsys()->ButtonCodeToString(key_bind->key);
 	auto s = ImGui::GetWindowSize();
@@ -157,7 +156,23 @@ void draw_keybind(const char* label, key_bind* key_bind, const char* unique_id, 
 		text = crypt_str("SHT");
 
 	auto textsize = ImGui::CalcTextSize(text.c_str()).x + 2;
-	ImGui::SetCursorPosX(ImGui::GetWindowSize().x - textsize - 27);
+	// when inline (with_bool == true), place button at current cursor (no force-right)
+	// otherwise, align to the right as before
+	if (!with_bool)
+		ImGui::SetCursorPosX(ImGui::GetWindowSize().x - textsize - 27);
+	else
+	{
+		// Inline: right-align within current content width (no clipping)
+		const float btn_w = ImGui::CalcTextSize(text.c_str()).x + 8.0f;
+		const float cur_x = ImGui::GetCursorPosX();
+		const float avail_x = ImGui::GetContentRegionAvail().x;
+		const float margin_r = 8.0f; // right padding
+		const float gap_l = 8.0f;    // gap from checkbox
+		float x = cur_x + avail_x - btn_w - margin_r;
+		if (x < cur_x + gap_l)
+			x = cur_x + gap_l;
+		ImGui::SetCursorPosX(x);
+	}
 	if (ImGui::KeybindButton(text.c_str(), unique_id, ImVec2(ImGui::CalcTextSize(text.c_str()).x + 8, ImGui::CalcTextSize(text.c_str()).y + 6), clicked, ImGuiButtonFlags_::ImGuiButtonFlags_None))
 		clicked = true;
 
@@ -522,15 +537,15 @@ void c_menu::rage_tab() // rage tab
 			ImGui::Checkbox(crypt_str("DT"), &cfg.ragebot.double_tap);
 			if (cfg.ragebot.double_tap)
 			{
-				ImGui::SameLine();
-				draw_keybind(crypt_str(""), &cfg.ragebot.double_tap_key, crypt_str("##HOTKEY_DOUBLETAP"));
+				ImGui::SameLine(0.0f, 8.0f);
+				draw_keybind(crypt_str(""), &cfg.ragebot.double_tap_key, crypt_str("##HOTKEY_DOUBLETAP"), true);
 			}
 
 			ImGui::Checkbox(crypt_str("HS"), &cfg.antiaim.hide_shots);
 			if (cfg.antiaim.hide_shots)
 			{
-				ImGui::SameLine();
-				draw_keybind(crypt_str(""), &cfg.antiaim.hide_shots_key, crypt_str("##HOTKEY_HIDESHOTS"));
+				ImGui::SameLine(0.0f, 8.0f);
+				draw_keybind(crypt_str(""), &cfg.antiaim.hide_shots_key, crypt_str("##HOTKEY_HIDESHOTS"), true);
 			}
 		}
 		ImGui::EndChild();

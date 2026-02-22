@@ -1007,7 +1007,7 @@ bool ImGui::KeybindButton(const char* label, const char* unique_id, const ImVec2
     ImVec2 text_pos = bb.Min + ImVec2((size.x - label_size.x) * 0.5f, (size.y - label_size.y) * 0.5f);
     window->DrawList->AddText(text_pos, ImColor(220, 220, 220, int(255 * g.Style.Alpha)), label);
 
-    if (g.IO.MouseClicked[1] && hovered)
+    if ((g.IO.MouseClicked[1] || (g.IO.MouseClicked[0] && (g.IO.KeyCtrl || g.IO.KeyAlt))) && hovered)
         OpenPopup(unique_id);
 
     return pressed;
