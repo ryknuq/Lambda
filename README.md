@@ -9,7 +9,7 @@ An open-source, community-driven cheat project for CS:GO, focused exclusively on
 
 ### A Message from me
 
-> This project is free and will always remain free. I want to go open source as well. The only way this is gonna survive is if I get support, in terms of mainly testing, suggestions and sometimes even developer help. When it gets dire, I mainly need someone to even to test the thing.
+> This project is free and will always remain free.
 
 This project was born out of a passion for the game and its HVH community. By making it open source, the goal is to create a transparent, collaborative, and powerful tool that can be shaped by its users. We are not interested in monetary gain; we are interested in building something great together.
 
@@ -19,15 +19,15 @@ This software is intended for educational purposes and for use on community serv
 
 ### Project History & Credits
 
-This project stands on the shoulders of giants. **Lambda** is based on the source code of **Divine**, which itself was based on **Legendware v3**.
+**Lambda** is based on the source code of **Divine**, which itself was based on **Legendware v3**.
 
-A huge amount of credit and thanks goes to the original developers of those projects. Their foundational work has made this project possible, and we aim to honor their efforts by continuing to build upon it in a free and open-source manner for the community.
+A huge amount of credit and thanks goes to the original developers of those projects.
 
 ---
 
 ### Features
 
-While this is a work-in-progress, the goal is to include a full suite of HVH features, and keep improving the ones that exist. This project is obviously not only lead by me, but i also want to give the i hope soon to be community which will give opinions and suggestions.
+While this is a work-in-progress, the goal is to include a full suite of HVH features, and keep improving the ones that exist. This project is obviously not only lead by me, but by the pretty much nonexistent users.
 
 ---
 
@@ -44,7 +44,7 @@ While this is a work-in-progress, the goal is to include a full suite of HVH fea
 2.  Open the solution file (`.sln`) in Visual Studio.
 3.  Set the build configuration to `Release` and `x86`. **MUST BE SET TO THIS, OTHERWISE IT WILL NOT BUILD!**
 4.  Build the solution (Ctrl+Shift+B).
-5.  The resulting `.dll` will be in the `Build` folder directory.
+5.  The resulting `.dll` will be in the `Release` folder directory.
 
 ---
 
