@@ -376,7 +376,7 @@ int aim::get_minimum_damage(bool visible, int health)
             minimum_damage = math::clamp(cfg.ragebot.weapon[g_ctx.globals.current_weapon].minimum_damage, 1, health);
     }
 
-    if (key_binds::get().get_key_bind_state(4))
+    if (g_ctx.globals.current_weapon != -1 && key_binds::get().get_key_bind_state(4 + g_ctx.globals.current_weapon))
     {
         if (cfg.ragebot.weapon[g_ctx.globals.current_weapon].minimum_override_damage > 100)
             minimum_damage = health + cfg.ragebot.weapon[g_ctx.globals.current_weapon].minimum_override_damage - 100;

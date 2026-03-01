@@ -159,21 +159,21 @@ void draw_keybind(const char* label, key_bind* key_bind, const char* unique_id, 
 	// when inline (with_bool == true), place button at current cursor (no force-right)
 	// otherwise, align to the right as before
 	if (!with_bool)
-		ImGui::SetCursorPosX(ImGui::GetWindowSize().x - textsize - 27);
+		ImGui::SetCursorPosX(ImGui::GetWindowSize().x - textsize - 27 * c_menu::get().dpi_scale);
 	else
 	{
 		// Inline: right-align within current content width (no clipping)
 		const float btn_w = ImGui::CalcTextSize(text.c_str()).x + 8.0f;
 		const float cur_x = ImGui::GetCursorPosX();
 		const float avail_x = ImGui::GetContentRegionAvail().x;
-		const float margin_r = 8.0f; // right padding
-		const float gap_l = 8.0f;    // gap from checkbox
+		const float margin_r = 8.0f * c_menu::get().dpi_scale; // right padding
+		const float gap_l = 8.0f * c_menu::get().dpi_scale;    // gap from checkbox
 		float x = cur_x + avail_x - btn_w - margin_r;
 		if (x < cur_x + gap_l)
 			x = cur_x + gap_l;
 		ImGui::SetCursorPosX(x);
 	}
-	if (ImGui::KeybindButton(text.c_str(), unique_id, ImVec2(ImGui::CalcTextSize(text.c_str()).x + 8, ImGui::CalcTextSize(text.c_str()).y + 6), clicked, ImGuiButtonFlags_::ImGuiButtonFlags_None))
+	if (ImGui::KeybindButton(text.c_str(), unique_id, ImVec2(ImGui::CalcTextSize(text.c_str()).x + 8 * c_menu::get().dpi_scale, ImGui::CalcTextSize(text.c_str()).y + 6 * c_menu::get().dpi_scale), clicked, ImGuiButtonFlags_::ImGuiButtonFlags_None))
 		clicked = true;
 
 	if (clicked)

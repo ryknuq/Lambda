@@ -1628,10 +1628,11 @@ bool ImGui::Checkbox(const char* label, bool* v)
     const ImGuiID id = window->GetID(label);
     const ImVec2 label_size = CalcTextSize(label, NULL, true);
 
-    const ImVec2 pos = window->DC.CursorPos + ImVec2(10, 2);
-    const float height = 18.0f;
-    const float width = 34.0f;
-    const ImRect total_bb(pos, pos + ImVec2(GetWindowSize().x - 20, height + 4));
+    const float dpi = c_menu::get().dpi_scale;
+    const ImVec2 pos = window->DC.CursorPos + ImVec2(10 * dpi, 2 * dpi);
+    const float height = 18.0f * dpi;
+    const float width = 34.0f * dpi;
+    const ImRect total_bb(pos, pos + ImVec2(width + (label_size.x > 0.0f ? 10.0f * dpi + label_size.x : 0.0f), height + 4 * dpi));
     
     ItemSize(total_bb, style.FramePadding.y);
     if (!ItemAdd(total_bb, id))
@@ -1669,7 +1670,7 @@ bool ImGui::Checkbox(const char* label, bool* v)
     if (it->second > 0.05f)
     {
         for (int i = 0; i < 4; i++)
-            window->DrawList->AddRect(check_bb.Min - ImVec2(i, i), check_bb.Max + ImVec2(i, i), ImColor(91, 140, 255, int((10 - i * 2) * it->second * aslpha)), height / 2.0f + i, ImDrawCornerFlags_All, 1.0f);
+            window->DrawList->AddRect(check_bb.Min - ImVec2(i * dpi, i * dpi), check_bb.Max + ImVec2(i * dpi, i * dpi), ImColor(91, 140, 255, int((10 - i * 2) * it->second * aslpha)), height / 2.0f + i * dpi, ImDrawCornerFlags_All, 1.0f);
     }
 
     window->DrawList->AddRectFilled(check_bb.Min, check_bb.Max, bg_col, height / 2.0f);
@@ -1681,8 +1682,8 @@ bool ImGui::Checkbox(const char* label, bool* v)
         window->DrawList->AddRect(check_bb.Min, check_bb.Max, ImColor(0.25f, 0.25f, 0.25f, 0.7f * aslpha), height / 2.0f, ImDrawCornerFlags_All, 1.0f);
 
     // Knob (circle)
-    float knob_radius = (height - 6.0f) / 2.0f;
-    float knob_pos_x = ImLerp(check_bb.Min.x + 3.0f + knob_radius, check_bb.Max.x - 3.0f - knob_radius, it->second);
+    float knob_radius = (height - 6.0f * dpi) / 2.0f;
+    float knob_pos_x = ImLerp(check_bb.Min.x + 3.0f * dpi + knob_radius, check_bb.Max.x - 3.0f * dpi - knob_radius, it->second);
     ImColor knob_col = ImLerp(ImVec4(0.6f, 0.6f, 0.6f, aslpha), ImVec4(1.0f, 1.0f, 1.0f, aslpha), it->second);
     window->DrawList->AddCircleFilled(ImVec2(knob_pos_x, check_bb.GetCenter().y), knob_radius, knob_col, 16);
 
@@ -1691,7 +1692,7 @@ bool ImGui::Checkbox(const char* label, bool* v)
     {
         ImGui::PushFont(c_menu::get().g_cxm);
         ImColor text_col = ImLerp(ImVec4(0.65f, 0.65f, 0.65f, aslpha), ImVec4(0.95f, 0.95f, 0.95f, aslpha), it->second);
-        window->DrawList->AddText(ImVec2(check_bb.Max.x + 10, check_bb.Min.y + (height - label_size.y) / 2.0f), text_col, label);
+        window->DrawList->AddText(ImVec2(check_bb.Max.x + 10 * dpi, check_bb.Min.y + (height - label_size.y) / 2.0f), text_col, label);
         ImGui::PopFont();
     }
 
