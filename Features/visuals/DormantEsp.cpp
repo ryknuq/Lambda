@@ -9,11 +9,11 @@ void c_dormant_esp::start()
 	if (!m_utlCurSoundList.Count())
 		return;
 
-	for (auto i = 0; i < m_utlCurSoundList.Count() && i < 32; i++)
+	for (auto i = 0; i < m_utlCurSoundList.Count(); i++)
 	{
 		auto& sound = m_utlCurSoundList[i];
 
-		if (sound.m_nSoundSource < 1 || sound.m_nSoundSource > 64)  
+		if (sound.m_nSoundSource < 1 || sound.m_nSoundSource > m_globals()->m_maxclients)  
 			continue;
 
 		if (sound.m_pOrigin->IsZero())
@@ -71,7 +71,9 @@ bool c_dormant_esp::adjust_sound(player_t* entity)
 
 	entity->m_bSpotted() = true;
 	entity->m_fFlags() = sound_player.m_nFlags;
-	entity->set_abs_origin(sound_player.m_vecOrigin);
+
+	if (entity->GetAbsOrigin().DistTo(sound_player.m_vecOrigin) > 1.0f)
+		entity->set_abs_origin(sound_player.m_vecOrigin);
 
 	g_ctx.globals.dormant_origin[i] = sound_player.m_vecOrigin;
 	return !expired;

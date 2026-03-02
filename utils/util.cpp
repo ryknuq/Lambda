@@ -196,84 +196,28 @@ namespace util
 
 	bool get_bbox(entity_t* e, Box& box, bool player_esp)
 	{
-		auto collideable = e->GetCollideable();
-		auto m_rgflCoordinateFrame = e->m_rgflCoordinateFrame();
+		Vector head, feet;
+		Vector head_screen, feet_screen;
 
-		auto min = collideable->OBBMins();
-		auto max = collideable->OBBMaxs();
+		feet = e->GetAbsOrigin();
 
-		Vector points[8] =
+		auto height = 72.0f;
+		if (e->is_player())
 		{
-			Vector(min.x, min.y, min.z),
-			Vector(min.x, max.y, min.z),
-			Vector(max.x, max.y, min.z),
-			Vector(max.x, min.y, min.z),
-			Vector(max.x, max.y, max.z),
-			Vector(min.x, max.y, max.z),
-			Vector(min.x, min.y, max.z),
-			Vector(max.x, min.y, max.z)
-		};
-
-		Vector pointsTransformed[8];
-
-		for (auto i = 0; i < 8; i++)
-			math::vector_transform(points[i], m_rgflCoordinateFrame, pointsTransformed[i]);
-
-		Vector pos = e->GetAbsOrigin();
-		Vector flb;
-		Vector brt;
-		Vector blb;
-		Vector frt;
-		Vector frb;
-		Vector brb;
-		Vector blt;
-		Vector flt;
-
-		auto bFlb = math::WorldToScreen(pointsTransformed[3], flb);
-		auto bBrt = math::WorldToScreen(pointsTransformed[5], brt);
-		auto bBlb = math::WorldToScreen(pointsTransformed[0], blb);
-		auto bFrt = math::WorldToScreen(pointsTransformed[4], frt);
-		auto bFrb = math::WorldToScreen(pointsTransformed[2], frb);
-		auto bBrb = math::WorldToScreen(pointsTransformed[1], brb);
-		auto bBlt = math::WorldToScreen(pointsTransformed[6], blt);
-		auto bFlt = math::WorldToScreen(pointsTransformed[7], flt);
-
-		if (!bFlb && !bBrt && !bBlb && !bFrt && !bFrb && !bBrb && !bBlt && !bFlt)
-			return false;
-
-		Vector arr[8] =
-		{
-			flb,
-			brt,
-			blb,
-			frt,
-			frb,
-			brb,
-			blt,
-			flt
-		};
-
-		auto left = flb.x;
-		auto top = flb.y;
-		auto right = flb.x;
-		auto bottom = flb.y;
-
-		for (auto i = 1; i < 8; i++)
-		{
-			if (left > arr[i].x)
-				left = arr[i].x;
-			if (top < arr[i].y)
-				top = arr[i].y;
-			if (right < arr[i].x)
-				right = arr[i].x;
-			if (bottom > arr[i].y)
-				bottom = arr[i].y;
+			auto player = (player_t*)e;
+			if (player->m_fFlags() & FL_DUCKING)
+				height = 54.0f;
 		}
 
-		box.x = left;
-		box.y = bottom;
-		box.w = right - left;
-		box.h = top - bottom;
+		head = feet + Vector(0.0f, 0.0f, height);
+
+		if (!math::WorldToScreen(feet, feet_screen) || !math::WorldToScreen(head, head_screen))
+			return false;
+
+		box.h = feet_screen.y - head_screen.y;
+		box.w = box.h / 2.0f;
+		box.x = head_screen.x - (box.w / 2.0f);
+		box.y = head_screen.y;
 
 		return true;
 	}

@@ -63,7 +63,7 @@ void playeresp::paint_traverse()
 
 	auto hud_radar = (CCSGO_HudRadar*)(radar_base - 0x14);
 
-	for (auto i = 1; i < m_globals()->m_maxclients; i++)
+	for (auto i = 1; i <= m_globals()->m_maxclients; i++)
 	{
 		auto e = static_cast<player_t*>(m_entitylist()->GetClientEntity(i));
 
@@ -81,11 +81,28 @@ void playeresp::paint_traverse()
 			continue;
 
 		auto valid_dormant = false;
+		if (e->IsDormant() && esp_alpha_fade[i] <= 0.0f && !valid_dormant)
+			continue;
+
 		auto backup_flags = e->m_fFlags();
 		auto backup_origin = e->GetAbsOrigin();
 
 		if (e->IsDormant())
+		{
 			valid_dormant = c_dormant_esp::get().adjust_sound(e);
+
+			if (!valid_dormant && radar_base && hud_radar && e->m_bSpotted())
+			{
+				auto& radar_info = hud_radar->radar_info[i];
+				if (!radar_info.pos.IsZero())
+				{
+					if (e->GetAbsOrigin().DistTo(radar_info.pos) > 1.0f)
+						e->set_abs_origin(radar_info.pos);
+
+					valid_dormant = true;
+				}
+			}
+		}
 		else
 		{
 			health[i] = e->m_iHealth();
@@ -95,7 +112,7 @@ void playeresp::paint_traverse()
 		if (radar_base && hud_radar && e->IsDormant() && e->m_iTeamNum() != g_ctx.local()->m_iTeamNum() && e->m_bSpotted())
 			health[i] = hud_radar->radar_info[i].health;
 
-		if (!health[i])
+		if (health[i] <= 0)
 		{
 			if (e->IsDormant())
 			{
@@ -339,8 +356,8 @@ bool playeresp::draw_ammobar(player_t* m_entity, const Box& box)
 	auto reloading = false;
 
 	auto animlayer = m_entity->get_animlayers()[1];
-	int health_tik = ammo * box.h / weapon_info->iMaxClip1;
-
+	int health_tik = ammo * box.w / weapon_info->iMaxClip1;
+	
 	if (animlayer.m_nSequence)
 	{
 		auto activity = m_entity->sequence_activity(animlayer.m_nSequence);
@@ -350,7 +367,7 @@ bool playeresp::draw_ammobar(player_t* m_entity, const Box& box)
 		if (reloading && animlayer.m_flCycle < 1.0f)
 		{
 			bar_width = animlayer.m_flCycle * box.w;
-			health_tik = animlayer.m_flCycle * box.h;
+			health_tik = animlayer.m_flCycle * box.w;
 		}
 	}
 
@@ -359,6 +376,8 @@ bool playeresp::draw_ammobar(player_t* m_entity, const Box& box)
 
 	g_Render->FilledRect(box.x - 1, box.y + 2 + box.h, (box.w + 2), 4, Color(0, 0, 0, 100));
 	g_Render->FilledRect(box.x, box.y + 3 + box.h, bar_width, 2, color);
+
+	return true;
 }
 
 void playeresp::draw_name(player_t* m_entity, const Box& box)

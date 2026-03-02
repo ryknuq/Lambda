@@ -35,7 +35,10 @@ void draw_multicombo(std::string name, std::vector<int>& variable, const char* l
 		if (variable[i])
 		{
 			if (j)
-				preview += crypt_str(", ") + (std::string)labels[i];
+			{
+				preview += crypt_str(", ...");
+				break;
+			}
 			else
 				preview = labels[i];
 
@@ -125,12 +128,14 @@ void draw_keybind(const char* label, key_bind* key_bind, const char* unique_id, 
 
 	auto clicked = false;
 	auto text = (std::string)m_inputsys()->ButtonCodeToString(key_bind->key);
+	for (auto& c : text) 
+		c = toupper(c);
+
 	auto s = ImGui::GetWindowSize();
 	if (key_bind->key <= KEY_NONE || key_bind->key >= KEY_MAX) {
 		text = crypt_str("< >");
 	}
 	else
-
 		// if we clicked on keybind
 		if (hooks::input_shouldListen && hooks::input_receivedKeyval == &key_bind->key)
 		{
@@ -155,15 +160,17 @@ void draw_keybind(const char* label, key_bind* key_bind, const char* unique_id, 
 	else if (text == crypt_str("SHIFT"))
 		text = crypt_str("SHT");
 
-	auto textsize = ImGui::CalcTextSize(text.c_str()).x + 2;
+	float btn_w = ImGui::CalcTextSize(text.c_str()).x + 8.0f * c_menu::get().dpi_scale;
+	if (btn_w < 40.0f * c_menu::get().dpi_scale)
+		btn_w = 40.0f * c_menu::get().dpi_scale;
+
 	// when inline (with_bool == true), place button at current cursor (no force-right)
 	// otherwise, align to the right as before
 	if (!with_bool)
-		ImGui::SetCursorPosX(ImGui::GetWindowSize().x - textsize - 27 * c_menu::get().dpi_scale);
+		ImGui::SetCursorPosX(ImGui::GetWindowSize().x - btn_w - 27 * c_menu::get().dpi_scale);
 	else
 	{
 		// Inline: right-align within current content width (no clipping)
-		const float btn_w = ImGui::CalcTextSize(text.c_str()).x + 8.0f;
 		const float cur_x = ImGui::GetCursorPosX();
 		const float avail_x = ImGui::GetContentRegionAvail().x;
 		const float margin_r = 8.0f * c_menu::get().dpi_scale; // right padding
@@ -173,7 +180,8 @@ void draw_keybind(const char* label, key_bind* key_bind, const char* unique_id, 
 			x = cur_x + gap_l;
 		ImGui::SetCursorPosX(x);
 	}
-	if (ImGui::KeybindButton(text.c_str(), unique_id, ImVec2(ImGui::CalcTextSize(text.c_str()).x + 8 * c_menu::get().dpi_scale, ImGui::CalcTextSize(text.c_str()).y + 6 * c_menu::get().dpi_scale), clicked, ImGuiButtonFlags_::ImGuiButtonFlags_None))
+
+	if (ImGui::KeybindButton(text.c_str(), unique_id, ImVec2(btn_w, ImGui::CalcTextSize(text.c_str()).y + 6 * c_menu::get().dpi_scale), clicked, ImGuiButtonFlags_::ImGuiButtonFlags_None))
 		clicked = true;
 
 	if (clicked)
