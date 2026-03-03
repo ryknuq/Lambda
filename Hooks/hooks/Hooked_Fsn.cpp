@@ -472,10 +472,10 @@ void __stdcall hooks::hooked_fsn(ClientFrameStage_t stage)
 					++g_ctx.globals.total_shots_hit;  // Track HIT
 
 					std::stringstream log;
-					log << crypt_str("HIT [") << current_shot->shot_info.client_hitbox << crypt_str("] - ")
+					log << crypt_str("HIT [") << current_shot->shot_info.server_hitbox << crypt_str("] / [") << current_shot->shot_info.client_hitbox << crypt_str("] - ")
 						<< current_shot->shot_info.weapon_name << crypt_str(" | Target: ")
 						<< current_shot->shot_info.target_name
-						<< crypt_str(" | Damage: ") << current_shot->shot_info.server_damage
+						<< crypt_str(" | [") << current_shot->shot_info.server_damage << crypt_str("] / [") << current_shot->shot_info.client_damage << crypt_str("]")
 						<< crypt_str(" | Dist: ") << std::fixed << std::setprecision(0) << current_shot->shot_info.distance_to_target << crypt_str("u")
 						<< crypt_str(" | Lat: ") << current_shot->shot_info.network_latency_ms << crypt_str("ms")
 						<< crypt_str(" | HC: ") << current_shot->shot_info.hitchance << crypt_str("%")

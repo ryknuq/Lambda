@@ -105,9 +105,7 @@ void __vectorcall hooks::hooked_clmove(float accumulated_extra_samples, bool bFi
 {
 	if (g_ctx.globals.should_recharge)
 	{
-		g_ctx.get_command()->m_tickcount = INT_MAX;
-
-		if (++g_ctx.globals.ticks_allowed >= 14)
+		if (++g_ctx.globals.ticks_allowed >= 16)
 		{
 			g_ctx.globals.should_recharge = false;
 			g_ctx.send_packet = true;
@@ -134,7 +132,7 @@ void __vectorcall hooks::hooked_clmove(float accumulated_extra_samples, bool bFi
 
 
 using WriteUsercmdDeltaToBuffer_t = bool(__thiscall*)(void*, int, void*, int, int, bool);
-void WriteUser—md(void* buf, CUserCmd* incmd, CUserCmd* outcmd);
+void WriteUsercmd(void* buf, CUserCmd* incmd, CUserCmd* outcmd);
 
 bool __fastcall hooks::hooked_writeusercmddeltatobuffer(void* ecx, void* edx, int slot, bf_write* buf, int from, int to, bool is_new_command)
 {
@@ -205,7 +203,7 @@ next_cmd:
 
 	for (auto i = choked_modifier - newcmds + 1; i > 0; --i)
 	{
-		WriteUser—md(buf, &to_cmd, &from_cmd);
+		WriteUsercmd(buf, &to_cmd, &from_cmd);
 
 		from_cmd = to_cmd;
 		to_cmd.m_command_number++;
@@ -271,10 +269,10 @@ next_cmd:
 	return true;
 }
 
-void WriteUser—md(void* buf, CUserCmd* incmd, CUserCmd* outcmd)
+void WriteUsercmd(void* buf, CUserCmd* incmd, CUserCmd* outcmd)
 {
-	using WriteUserCmd_t = void(__fastcall*)(void*, CUserCmd*, CUserCmd*);
-	static auto Fn = (WriteUserCmd_t)util::FindSignature(crypt_str("client.dll"), crypt_str("55 8B EC 83 E4 F8 51 53 56 8B D9"));
+	using WriteUsercmd_t = void(__fastcall*)(void*, CUserCmd*, CUserCmd*);
+	static auto Fn = (WriteUsercmd_t)util::FindSignature(crypt_str("client.dll"), crypt_str("55 8B EC 83 E4 F8 51 53 56 8B D9"));
 
 	__asm
 	{

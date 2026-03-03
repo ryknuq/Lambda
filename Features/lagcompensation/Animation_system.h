@@ -194,13 +194,19 @@ public:
 	bool dormant;
 	bool bot;
 	bool shot;
+	bool exploited;
 
 	int flags;
 	int bone_count;
+	int ammo_count;
+	int tickbase;
+	int weapon_sequence;
 
 	float simulation_time;
 	float duck_amount;
 	float lby;
+	float last_shot_time;
+	float weapon_cycle;
 
 	Vector angles;
 	Vector abs_angles;
@@ -232,15 +238,22 @@ public:
 		immune = false;
 		dormant = false;
 		bot = false;
+		shot = false;
+		exploited = false;
 
 		flags = 0;
 		bone_count = 0;
+		ammo_count = -1;
+		tickbase = 0;
+		weapon_sequence = -1;
 
 		std::memset(this->pre_orig, 0, sizeof(pre_orig));
 
 		simulation_time = 0.0f;
 		duck_amount = 0.0f;
 		lby = 0.0f;
+		last_shot_time = 0.0f;
+		weapon_cycle = 0.0f;
 
 		angles.Zero();
 		abs_angles.Zero();
@@ -280,10 +293,25 @@ public:
 
 		flags = player->m_fFlags();
 		bone_count = player->m_CachedBoneData().Count();
+		tickbase = player->m_nTickBase();
 
 		simulation_time = player->m_flSimulationTime();
 		duck_amount = player->m_flDuckAmount();
 		lby = player->m_flLowerBodyYawTarget();
+
+		auto weapon = player->m_hActiveWeapon().Get();
+		if (weapon)
+		{
+			last_shot_time = weapon->m_fLastShotTime();
+			ammo_count = weapon->m_iClip1();
+
+			auto layers = player->get_animlayers();
+			if (layers)
+			{
+				weapon_sequence = layers[1].m_nSequence;
+				weapon_cycle = layers[1].m_flCycle;
+			}
+		}
 
 		angles = player->m_angEyeAngles();
 		abs_angles = player->GetAbsAngles();
@@ -353,12 +381,16 @@ public:
 		auto outgoing = net_channel_info->GetLatency(FLOW_OUTGOING);
 		auto incoming = net_channel_info->GetLatency(FLOW_INCOMING);
 
-		auto correct = math::clamp(outgoing + incoming + util::get_interpolation(), 0.0f, sv_maxunlag->GetFloat());
+		// Apply 10ms safety buffer to ensure server compensation window doesn't expire (0.19s instead of 0.2s)
+		auto unlag_buffer = 0.01f;
+		auto max_unlag = sv_maxunlag->GetFloat() - unlag_buffer;
+
+		auto correct = math::clamp(outgoing + incoming + util::get_interpolation(), 0.0f, max_unlag);
 
 		auto curtime = g_ctx.local()->is_alive() ? TICKS_TO_TIME(g_ctx.globals.fixed_tickbase) : m_globals()->m_curtime;
 		auto delta_time = correct - (curtime - simulation_time);
 
-		if (fabs(delta_time) > sv_maxunlag->GetFloat())
+		if (fabs(delta_time) > max_unlag)
 			return false;
 
 		auto extra_choke = 0;
@@ -367,7 +399,7 @@ public:
 			extra_choke = 14 - m_clientstate()->iChokedCommands;
 
 		auto server_tickcount = extra_choke + m_globals()->m_tickcount + TIME_TO_TICKS(outgoing + incoming);
-		auto dead_time = (int)(TICKS_TO_TIME(server_tickcount) - sv_maxunlag->GetFloat());
+		auto dead_time = (int)(TICKS_TO_TIME(server_tickcount) - max_unlag);
 
 		if (simulation_time < (float)dead_time)
 			return false;

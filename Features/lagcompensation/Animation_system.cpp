@@ -218,6 +218,8 @@ void lagcompensation::update_player_animations(player_t* e)
 		return;
 
 	adjust_data* previous_record = nullptr;
+	if (records->size() >= 2)
+		previous_record = &records->at(1);
 
 	auto record = &records->front();
 
@@ -267,7 +269,7 @@ void lagcompensation::update_player_animations(player_t* e)
 				if (weapon)
 				{
 					auto max_speed = 260.0f;
-					auto weapon_info = e->m_hActiveWeapon().Get()->get_csweapon_info();
+					auto weapon_info = weapon->get_csweapon_info();
 
 					if (weapon_info)
 						max_speed = e->m_bIsScoped() ? weapon_info->flMaxPlayerSpeedAlt : weapon_info->flMaxPlayerSpeed;
@@ -362,8 +364,15 @@ void lagcompensation::update_player_animations(player_t* e)
 			animstate->m_bInHitGroundAnimation = false;
 		}
 
-		animstate->time_since_in_air() = 0.0f;
 		animstate->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y);
+
+		// PVS Fix: Initialize shot detection values to prevent false positives
+		auto weapon = e->m_hActiveWeapon().Get();
+		if (weapon)
+		{
+			record->last_shot_time = weapon->m_fLastShotTime();
+			record->ammo_count = weapon->m_iClip1();
+		}
 	}
 
 	auto updated_animations = false;
@@ -622,6 +631,58 @@ void lagcompensation::update_player_animations(player_t* e)
 	memcpy(e->get_animlayers(), animlayers, e->animlayer_count() * sizeof(AnimationLayer));
 	memcpy(player_resolver[e->EntIndex()].previous_layers, animlayers, sizeof(AnimationLayer) * 13);
 	record->store_data(e, false);
+
+	// Premium Shot Detection
+	if (previous_record && !is_dormant[e->EntIndex()])
+	{
+		auto weapon = e->m_hActiveWeapon().Get();
+		if (weapon)
+		{
+			// Filter out PVS entry (previous == 0) and use epsilon for floating point precision
+			bool shot_in_window = previous_record->last_shot_time > 0.0f && 
+								  record->last_shot_time > previous_record->last_shot_time + 0.0001f && 
+								  record->last_shot_time <= record->simulation_time;
+
+			bool ammo_decreased = false;
+			if (!weapon->is_grenade() && !weapon->is_knife())
+			{
+				// Robust ammo check: must decrease from a valid previous count
+				if (previous_record->ammo_count > 0 && record->ammo_count < previous_record->ammo_count && record->ammo_count != -1)
+					ammo_decreased = true;
+			}
+
+			// Layer 1 Activity check (High Precision Fire Detection)
+			bool layer1_activity_matches = false;
+			if (record->weapon_sequence != -1)
+			{
+				auto activity = e->sequence_activity(record->weapon_sequence);
+				if (activity == ACT_CSGO_FIRE_PRIMARY || activity == ACT_CSGO_FIRE_SECONDARY)
+					layer1_activity_matches = true;
+				else if (record->weapon_sequence != previous_record->weapon_sequence && record->weapon_cycle < 0.15f)
+				{
+					// Fallback for custom or unidentified fire sequences
+					// Only triggers if it's the start of a new sequence
+					layer1_activity_matches = true; 
+				}
+			}
+
+			// Final shot validation: Requires ammo decrease OR a valid networked shot time confirmed by animation
+			if (ammo_decreased || (shot_in_window && layer1_activity_matches))
+			{
+				record->shot = true;
+			}
+		}
+
+		// Tickbase shift detection (Hide Shots)
+		if (abs(record->tickbase - previous_record->tickbase) > 1)
+		{
+			record->exploited = true;
+			
+			// Force bone rebuild for exploited records to ensure accuracy
+			e->invalidate_bone_cache();
+			setup_matrix(e, animlayers, MAIN);
+		}
+	}
 
 	if (e->m_flSimulationTime() < e->m_flOldSimulationTime())
 		record->invalid = true;

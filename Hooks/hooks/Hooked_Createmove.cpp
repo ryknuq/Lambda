@@ -76,16 +76,8 @@ void __stdcall hooks::hooked_createmove(int sequence_number, float input_sample_
 
 	if (g_ctx.globals.should_recharge)
 	{
-		m_pcmd->m_tickcount = INT_MAX;
-		m_pcmd->m_forwardmove = 0.0f;
-		m_pcmd->m_sidemove = 0.0f;
-		m_pcmd->m_upmove = 0.0f;
 		m_pcmd->m_buttons &= ~IN_ATTACK;
 		m_pcmd->m_buttons &= ~IN_ATTACK2;
-
-		verified->m_cmd = *m_pcmd;
-		verified->m_crc = m_pcmd->GetChecksum();
-		return;
 	}
 
 	if (g_ctx.globals.ticks_allowed < 16 && (misc::get().double_tap_enabled && misc::get().double_tap_key || misc::get().hide_shots_enabled && misc::get().hide_shots_key))

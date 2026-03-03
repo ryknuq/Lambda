@@ -304,10 +304,22 @@ static bool compare_records(const optimized_adjust_data& first, const optimized_
 
 adjust_data* aim::get_record(std::deque <adjust_data>* records, bool history)
 {
-    if (history && records->size() >= 2)
-    {
-        // Only use best record from deque, don't sort every frame
-        adjust_data* best_record = nullptr;
+	if (history && records->size() >= 2)
+	{
+		// Premium: Prioritize valid "shot" records in history first
+		for (auto i = 0; i < records->size(); ++i)
+		{
+			auto record = &records->at(i);
+
+			if (!record->valid())
+				continue;
+
+			if (record->shot)
+				return record;
+		}
+
+		// Only use best record from deque, don't sort every frame
+		adjust_data* best_record = nullptr;
         int best_idx = -1;
 
         for (auto i = 0; i < records->size(); ++i)
@@ -453,7 +465,7 @@ bool aim::automatic_stop(CUserCmd* cmd)
     if (!cfg.ragebot.weapon[g_ctx.globals.current_weapon].autostop)
         return true;
 
-    if (g_ctx.globals.slowwalking)
+    if (g_ctx.globals.slowwalking || misc::get().recharging_double_tap)
         return true;
 
     if (!(g_ctx.local()->m_fFlags() & FL_ONGROUND && engineprediction::get().backup_data.flags & FL_ONGROUND))
@@ -680,21 +692,19 @@ void aim::scan(adjust_data* record, scan_data& data, const Vector& shoot_positio
 			get_adaptive_minimum_damage(false, record->player->m_iHealth(), point.hitbox);
 
 		// Multi-point optimization: prefer points with better penetration characteristics
-		bool is_better_point = false;
-		
-		if (fire_data.damage >= current_minimum_damage)
+		float current_score = (float)fire_data.damage;
+
+		// Premium: 100x Multiplier for on-shot records
+		if (record->shot && fire_data.visible)
 		{
-			if (fire_data.damage > best_damage)
-				is_better_point = true;
-			else if (fire_data.damage == best_damage)
-			{
-				// Same damage - prefer visible over wallbang
-				if (fire_data.visible) // Only prefer if visible when damage is equal
-					is_better_point = true;
-			}
+			current_score *= 100.0f;
 		}
 
-		if (is_better_point && fire_data.damage >= best_damage)
+		static float best_score = -1.0f;
+		if (point.hitbox == hitboxes.front() && point.center)
+			best_score = -1.0f;
+
+		if (current_score >= best_score && fire_data.damage >= current_minimum_damage)
 		{
 			if (!should_stop)
 			{
@@ -712,6 +722,7 @@ void aim::scan(adjust_data* record, scan_data& data, const Vector& shoot_positio
 				continue;
 
 			best_damage = fire_data.damage;
+			best_score = current_score;
 
 			data.point = point;
 			data.visible = fire_data.visible;
@@ -1159,6 +1170,12 @@ void aim::fire(CUserCmd* cmd)
         return;
 
     // Safety check for weapon validity
+    if (!g_ctx.globals.weapon)
+        return;
+
+    if (g_ctx.globals.current_weapon == -1)
+        return;
+
     auto weapon_info = g_ctx.globals.weapon->get_csweapon_info();
     if (!weapon_info)
         return;
@@ -1178,7 +1195,10 @@ void aim::fire(CUserCmd* cmd)
 
     if (cfg.ragebot.weapon[g_ctx.globals.current_weapon].hitchance)
     {
-        if (!is_valid_hitchance)
+        // Premium: For on-shot targets, we lower the threshold to 30% to ensure instant fire on snaps
+        auto needed_hitchance = (final_target.record->shot && final_target.data.visible) ? 30 : hitchance_amount;
+
+        if (!is_valid_hitchance || (g_ctx.globals.weapon->m_iItemDefinitionIndex() != WEAPON_SSG08 && g_ctx.globals.weapon->m_iItemDefinitionIndex() != WEAPON_AWP && final_hitchance < (float)needed_hitchance))
         {
             auto is_zoomable_weapon = g_ctx.globals.weapon->m_iItemDefinitionIndex() == WEAPON_SCAR20 || g_ctx.globals.weapon->m_iItemDefinitionIndex() == WEAPON_G3SG1 || g_ctx.globals.weapon->m_iItemDefinitionIndex() == WEAPON_SSG08 || g_ctx.globals.weapon->m_iItemDefinitionIndex() == WEAPON_AWP || g_ctx.globals.weapon->m_iItemDefinitionIndex() == WEAPON_AUG || g_ctx.globals.weapon->m_iItemDefinitionIndex() == WEAPON_SG553;
 
@@ -1190,7 +1210,7 @@ void aim::fire(CUserCmd* cmd)
     }
 
 
-    auto final_hitchance = 0;
+    // auto final_hitchance = 0;
 
     if (!g_ctx.globals.double_tap_aim && cfg.ragebot.weapon[g_ctx.globals.current_weapon].hitchance)
         hitchance_amount = cfg.ragebot.weapon[g_ctx.globals.current_weapon].hitchance_amount;
@@ -1366,7 +1386,8 @@ void BulidSeedTable() {
 
 int aim::hitchance(const Vector& aim_angle)
 {
-    auto final_hitchance = 0;
+    // Use member variable instead of local
+    final_hitchance = 0;
     auto weapon_info = g_ctx.globals.weapon->get_csweapon_info();
 
     if (!weapon_info)

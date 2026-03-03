@@ -1224,7 +1224,7 @@ bool misc::double_tap(CUserCmd* m_pcmd)
 
 	if (recharging_double_tap)
 	{
-		if (can_shift_shot(max_tickbase_shift) && !aim::get().should_stop)
+		if (can_shift_shot(max_tickbase_shift))
 		{
 			recharging_double_tap = false;
 			double_tap_key = true;
@@ -1232,6 +1232,8 @@ bool misc::double_tap(CUserCmd* m_pcmd)
 		}
 		else if (m_pcmd->m_buttons & IN_ATTACK)
 			firing_dt = true;
+
+		g_ctx.globals.tickbase_shift = 0;
 	}
 
 	if (!cfg.ragebot.enable)

@@ -48,6 +48,37 @@ void resolver::resolve()
 
     player_record->side = RESOLVER_ORIGINAL;
 
+    // Premium: On-Shot Resolver Logic
+    if (player_record->shot)
+    {
+        auto layers = player->get_animlayers();
+        float layer6_weight = layers[ANIMATION_LAYER_MOVEMENT_MOVE].m_flWeight;
+        float layer6_playback_rate = layers[ANIMATION_LAYER_MOVEMENT_MOVE].m_flPlaybackRate;
+
+        // If Layer 6 weight drops significantly, they snapped to real angles (Standard AA)
+        // We force ZERO side to align GoalFeetYaw with EyeAngles
+        if (layer6_weight < 0.1f)
+        {
+            player_record->side = RESOLVER_ZERO;
+            anim_state->m_flGoalFeetYaw = math::normalize_yaw(player->m_angEyeAngles().y);
+        }
+        else if (layer6_weight > 0.5f && abs(layer6_playback_rate) > 0.1f)
+        {
+            // If weight remains high during shot, they are moving/jittering (On-Shot Desync)
+            // Use last known good side or original side
+            player_record->side = RESOLVER_ORIGINAL;
+        }
+        else
+        {
+            // Default snap to real
+            player_record->side = RESOLVER_ZERO;
+            anim_state->m_flGoalFeetYaw = math::normalize_yaw(player->m_angEyeAngles().y);
+        }
+
+        update_animation_layers(player);
+        return;
+    }
+
     // Check validity - skip teammates, ladder, noclip
     if (player->m_iTeamNum() == g_ctx.local()->m_iTeamNum() ||
         player->get_move_type() == MOVETYPE_LADDER ||
