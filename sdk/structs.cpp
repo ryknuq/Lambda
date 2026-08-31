@@ -791,18 +791,60 @@ Vector player_t::hitbox_position_matrix(int hitbox_id, matrix3x4_t matrix[MAXSTU
 	return (min + max) * 0.5f;
 }
 
+static uintptr_t invalidate_bone_cache_address()
+{
+	static auto address = (uintptr_t)util::FindSignature(crypt_str("client.dll"), crypt_str("80 3D ?? ?? ?? ?? ?? 74 16 A1 ?? ?? ?? ?? 48 C7 81"));
+	return address;
+}
+
+static uintptr_t force_bone_offset()
+{
+	static auto offset = (uintptr_t)netvars::get().get_offset(crypt_str("CCSPlayer"), crypt_str("m_nForceBone"));
+	return offset ? offset : (uintptr_t)0x268C;
+}
+
+static uintptr_t last_bone_setup_time_offset()
+{
+	static auto offset = []
+	{
+		auto invalidate_bone_cache = invalidate_bone_cache_address();
+
+		if (invalidate_bone_cache)
+			return *(uintptr_t*)(invalidate_bone_cache + 0x11);
+
+		auto sequence = (uintptr_t)netvars::get().get_offset(crypt_str("CCSPlayer"), crypt_str("m_nSequence"));
+
+		return sequence ? sequence + 0x68 : (uintptr_t)0x2928;
+	}();
+
+	return offset;
+}
+
+static uintptr_t most_recent_model_bone_counter_offset()
+{
+	static auto offset = []
+	{
+		auto invalidate_bone_cache = invalidate_bone_cache_address();
+
+		if (invalidate_bone_cache)
+			return *(uintptr_t*)(invalidate_bone_cache + 0x1B);
+
+		return force_bone_offset() + 0x4;
+	}();
+
+	return offset;
+}
+
 CUtlVector <matrix3x4_t>& player_t::m_CachedBoneData()
 {
-	//static auto m_CachedBoneData = *(DWORD*)(util::FindSignature(crypt_str("client.dll"), crypt_str("FF B7 ?? ?? ?? ?? 52")) + 0x2) + 0x4;
-	//return *(CUtlVector <matrix3x4_t>*)(uintptr_t(this) + m_CachedBoneData);
-	//fixed
-	return *(CUtlVector <matrix3x4_t>*)(uintptr_t(this) + 0x2914);
+	static auto offset = last_bone_setup_time_offset() - 0x14;
+
+	return *(CUtlVector <matrix3x4_t>*)(uintptr_t(this) + offset);
 }
 
 CBoneAccessor& player_t::m_BoneAccessor()
 {
-	static auto m_nForceBone = netvars::get().get_offset(crypt_str("CBaseAnimating"), crypt_str("m_nForceBone"));
-	static auto BoneAccessor = m_nForceBone + 0x1C;
+	static auto BoneAccessor = force_bone_offset() + 0x1C;
 
 	return *(CBoneAccessor*)((uintptr_t)this + BoneAccessor);
 }
@@ -862,16 +904,14 @@ void player_t::update_clientside_animation()
 
 uint32_t& player_t::m_iMostRecentModelBoneCounter()
 {
-	static auto invalidate_bone_cache = util::FindSignature(crypt_str("client.dll"), crypt_str("80 3D ?? ?? ?? ?? ?? 74 16 A1 ?? ?? ?? ?? 48 C7 81"));
-	static auto most_recent_model_bone_counter = *(uintptr_t*)(invalidate_bone_cache + 0x1B);
+	static auto most_recent_model_bone_counter = most_recent_model_bone_counter_offset();
 
 	return *(uint32_t*)((uintptr_t)this + most_recent_model_bone_counter);
 }
 
 float& player_t::m_flLastBoneSetupTime()
 {
-	static auto invalidate_bone_cache = util::FindSignature(crypt_str("client.dll"), crypt_str("80 3D ?? ?? ?? ?? ?? 74 16 A1 ?? ?? ?? ?? 48 C7 81"));
-	static auto last_bone_setup_time = *(uintptr_t*)(invalidate_bone_cache + 0x11);
+	static auto last_bone_setup_time = last_bone_setup_time_offset();
 
 	return *(float*)((uintptr_t)this + last_bone_setup_time);
 }
@@ -933,7 +973,10 @@ int player_t::animlayer_count()
 
 AnimationLayer* player_t::get_animlayers()
 {
-	return *(AnimationLayer**)((DWORD)this + 0x2990);
+	static auto anim_overlays = (uintptr_t)util::FindSignature(crypt_str("client.dll"), crypt_str("8B 89 ?? ?? ?? ?? 8D 0C D1"));
+	static auto offset = anim_overlays ? *(uintptr_t*)(anim_overlays + 0x2) : (uintptr_t)0x2990;
+
+	return *(AnimationLayer**)((uintptr_t)this + offset);
 }
 
 int player_t::sequence_activity(int sequence)
@@ -957,8 +1000,8 @@ c_baseplayeranimationstate* player_t::get_animation_state()
 
 CStudioHdr* player_t::m_pStudioHdr()
 {
-	static auto studio_hdr = (uintptr_t)util::FindSignature(crypt_str("client.dll"), crypt_str("8B B7 ?? ?? ?? ?? 89 74 24 20"));
-	static auto offset = studio_hdr ? *(uintptr_t*)(studio_hdr + 0x2) + 0x4 : 0x2950;
+	static auto studio_hdr = (uintptr_t)util::FindSignature(crypt_str("client.dll"), crypt_str("8B B6 ?? ?? ?? ?? 85 F6 74 05 83 3E 00 75 02 33 F6 F3 0F 10 44 24"));
+	static auto offset = studio_hdr ? *(uintptr_t*)(studio_hdr + 0x2) : (uintptr_t)0x2950;
 
 	return *(CStudioHdr**)((uintptr_t)this + offset);
 }
