@@ -525,11 +525,20 @@ void aim::scan(adjust_data* record, scan_data& data, const Vector& shoot_positio
     if (hitboxes.empty())
         return;
 
-    auto force_safe_points = key_binds::get().get_key_bind_state(3) || cfg.ragebot.weapon[g_ctx.globals.current_weapon].max_misses && g_ctx.globals.missed_shots[record->i] >= cfg.ragebot.weapon[g_ctx.globals.current_weapon].max_misses_amount;
+    auto& weapon_cfg = cfg.ragebot.weapon[g_ctx.globals.current_weapon];
+
+    auto safe_points_key = key_binds::get().get_key_bind_state(3);
+    auto force_safe_points = safe_points_key || weapon_cfg.max_misses && g_ctx.globals.missed_shots[record->i] >= weapon_cfg.max_misses_amount;
     auto best_damage = 0;
 
+    auto health = record->player->m_iHealth();
+
+    auto visible_minimum_damage = get_adaptive_minimum_damage(true, health, HITBOX_HEAD);
+    auto occluded_minimum_damage = get_adaptive_minimum_damage(false, health, HITBOX_HEAD);
+    auto damage_floor = (float)min(visible_minimum_damage, occluded_minimum_damage);
+
 	std::vector <scan_point> points;
-	
+
 	for (auto& hitbox : hitboxes)
 	{
 		auto current_points = get_points(record, hitbox, true);
@@ -557,7 +566,7 @@ void aim::scan(adjust_data* record, scan_data& data, const Vector& shoot_positio
 			else
 				point.safe = 1.0f;
 
-			if (!(key_binds::get().get_key_bind_state(3)) || cfg.ragebot.weapon[g_ctx.globals.current_weapon].prefer_safe_points || point.safe)
+			if (!safe_points_key || weapon_cfg.prefer_safe_points || point.safe)
 			{
 				points.emplace_back(point);
 			};
@@ -579,14 +588,14 @@ void aim::scan(adjust_data* record, scan_data& data, const Vector& shoot_positio
 			if (key_binds::get().get_key_bind_state(22))
 				break;
 
-			if (best_damage >= record->player->m_iHealth())
+			if (best_damage >= health)
 				break;
 
-			if (cfg.ragebot.weapon[g_ctx.globals.current_weapon].prefer_body_aim && best_damage >= 1)
+			if (weapon_cfg.prefer_body_aim && best_damage >= 1)
 				break;
 		}
 
-		auto fire_data = autowall::get().wall_penetration(shoot_position, point.point, record->player);
+		auto fire_data = autowall::get().wall_penetration(shoot_position, point.point, record->player, damage_floor);
 
 		if (!fire_data.valid)
 			continue;
@@ -597,9 +606,7 @@ void aim::scan(adjust_data* record, scan_data& data, const Vector& shoot_positio
 		if (!fire_data.visible && !cfg.ragebot.enable)
 			continue;
 
-		auto current_minimum_damage = fire_data.visible ? 
-			get_adaptive_minimum_damage(true, record->player->m_iHealth(), point.hitbox) : 
-			get_adaptive_minimum_damage(false, record->player->m_iHealth(), point.hitbox);
+		auto current_minimum_damage = fire_data.visible ? visible_minimum_damage : occluded_minimum_damage;
 
 		float current_score = static_cast<float>(fire_data.damage);
 		current_score += point.center ? 2.0f : 0.0f;
@@ -611,11 +618,11 @@ void aim::scan(adjust_data* record, scan_data& data, const Vector& shoot_positio
 			{
 				should_stop = true;
 
-				if (cfg.ragebot.weapon[g_ctx.globals.current_weapon].autostop_modifiers[AUTOSTOP_LETHAL] && fire_data.damage < record->player->m_iHealth())
+				if (weapon_cfg.autostop_modifiers[AUTOSTOP_LETHAL] && fire_data.damage < health)
 					should_stop = false;
-				else if (cfg.ragebot.weapon[g_ctx.globals.current_weapon].autostop_modifiers[AUTOSTOP_VISIBLE] && !fire_data.visible)
+				else if (weapon_cfg.autostop_modifiers[AUTOSTOP_VISIBLE] && !fire_data.visible)
 					should_stop = false;
-				else if (cfg.ragebot.weapon[g_ctx.globals.current_weapon].autostop_modifiers[AUTOSTOP_CENTER] && !point.center)
+				else if (weapon_cfg.autostop_modifiers[AUTOSTOP_CENTER] && !point.center)
 					should_stop = false;
 			}
 
@@ -629,6 +636,9 @@ void aim::scan(adjust_data* record, scan_data& data, const Vector& shoot_positio
 			data.visible = fire_data.visible;
 			data.damage = fire_data.damage;
 			data.hitbox = fire_data.hitbox;
+
+			if (fire_data.visible && point.center && point.safe && fire_data.damage >= health)
+				break;
 		}
 	}
 }

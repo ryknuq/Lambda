@@ -308,14 +308,19 @@ float antiaim::get_yaw(CUserCmd* m_pcmd) // fixed by semmxz
 
 		return yaw;
 	}
-	else if (force_choke)
+
+	if (force_choke)
 	{
 		force_choke = false;
-		g_ctx.send_packet = false;
 
-		return yaw;
+		if (m_clientstate()->iChokedCommands < 14)
+		{
+			g_ctx.send_packet = false;
+			return yaw;
+		}
 	}
-	else if (g_ctx.send_packet)
+
+	if (g_ctx.send_packet)
 		yaw += desync_angle;
 
 	return yaw;
@@ -384,6 +389,8 @@ bool antiaim::should_break_lby(CUserCmd* m_pcmd, int lby_type)
 	{
 		g_ctx.send_packet = true;
 		fakelag::get().started_peeking = false;
+
+		return false;
 	}
 
 	auto animstate = g_ctx.local()->get_animation_state();

@@ -91,6 +91,39 @@ enum animstate_layer_t
 	ANIMATION_LAYER_COUNT, // layers count
 };
 
+static constexpr int resolver_candidate_count = 9;
+
+inline constexpr float resolver_candidate_scale[resolver_candidate_count] =
+{
+	0.0f, 1.0f, -1.0f, 0.5f, -0.5f, 0.75f, -0.75f, 0.25f, -0.25f
+};
+
+inline constexpr int resolver_candidate_matrix[resolver_candidate_count] =
+{
+	NONE, FIRST, SECOND, -1, -1, -1, -1, -1, -1
+};
+
+inline constexpr resolver_side resolver_candidate_sides[resolver_candidate_count] =
+{
+	RESOLVER_ZERO, RESOLVER_FIRST, RESOLVER_SECOND, RESOLVER_LOW_FIRST, RESOLVER_LOW_SECOND,
+	RESOLVER_HIGH_FIRST, RESOLVER_HIGH_SECOND, RESOLVER_DESYNC_FIRST, RESOLVER_DESYNC_SECOND
+};
+
+inline constexpr int resolver_candidate_order[resolver_candidate_count] =
+{
+	2, 6, 4, 8, 0, 7, 3, 5, 1
+};
+
+inline constexpr animstate_layer_t resolver_scored_layers[] =
+{
+	ANIMATION_LAYER_AIMMATRIX,
+	ANIMATION_LAYER_ADJUST,
+	ANIMATION_LAYER_MOVEMENT_MOVE,
+	ANIMATION_LAYER_MOVEMENT_STRAFECHANGE,
+	ANIMATION_LAYER_WHOLE_BODY,
+	ANIMATION_LAYER_ALIVELOOP,
+	ANIMATION_LAYER_LEAN
+};
 
 struct matrixes
 {
@@ -162,6 +195,9 @@ public:
 	float positive_side = 0.0f;
 	float negative_side = 0.0f;
 
+	float last_resolved_yaw = 0.0f;
+	float last_resolved_time = 0.0f;
+
 	int bruteforce_ticks = 0;
 	int freestand_side = 0;
 };
@@ -178,7 +214,9 @@ public:
 	AnimationLayer Animlayers[4][13];
 	matrixes matrixes_data;
 	// fix
-	AnimationLayer resolver_layers[4][15];
+	AnimationLayer resolver_layers[resolver_candidate_count][15];
+	float resolver_poses[resolver_candidate_count][24];
+	float network_poses[24];
 	AnimationLayer m_pResolveLayers[4][15];
 	AnimationLayer pre_orig[13] = {};
 	resolver_type type;
@@ -251,6 +289,8 @@ public:
 		std::memset(this->pre_orig, 0, sizeof(pre_orig));
 		std::memset(&matrixes_data, 0, sizeof(matrixes_data));
 		std::memset(resolver_layers, 0, sizeof(resolver_layers));
+		std::memset(resolver_poses, 0, sizeof(resolver_poses));
+		std::memset(network_poses, 0, sizeof(network_poses));
 
 		simulation_time = 0.0f;
 		duck_amount = 0.0f;

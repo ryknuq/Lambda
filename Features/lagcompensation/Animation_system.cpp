@@ -236,6 +236,7 @@ void lagcompensation::update_player_animations(player_t* e)
 	float pose_parametrs[24];
 
 	memcpy(pose_parametrs, &e->m_flPoseParameter(), 24 * sizeof(float));
+	memcpy(record->network_poses, pose_parametrs, 24 * sizeof(float));
 	memcpy(animlayers, e->get_animlayers(), e->animlayer_count() * sizeof(AnimationLayer));
 	memcpy(record->layers, animlayers, e->animlayer_count() * sizeof(AnimationLayer));
 	memcpy(record->left_layers, animlayers, e->animlayer_count() * sizeof(AnimationLayer));
@@ -490,6 +491,9 @@ void lagcompensation::update_player_animations(player_t* e)
 
 	memcpy(animstate, &state, sizeof(c_baseplayeranimationstate));
 
+	AnimationLayer baseline_layers[15];
+	memcpy(baseline_layers, e->get_animlayers(), e->animlayer_count() * sizeof(AnimationLayer));
+
 	auto setup_matrix = [&](player_t* e, AnimationLayer* layers, const int& matrix) -> bool
 		{
 			e->invalidate_physics_recursive(8);
@@ -535,95 +539,37 @@ void lagcompensation::update_player_animations(player_t* e)
 		memcpy(animstate, &state, sizeof(c_baseplayeranimationstate));
 
 		const auto max_delta = std::clamp(std::fabs(e->get_max_desync_delta()), 25.0f, 60.0f);
+		const auto eye_yaw = e->m_angEyeAngles().y;
 
-		memcpy(&e->m_flPoseParameter(), pose_parametrs, 24 * sizeof(float));
-		animstate->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y); //-V807
+		auto simulate_side = [&](float yaw, int matrix, int slot)
+		{
+			memcpy(animstate, &state, sizeof(c_baseplayeranimationstate));
+			memcpy(&e->m_flPoseParameter(), pose_parametrs, 24 * sizeof(float));
+			memcpy(e->get_animlayers(), baseline_layers, e->animlayer_count() * sizeof(AnimationLayer));
 
-		g_ctx.globals.updating_animation = true;
-		e->update_clientside_animation();
-		g_ctx.globals.updating_animation = false;
+			animstate->m_flGoalFeetYaw = math::normalize_yaw(yaw);
+			animstate->m_flCurrentFeetYaw = animstate->m_flGoalFeetYaw;
 
-		setup_matrix(e, animlayers, NONE);
-		memcpy(record->resolver_layers[0], e->get_animlayers(), sizeof(AnimationLayer) * 13);
+			g_ctx.globals.updating_animation = true;
+			e->update_clientside_animation();
+			g_ctx.globals.updating_animation = false;
+
+			memcpy(record->resolver_poses[slot], &e->m_flPoseParameter(), 24 * sizeof(float));
+			memcpy(record->resolver_layers[slot], e->get_animlayers(), sizeof(AnimationLayer) * 13);
+
+			if (matrix >= 0)
+				setup_matrix(e, animlayers, matrix);
+		};
+
+		for (auto slot = 0; slot < resolver_candidate_count; ++slot)
+			simulate_side(eye_yaw + max_delta * resolver_candidate_scale[slot], resolver_candidate_matrix[slot], slot);
+
 		memcpy(animstate, &state, sizeof(c_baseplayeranimationstate));
 		memcpy(&e->m_flPoseParameter(), pose_parametrs, 24 * sizeof(float));
-
-		animstate->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y + max_delta);
-
-		g_ctx.globals.updating_animation = true;
-		e->update_clientside_animation();
-		g_ctx.globals.updating_animation = false;
-
-		setup_matrix(e, animlayers, FIRST);
-		memcpy(record->resolver_layers[1], e->get_animlayers(), sizeof(AnimationLayer) * 13);
-		memcpy(animstate, &state, sizeof(c_baseplayeranimationstate));
-		memcpy(&e->m_flPoseParameter(), pose_parametrs, 24 * sizeof(float));
-
-		animstate->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y - max_delta);
-
-		g_ctx.globals.updating_animation = true;
-		e->update_clientside_animation();
-		g_ctx.globals.updating_animation = false;
-
-		setup_matrix(e, animlayers, SECOND);
-		memcpy(record->resolver_layers[2], e->get_animlayers(), sizeof(AnimationLayer) * 13);
-		memcpy(animstate, &state, sizeof(c_baseplayeranimationstate));
-		memcpy(&e->m_flPoseParameter(), pose_parametrs, 24 * sizeof(float));
-
-		animstate->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y - max_delta * 0.5f);
-
-		g_ctx.globals.updating_animation = true;
-		e->update_clientside_animation();
-		g_ctx.globals.updating_animation = false;
-
-		setup_matrix(e, animlayers, THIRD);
-		memcpy(record->resolver_layers[3], e->get_animlayers(), sizeof(AnimationLayer) * 13);
-		memcpy(animstate, &state, sizeof(c_baseplayeranimationstate));
-		memcpy(&e->m_flPoseParameter(), pose_parametrs, 24 * sizeof(float));
+		memcpy(e->get_animlayers(), baseline_layers, e->animlayer_count() * sizeof(AnimationLayer));
 
 		player_resolver[e->EntIndex()].initialize(e, record, previous_goal_feet_yaw[e->EntIndex()], e->m_angEyeAngles().x);
 		player_resolver[e->EntIndex()].resolve();
-
-		switch (record->side)
-		{
-		case RESOLVER_ORIGINAL:
-			e->get_animation_state()->m_flGoalFeetYaw = previous_goal_feet_yaw[e->EntIndex()];
-			break;
-		case RESOLVER_ZERO:
-			e->get_animation_state()->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y);
-			break;
-		case RESOLVER_FIRST:
-			e->get_animation_state()->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y + max_delta);
-			break;
-		case RESOLVER_SECOND:
-			e->get_animation_state()->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y - max_delta);
-			break;
-		case RESOLVER_LOW_FIRST:
-			e->get_animation_state()->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y + max_delta * 0.5f);
-			break;
-		case RESOLVER_LOW_SECOND:
-			e->get_animation_state()->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y - max_delta * 0.5f);
-			break;
-		case RESOLVER_HIGH_FIRST:
-			e->get_animation_state()->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y + e->get_max_desync_delta() * 2);
-			break;
-		case RESOLVER_HIGH_SECOND:
-			e->get_animation_state()->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y - e->get_max_desync_delta() * 2);
-			break;
-		}
-	}
-
-	if (record->high_desync_resolver_active)
-	{
-		switch (record->side)
-		{
-		case RESOLVER_DESYNC_FIRST:
-			e->m_angEyeAngles().y = math::AngleNormalize(animstate->m_flGoalFeetYaw - 60.0);
-			break;
-		case RESOLVER_DESYNC_SECOND:
-			e->m_angEyeAngles().y = math::AngleNormalize(animstate->m_flGoalFeetYaw + 60.0);
-			break;
-		}
 	}
 
 	switch (record->type)

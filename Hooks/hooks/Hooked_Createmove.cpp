@@ -210,9 +210,6 @@ void __stdcall hooks::hooked_createmove(int sequence_number, float input_sample_
 
 	misc::get().automatic_peek(m_pcmd, wish_yaw.y);
 
-	antiaim::get().desync_angle = 0.0f;
-	antiaim::get().create_move(m_pcmd);
-
 	if (m_gamerules()->m_bIsValveDS() && m_clientstate()->iChokedCommands >= 6) //-V648
 	{
 		g_ctx.send_packet = true;
@@ -237,6 +234,12 @@ void __stdcall hooks::hooked_createmove(int sequence_number, float input_sample_
 		g_ctx.globals.should_send_packet = true;
 		g_ctx.send_packet = false;
 	}
+
+	if (g_ctx.globals.should_recharge)
+		g_ctx.send_packet = false;
+
+	antiaim::get().desync_angle = 0.0f;
+	antiaim::get().create_move(m_pcmd);
 
 	if (!g_ctx.globals.weapon->is_non_aim())
 	{
@@ -333,9 +336,6 @@ void __stdcall hooks::hooked_createmove(int sequence_number, float input_sample_
 		local_animations::get().local_data.stored_real_angles = m_pcmd->m_viewangles;
 
 	util::movement_fix(wish_yaw, m_pcmd);
-
-	if (g_ctx.globals.should_recharge)
-		g_ctx.send_packet = false;
 
 	if (g_ctx.globals.ticks_choke)
 	{

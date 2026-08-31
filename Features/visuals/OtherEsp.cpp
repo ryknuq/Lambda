@@ -29,12 +29,13 @@ bool can_penetrate(weapon_t* weapon)
 	auto eye_pos = g_ctx.globals.render_eye_pos;
 	auto hits = 1;
 	auto damage = (float)weapon_info->iDamage;
-	auto penetration_power = weapon_info->flPenetration;
+
+	auto surface_data = m_physsurface()->GetSurfaceData(trace.surface.surfaceProps);
 
 	static auto damageReductionBullets = m_cvar()->FindVar(crypt_str("ff_damage_reduction_bullets"));
 	static auto damageBulletPenetration = m_cvar()->FindVar(crypt_str("ff_damage_bullet_penetration"));
 
-	return autowall::get().handle_bullet_penetration(weapon_info, trace, eye_pos, direction, hits, damage, penetration_power, damageReductionBullets->GetFloat(), damageBulletPenetration->GetFloat(), trace.hit_entity);
+	return autowall::get().handle_bullet_penetration(weapon_info, trace, surface_data, eye_pos, direction, hits, damage, 1.0f, damageReductionBullets->GetFloat(), damageBulletPenetration->GetFloat(), trace.hit_entity);
 }
 
 void otheresp::penetration_reticle()

@@ -29,55 +29,38 @@ void fakelag::Fakelag(CUserCmd* m_pcmd)
 	}
 
 	auto choked = m_clientstate()->iChokedCommands; //-V807
+	auto valve_ds = m_gamerules()->m_bIsValveDS(); //-V807
 
-	switch (cfg.antiaim.fakelag_type)
+	auto peek_choke = g_ctx.local()->m_fFlags() & FL_ONGROUND && engineprediction::get().backup_data.flags & FL_ONGROUND && !valve_ds && key_binds::get().get_key_bind_state(20); //-V807
+
+	if (peek_choke)
+		max_choke = 14;
+	else if (!g_ctx.globals.exploits && cfg.antiaim.fakelag)
 	{
-	case 0:
-		max_choke = cfg.antiaim.fakelag_amount;
-		break;
+		switch (cfg.antiaim.fakelag_type)
+		{
+		default:
+			max_choke = cfg.antiaim.fakelag_amount;
+			break;
+		}
+	}
+	else
+	{
+		condition = true;
+
+		if (!g_ctx.globals.exploits && antiaim::get().condition(m_pcmd, false))
+			return;
+
+		max_choke = 1;
 	}
 
-	if (m_gamerules()->m_bIsValveDS()) //-V807
+	if (valve_ds)
 		max_choke = m_engine()->IsVoiceRecording() ? 1 : min(max_choke, 6);
 
 	if (misc::get().recharging_double_tap)
 		max_choke = g_ctx.globals.exploits ? 1 : 2;
 
-	if (g_ctx.local()->m_fFlags() & FL_ONGROUND && engineprediction::get().backup_data.flags & FL_ONGROUND && !m_gamerules()->m_bIsValveDS() && key_binds::get().get_key_bind_state(20)) //-V807
-	{
-		max_choke = 14;
-
-		if (choked < max_choke)
-			g_ctx.send_packet = false;
-		else
-			g_ctx.send_packet = true;
-	}
-	else
-	{
-		if (!g_ctx.globals.exploits && cfg.antiaim.fakelag)
-		{
-			max_choke = cfg.antiaim.fakelag_amount;
-
-			if (m_gamerules()->m_bIsValveDS())
-				max_choke = min(max_choke, 6);
-
-			if (choked < max_choke)
-				g_ctx.send_packet = false;
-			else
-				g_ctx.send_packet = true;
-		}
-		else if (g_ctx.globals.exploits || !antiaim::get().condition(m_pcmd, false)) //-V648
-		{
-			condition = true;
-
-			if (choked < 1)
-				g_ctx.send_packet = false;
-			else
-				g_ctx.send_packet = true;
-		}
-		else
-			condition = true;
-	}
+	g_ctx.send_packet = choked >= max_choke;
 }
 
 void fakelag::Createmove()
@@ -87,18 +70,21 @@ void fakelag::Createmove()
 
 	auto m_pcmd = g_ctx.get_command();
 
-	bool has_triggers = false;
-	for (size_t i = 0; i < cfg.antiaim.fakelag_enablers.size(); i++)
+	if (cfg.antiaim.fakelag && !g_ctx.globals.exploits && !misc::get().recharging_double_tap)
 	{
-		if (cfg.antiaim.fakelag_enablers[i])
+		bool has_triggers = false;
+		for (size_t i = 0; i < cfg.antiaim.fakelag_enablers.size(); i++)
 		{
-			has_triggers = true;
-			break;
+			if (cfg.antiaim.fakelag_enablers[i])
+			{
+				has_triggers = true;
+				break;
+			}
 		}
-	}
 
-	if (has_triggers && misc::get().break_lc(m_pcmd))
-		return;
+		if (has_triggers && misc::get().break_lc(m_pcmd))
+			return;
+	}
 
 	Fakelag(m_pcmd);
 }
