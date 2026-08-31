@@ -36,6 +36,7 @@ class key_binds : public singleton <key_binds>
 	std::unordered_map <int, key_bind_mode> mode;
 
 	void update_key_bind(key_bind* key_bind, int key_bind_id);
+	void update_manual_binds();
 public:
 	void initialize_key_binds();
 	void update_key_binds();

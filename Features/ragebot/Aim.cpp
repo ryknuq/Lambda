@@ -94,6 +94,8 @@ void aim::run(CUserCmd* cmd)
         }
     }
 
+    automatic_scope(cmd);
+
     restore_players();
 
     if (!automatic_stop(cmd))
@@ -1028,6 +1030,74 @@ int aim::calc_bt_ticks()
 
         if (record->simulation_time == final_target.record->simulation_time)
             return i;
+    }
+}
+
+void aim::automatic_scope(CUserCmd* cmd)
+{
+    if (!cfg.ragebot.autoscope)
+        return;
+
+    if (!g_ctx.globals.weapon)
+        return;
+
+    auto index = g_ctx.globals.weapon->m_iItemDefinitionIndex();
+
+    if (index != WEAPON_SCAR20 && index != WEAPON_G3SG1 && index != WEAPON_SSG08 && index != WEAPON_AWP && index != WEAPON_AUG && index != WEAPON_SG553)
+        return;
+
+    if (g_ctx.globals.weapon->m_zoomLevel())
+        return;
+
+    if (cmd->m_buttons & IN_ATTACK2)
+        return;
+
+    if (g_ctx.globals.weapon->is_empty())
+        return;
+
+    if (g_ctx.local()->m_bIsDefusing())
+        return;
+
+    if (!scanned_targets.empty())
+    {
+        cmd->m_buttons |= IN_ATTACK2;
+        return;
+    }
+
+    if (targets.empty())
+        return;
+
+    auto weapon_info = g_ctx.globals.weapon->get_csweapon_info();
+
+    if (!weapon_info)
+        return;
+
+    auto max_speed = g_ctx.globals.scoped ? weapon_info->flMaxPlayerSpeedAlt : weapon_info->flMaxPlayerSpeed;
+    auto velocity = engineprediction::get().backup_data.velocity;
+
+    auto ticks_to_stop = math::clamp(velocity.Length2D() / max_speed * 3.0f, 0.0f, 4.0f);
+    auto lookahead = math::clamp((float)m_clientstate()->iChokedCommands + 6.0f + ticks_to_stop, 1.0f, 16.0f);
+
+    auto predicted_eye_pos = g_ctx.globals.eye_pos + velocity * (m_globals()->m_intervalpertick * lookahead);
+
+    for (auto& target : targets)
+    {
+        if (!target.last_record || !target.last_record->valid())
+            continue;
+
+        if (predicted_eye_pos.DistTo(target.last_record->origin) > weapon_info->flRange)
+            continue;
+
+        scan_data predicted_data;
+
+        target.last_record->adjust_player();
+        scan(target.last_record, predicted_data, predicted_eye_pos);
+
+        if (!predicted_data.valid())
+            continue;
+
+        cmd->m_buttons |= IN_ATTACK2;
+        break;
     }
 }
 

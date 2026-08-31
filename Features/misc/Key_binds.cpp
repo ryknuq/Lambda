@@ -50,17 +50,10 @@ void key_binds::update_key_bind(key_bind* key_bind, int key_bind_id)
 		if (misc::get().hide_shots_key && cfg.antiaim.hide_shots_key.key != cfg.ragebot.double_tap_key.key)
 			misc::get().double_tap_key = false;
 		break;
-	case 13: // Manual back
-		if (active) antiaim::get().manual_side = SIDE_BACK;
-		else if (antiaim::get().manual_side == SIDE_BACK) antiaim::get().manual_side = SIDE_NONE;
-		break;
-	case 14: // Manual left
-		if (active) antiaim::get().manual_side = SIDE_LEFT;
-		else if (antiaim::get().manual_side == SIDE_LEFT) antiaim::get().manual_side = SIDE_NONE;
-		break;
-	case 15: // Manual right
-		if (active) antiaim::get().manual_side = SIDE_RIGHT;
-		else if (antiaim::get().manual_side == SIDE_RIGHT) antiaim::get().manual_side = SIDE_NONE;
+	case 13:
+	case 14:
+	case 15:
+		keys[key_bind_id] = active;
 		break;
 	default:
 		keys[key_bind_id] = active;
@@ -68,6 +61,51 @@ void key_binds::update_key_bind(key_bind* key_bind, int key_bind_id)
 	}
 
 	mode[key_bind_id] = key_bind->mode;
+}
+
+void key_binds::update_manual_binds()
+{
+	static bool previous[3] = { false, false, false };
+
+	key_bind* binds[3] = { &cfg.antiaim.manual_back, &cfg.antiaim.manual_left, &cfg.antiaim.manual_right };
+	const int sides[3] = { SIDE_BACK, SIDE_LEFT, SIDE_RIGHT };
+
+	auto pressed = -1;
+
+	for (auto i = 0; i < 3; i++)
+	{
+		update_key_bind(binds[i], 13 + i);
+
+		if (binds[i]->mode != ALWAYS_ON && (binds[i]->key <= KEY_NONE || binds[i]->key >= KEY_MAX))
+			keys[13 + i] = false;
+
+		if (keys[13 + i] && !previous[i] && binds[i]->mode != ALWAYS_ON)
+			pressed = i;
+	}
+
+	if (pressed != -1)
+	{
+		for (auto i = 0; i < 3; i++)
+		{
+			if (i == pressed)
+				continue;
+
+			keys[13 + i] = false;
+			binds[i]->holding = util::is_button_down(binds[i]->key);
+		}
+	}
+
+	int side = SIDE_NONE;
+
+	for (auto i = 0; i < 3; i++)
+	{
+		previous[i] = keys[13 + i];
+
+		if (keys[13 + i] && side == SIDE_NONE)
+			side = sides[i];
+	}
+
+	antiaim::get().manual_side = side;
 }
 
 void key_binds::initialize_key_binds()
@@ -91,9 +129,7 @@ void key_binds::update_key_binds()
 		update_key_bind(&cfg.ragebot.weapon[i].damage_override_key, 4 + i);
 
 	update_key_bind(&cfg.antiaim.hide_shots_key, 12);
-	update_key_bind(&cfg.antiaim.manual_back, 13);
-	update_key_bind(&cfg.antiaim.manual_left, 14);
-	update_key_bind(&cfg.antiaim.manual_right, 15);
+	update_manual_binds();
 	update_key_bind(&cfg.antiaim.flip_desync, 16);
 	update_key_bind(&cfg.misc.thirdperson_toggle, 17);
 	update_key_bind(&cfg.misc.automatic_peek, 18);

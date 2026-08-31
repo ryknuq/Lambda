@@ -5,6 +5,7 @@
 #include "..\misc\prediction_system.h"
 #include "..\misc\misc.h"
 #include "..\lagcompensation\local_animations.h"
+#include "..\lagcompensation\animation_system.h"
 
 void antiaim::create_move(CUserCmd* m_pcmd)
 {
@@ -14,9 +15,6 @@ void antiaim::create_move(CUserCmd* m_pcmd)
 
 	if (cfg.antiaim.antiaim_type)
 		type = ANTIAIM_LEGIT;
-
-	if (!cfg.ragebot.enable && type != ANTIAIM_LEGIT)
-		return;
 
 	if (condition(m_pcmd))
 		return;
@@ -136,14 +134,8 @@ float antiaim::get_yaw(CUserCmd* m_pcmd) // fixed by semmxz
 	}
 	else
 	{
-		if (manual_side == SIDE_NONE)
-		{
+		final_manual_side = manual_side;
 
-		}
-		else
-			final_manual_side = manual_side;
-
-		// fix
 		auto base_angle = m_pcmd->m_viewangles.y + 180.0f;
 
 		if (cfg.antiaim.type[type].base_angle == 1)
@@ -414,40 +406,52 @@ bool antiaim::should_break_lby(CUserCmd* m_pcmd, int lby_type)
 
 float antiaim::at_targets()
 {
+	static auto sticky_index = -1;
+
 	player_t* target = nullptr;
-	auto best_fov = FLT_MAX;
+	auto best_distance = FLT_MAX;
+
+	auto sticky = static_cast<player_t*>(m_entitylist()->GetClientEntity(sticky_index));
+
+	if (sticky && sticky->valid(true))
+		best_distance = g_ctx.globals.eye_pos.DistTo(sticky->GetAbsOrigin()) * 0.85f;
+	else
+	{
+		sticky = nullptr;
+		sticky_index = -1;
+	}
 
 	for (auto i = 1; i <= m_globals()->m_maxclients; i++)
 	{
 		auto e = static_cast<player_t*>(m_entitylist()->GetClientEntity(i));
 
-		if (!e || !e->valid(true))
+		if (!e || e == sticky || !e->valid(true))
 			continue;
 
-		auto weapon = e->m_hActiveWeapon().Get();
+		auto distance = g_ctx.globals.eye_pos.DistTo(e->GetAbsOrigin());
 
-		if (!weapon)
+		if (distance >= best_distance)
 			continue;
 
-		if (weapon->is_non_aim())
-			continue;
-
-		Vector angles;
-		m_engine()->GetViewAngles(angles);
-
-		auto fov = math::get_fov(angles, math::calculate_angle(g_ctx.globals.eye_pos, e->GetAbsOrigin()));
-
-		if (fov < best_fov)
-		{
-			best_fov = fov;
-			target = e;
-		}
+		best_distance = distance;
+		target = e;
 	}
+
+	if (target)
+		sticky_index = target->EntIndex();
+	else
+		target = sticky;
 
 	if (!target)
 		return g_ctx.get_command()->m_viewangles.y + 180.0f;
 
-	return math::calculate_angle(g_ctx.globals.eye_pos, target->GetAbsOrigin()).y + 180.0f;
+	auto position = target->GetAbsOrigin();
+	auto record = &player_records[target->EntIndex()];
+
+	if (!record->empty() && record->front().valid())
+		position = record->front().origin;
+
+	return math::calculate_angle(g_ctx.globals.eye_pos, position).y + 180.0f;
 }
 
 bool antiaim::automatic_direction()

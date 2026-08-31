@@ -75,20 +75,6 @@ void __stdcall hooks::hooked_createmove(int sequence_number, float input_sample_
 	}
 
 
-	if (g_ctx.globals.should_recharge)
-	{
-		m_pcmd->m_buttons &= ~IN_ATTACK;
-		m_pcmd->m_buttons &= ~IN_ATTACK2;
-
-		if (++g_ctx.globals.ticks_allowed >= 16)
-		{
-			g_ctx.globals.ticks_allowed = 16;
-			g_ctx.globals.should_recharge = false;
-		}
-	}
-	else if (g_ctx.globals.ticks_allowed < 16 && (misc::get().double_tap_enabled && misc::get().double_tap_key || misc::get().hide_shots_enabled && misc::get().hide_shots_key))
-		g_ctx.globals.should_recharge = true;
-
 	g_ctx.globals.backup_tickbase = g_ctx.local()->m_nTickBase();
 
 	if (g_ctx.globals.next_tickbase_shift)
@@ -180,8 +166,7 @@ void __stdcall hooks::hooked_createmove(int sequence_number, float input_sample_
 	if (cfg.ragebot.enable && !g_ctx.globals.weapon->is_non_aim() && engineprediction::get().backup_data.flags & FL_ONGROUND && g_ctx.local()->m_fFlags() & FL_ONGROUND)
 		slowwalk::get().create_move(m_pcmd, 0.95f + 0.003125f * (16 - m_clientstate()->iChokedCommands));
 
-	if (!g_ctx.globals.should_recharge)
-		fakelag::get().Createmove();
+	fakelag::get().Createmove();
 
 	if (cfg.ragebot.defensive_doubletap)
 		misc::get().createmove(m_pcmd);
@@ -234,9 +219,6 @@ void __stdcall hooks::hooked_createmove(int sequence_number, float input_sample_
 		g_ctx.globals.should_send_packet = true;
 		g_ctx.send_packet = false;
 	}
-
-	if (g_ctx.globals.should_recharge)
-		g_ctx.send_packet = false;
 
 	antiaim::get().desync_angle = 0.0f;
 	antiaim::get().create_move(m_pcmd);
@@ -294,8 +276,7 @@ void __stdcall hooks::hooked_createmove(int sequence_number, float input_sample_
 		misc::get().hide_shots(m_pcmd, false);
 	else
 	{
-		if (!misc::get().recharging_double_tap)
-			g_ctx.globals.ticks_allowed = backup_ticks_allowed;
+		g_ctx.globals.ticks_allowed = backup_ticks_allowed;
 		misc::get().hide_shots(m_pcmd, true);
 	}
 

@@ -179,6 +179,7 @@ class aim : public singleton <aim>
 	int GetTicksToShoot();
 	bool HoldFiringAnimation();
 	void find_best_target();
+	void automatic_scope(CUserCmd* cmd);
 	void fire(CUserCmd* cmd);
 	void build_seed_table();
 	float hitchance_mashup(player_t* e);
