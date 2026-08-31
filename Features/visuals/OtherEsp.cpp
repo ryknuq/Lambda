@@ -14,22 +14,19 @@ bool can_penetrate(weapon_t* weapon)
 	if (!weapon_info)
 		return false;
 
-	Vector view_angles;
-	m_engine()->GetViewAngles(view_angles);
-
 	Vector direction;
-	math::angle_vectors(view_angles, direction);
+	math::angle_vectors(g_ctx.globals.render_angles, direction);
 
 	CTraceFilter filter;
 	filter.pSkip = g_ctx.local();
 
 	trace_t trace;
-	util::trace_line(g_ctx.globals.eye_pos, g_ctx.globals.eye_pos + direction * weapon_info->flRange, MASK_SHOT_HULL | CONTENTS_HITBOX, &filter, &trace);
+	util::trace_line(g_ctx.globals.render_eye_pos, g_ctx.globals.render_eye_pos + direction * weapon_info->flRange, MASK_SHOT_HULL | CONTENTS_HITBOX, &filter, &trace);
 
 	if (trace.fraction == 1.0f)
 		return false;
 
-	auto eye_pos = g_ctx.globals.eye_pos;
+	auto eye_pos = g_ctx.globals.render_eye_pos;
 	auto hits = 1;
 	auto damage = (float)weapon_info->iDamage;
 	auto penetration_power = weapon_info->flPenetration;
@@ -56,23 +53,20 @@ void otheresp::penetration_reticle()
 	if (!weapon)
 		return;
 
-	auto color = Color::Red;
+	auto weapon_info = weapon->get_csweapon_info();
 
-	if (!weapon->is_non_aim() && weapon->m_iItemDefinitionIndex() != WEAPON_TASER && can_penetrate(weapon))
-		color = Color::Green;
+	if (!weapon_info)
+		return;
 
-	static int width, height;
-	m_engine()->GetScreenSize(width, height);
+	auto penetrates = !weapon->is_non_aim() && weapon->m_iItemDefinitionIndex() != WEAPON_TASER && can_penetrate(weapon);
+	auto color = penetrates ? Color::Green : Color::Red;
 
 	trace_t enterTrace;
 	CTraceFilter filter;
 	Ray_t ray;
-	auto weapon_info = weapon->get_csweapon_info();
-	if (!weapon_info)
-		return;
-	Vector viewangles; m_engine()->GetViewAngles(viewangles);
-	Vector direction; math::angle_vectors(viewangles, direction);
-	Vector start = g_ctx.globals.eye_pos;
+
+	Vector direction; math::angle_vectors(g_ctx.globals.render_angles, direction);
+	Vector start = g_ctx.globals.render_eye_pos;
 	auto m_flMaxRange = weapon_info->flRange * 2;
 	Vector end = start + (direction * m_flMaxRange);
 
@@ -88,12 +82,11 @@ void otheresp::penetration_reticle()
 	float invanglex = math::dot_product(Vector(-1, 0, 0), enterTrace.plane.normal);
 
 	if (anglez > 0.5 || invanglez > 0.5)
-		g_Render->filled_rect_world(enterTrace.endpos, Vector2D(3, 3), Color(color.r(), color.g(), color.b(), 100), 0, int(can_penetrate(weapon)));
+		g_Render->filled_rect_world(enterTrace.endpos, Vector2D(3, 3), Color(color.r(), color.g(), color.b(), 100), 0, int(penetrates));
 	else if (angley > 0.5 || invangley > 0.5)
-		g_Render->filled_rect_world(enterTrace.endpos, Vector2D(3, 3), Color(color.r(), color.g(), color.b(), 100), 1, int(can_penetrate(weapon)));
+		g_Render->filled_rect_world(enterTrace.endpos, Vector2D(3, 3), Color(color.r(), color.g(), color.b(), 100), 1, int(penetrates));
 	else if (anglex > 0.5 || invanglex > 0.5)
-		g_Render->filled_rect_world(enterTrace.endpos, Vector2D(3, 3), Color(color.r(), color.g(), color.b(), 100), 2, int(can_penetrate(weapon)));
-	Vector pos2d;
+		g_Render->filled_rect_world(enterTrace.endpos, Vector2D(3, 3), Color(color.r(), color.g(), color.b(), 100), 2, int(penetrates));
 }
 
 void otheresp::damage_marker_paint()

@@ -83,6 +83,15 @@ void __stdcall hooks::hooked_overrideview(CViewSetup* viewsetup)
                 math::VectorMA(viewsetup->origin, -m_input()->m_vecCameraOffset.z, camera_forward, viewsetup->origin);
             }
         }
+
+        if (m_input()->m_fCameraInThirdPerson)
+            g_ctx.globals.render_eye_pos = fakeducking
+                ? g_ctx.local()->GetRenderOrigin() + Vector(0.0f, 0.0f, m_gamemovement()->GetPlayerViewOffset(false).z + 0.064f)
+                : g_ctx.local()->GetRenderOrigin() + g_ctx.local()->m_vecViewOffset();
+        else
+            g_ctx.globals.render_eye_pos = viewsetup->origin;
+
+        g_ctx.globals.render_angles = viewsetup->angles;
     }
     else
         return original_fn(viewsetup);

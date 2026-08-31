@@ -207,6 +207,8 @@ public:
 		VMatrix world_to_screen_matrix;
 
 		Vector eye_pos = ZERO;
+		Vector render_eye_pos = ZERO;
+		Vector render_angles = ZERO;
 		Vector start_position = ZERO;
 		Vector dormant_origin[65];
 
