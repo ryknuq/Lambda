@@ -90,10 +90,19 @@ void zeusbot::scan_targets()
 	}
 }
 
+static constexpr auto zeus_lethal_range = 180.0f;
+
 void zeusbot::scan(adjust_data* record, scan_data& data)
 {
 	auto best_damage = 0;
 	auto hitbox = 0;
+
+	auto weapon_info = g_ctx.globals.weapon->get_csweapon_info();
+
+	if (!weapon_info)
+		return;
+
+	auto max_range = min(weapon_info->flRange, zeus_lethal_range);
 
 	std::vector <scan_point> points;
 
@@ -130,6 +139,9 @@ void zeusbot::scan(adjust_data* record, scan_data& data)
 		if (data.point.safe && data.point.safe < point.safe)
 			continue;
 
+		if (g_ctx.globals.eye_pos.DistTo(point.point) > max_range)
+			continue;
+
 		auto fire_data = autowall::get().wall_penetration(g_ctx.globals.eye_pos, point.point, record->player);
 
 		if (!fire_data.valid)
@@ -141,7 +153,7 @@ void zeusbot::scan(adjust_data* record, scan_data& data)
 		if (!fire_data.visible)
 			continue;
 
-		if (fire_data.damage >= record->player->m_iHealth() * 1.5f && fire_data.damage >= best_damage)
+		if (fire_data.damage >= best_damage)
 		{
 			best_damage = fire_data.damage;
 
@@ -155,7 +167,7 @@ void zeusbot::scan(adjust_data* record, scan_data& data)
 
 static bool compare_targets(const scanned_target& first, const scanned_target& second)
 {
-	return first.data.damage > second.data.damage;
+	return first.distance < second.distance;
 }
 
 void zeusbot::find_best_target()
@@ -179,12 +191,6 @@ void zeusbot::fire(CUserCmd* cmd)
 		return;
 
 	auto aim_angle = math::calculate_angle(g_ctx.globals.eye_pos, final_target.data.point.point).Clamp();
-
-	if (!cfg.ragebot.enable)
-		m_engine()->SetViewAngles(aim_angle);
-
-	if (!cfg.ragebot.enable && !(cmd->m_buttons & IN_ATTACK))
-		return;
 
 	auto final_hitchance = hitchance(aim_angle);
 
@@ -244,6 +250,8 @@ void zeusbot::fire(CUserCmd* cmd)
 		case HITBOX_LEFT_FOOT:
 			return shot_info ? crypt_str("Right foot") : crypt_str("right foot");
 		}
+
+		return shot_info ? crypt_str("Generic") : crypt_str("generic");
 	};
 
 	player_info_t player_info;
@@ -266,6 +274,7 @@ void zeusbot::fire(CUserCmd* cmd)
 	cmd->m_tickcount = TIME_TO_TICKS(final_target.record->simulation_time + util::get_interpolation());
 
 	g_ctx.globals.aimbot_working = true;
+	g_ctx.globals.last_aimbot_shot = m_globals()->m_tickcount;
 }
 
 int zeusbot::hitchance(const Vector& aim_angle)

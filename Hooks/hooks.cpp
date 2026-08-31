@@ -73,18 +73,24 @@ namespace hooks
 		{
 			menu_open = !menu_open;
 
-			if (menu_open && g_ctx.available())
+			if (menu_open)
 			{
-				if (g_ctx.globals.current_weapon != -1)
+				if (GetAsyncKeyState(VK_LBUTTON) & 0x8000)
+					CallWindowProc(INIT::OldWindow, hWnd, WM_LBUTTONUP, 0, MAKELPARAM((int)mouse_pos.x, (int)mouse_pos.y));
+
+				if (g_ctx.available())
 				{
-					if (cfg.ragebot.enable)
-						rage_weapon = g_ctx.globals.current_weapon;
+					if (g_ctx.globals.current_weapon != -1)
+					{
+						if (cfg.ragebot.enable)
+							rage_weapon = g_ctx.globals.current_weapon;
+					}
 				}
 			}
 		}
 
 		auto pressed_buttons = false;
-		auto pressed_menu_key = uMsg == WM_LBUTTONDOWN || uMsg == WM_LBUTTONUP || uMsg == WM_RBUTTONDOWN || uMsg == WM_RBUTTONUP || uMsg == WM_MOUSEWHEEL;
+		auto pressed_menu_key = uMsg == WM_LBUTTONDOWN || uMsg == WM_LBUTTONUP || uMsg == WM_LBUTTONDBLCLK || uMsg == WM_RBUTTONDOWN || uMsg == WM_RBUTTONUP || uMsg == WM_RBUTTONDBLCLK || uMsg == WM_MOUSEWHEEL;
 
 		if (g_ctx.local()->is_alive() && !pressed_menu_key && !g_ctx.globals.focused_on_input)
 			pressed_buttons = true;
@@ -92,7 +98,7 @@ namespace hooks
 		if (!pressed_buttons && d3d_init && menu_open && ImGui_ImplDX9_WndProcHandler(hWnd, uMsg, wParam, lParam) && !input_shouldListen)
 			return true;
 
-		if (menu_open && (uMsg == WM_LBUTTONDOWN || uMsg == WM_LBUTTONUP || uMsg == WM_MOUSEMOVE) && !input_shouldListen)
+		if (menu_open && (uMsg == WM_LBUTTONDOWN || uMsg == WM_LBUTTONUP || uMsg == WM_LBUTTONDBLCLK || uMsg == WM_MOUSEMOVE) && !input_shouldListen)
 			return false;
 
 		return CallWindowProc(INIT::OldWindow, hWnd, uMsg, wParam, lParam);
