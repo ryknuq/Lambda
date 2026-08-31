@@ -1,9 +1,61 @@
 ﻿#include "local_animations.h"
 
 
+void local_animations::update_prediction_animations()
+{
+	auto local = g_ctx.local();
+	if (!local || !local->is_alive() || !g_ctx.get_command())
+		return;
+
+	const auto current_handle = local->GetRefEHandle();
+	const auto changed_player = prediction_handle != current_handle;
+	const auto respawned = prediction_spawntime != local->m_flSpawnTime();
+
+	if (changed_player && local_data.prediction_animstate)
+	{
+		m_memalloc()->Free(local_data.prediction_animstate);
+		local_data.prediction_animstate = nullptr;
+	}
+
+	if (!local_data.prediction_animstate)
+	{
+		local_data.prediction_animstate = static_cast<c_baseplayeranimationstate*>(
+			m_memalloc()->Alloc(sizeof(c_baseplayeranimationstate)));
+
+		if (!local_data.prediction_animstate)
+			return;
+
+		util::create_state(local_data.prediction_animstate, local);
+		prediction_handle = current_handle;
+		prediction_spawntime = local->m_flSpawnTime();
+	}
+	else if (respawned)
+	{
+		util::reset_state(local_data.prediction_animstate);
+		prediction_spawntime = local->m_flSpawnTime();
+	}
+
+	auto layers = std::array<AnimationLayer, 13>{};
+	auto poses = local->m_flPoseParameter();
+	const auto layer_count = min(local->animlayer_count(), static_cast<int>(layers.size()));
+	memcpy(layers.data(), local->get_animlayers(), layer_count * sizeof(AnimationLayer));
+
+	local_data.prediction_animstate->m_pBaseEntity = local;
+	local_data.prediction_animstate->m_iLastClientSideAnimationUpdateFramecount =
+		min(local_data.prediction_animstate->m_iLastClientSideAnimationUpdateFramecount,
+			m_globals()->m_framecount - 1);
+	util::update_state(local_data.prediction_animstate, g_ctx.get_command()->m_viewangles);
+
+	memcpy(local->get_animlayers(), layers.data(), layer_count * sizeof(AnimationLayer));
+	local->m_flPoseParameter() = poses;
+}
+
 void local_animations::run(ClientFrameStage_t stage) // Шиза
 {
     auto local = g_ctx.local();
+	if (!local || !local->is_alive())
+		return;
+
     auto* animstate = local->get_animation_state();
 
     // Проверка на nullptr для animstate
@@ -64,6 +116,8 @@ void local_animations::reset_animation_layers()
 {
     auto local = g_ctx.local();
     auto animlayers = local->get_animlayers();
+	if (!animlayers || local->animlayer_count() <= 12)
+		return;
 
     animlayers[3].m_flWeight = 0.0f;
     animlayers[3].m_flCycle = 0.0f;
@@ -96,7 +150,8 @@ void local_animations::handle_walk_type()
 void local_animations::update_fake_animations()
 {
     bool alloc = !local_data.animstate;
-    bool change = !alloc && handle != &g_ctx.local()->GetRefEHandle();
+	const auto current_handle = g_ctx.local()->GetRefEHandle();
+    bool change = !alloc && handle != current_handle;
     bool reset = !alloc && !change && g_ctx.local()->m_flSpawnTime() != spawntime;
 
     if (change)
@@ -127,7 +182,7 @@ void local_animations::update_fake_animations()
             return;
         }
 
-        handle = (CBaseHandle*)&g_ctx.local()->GetRefEHandle();
+		handle = current_handle;
         spawntime = g_ctx.local()->m_flSpawnTime();
     }
 

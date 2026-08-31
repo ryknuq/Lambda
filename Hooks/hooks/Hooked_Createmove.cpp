@@ -32,10 +32,11 @@ void __stdcall hooks::hooked_createmove(int sequence_number, float input_sample_
 	auto verified = m_input()->GetVerifiedUserCmd(sequence_number);
 
 	g_ctx.globals.in_createmove = false;
-	Vector wish_yaw = m_pcmd->m_viewangles;
 
-	if (!m_pcmd)
+	if (!m_pcmd || !verified)
 		return;
+
+	Vector wish_yaw = m_pcmd->m_viewangles;
 
 	if (!m_pcmd->m_command_number)
 		return;
@@ -161,6 +162,10 @@ void __stdcall hooks::hooked_createmove(int sequence_number, float input_sample_
 
 	engineprediction::get().predict(m_pcmd);
 
+	local_animations::get().update_prediction_animations();
+
+	// fix
+	g_ctx.globals.prediction_matrix_valid = false;
 	g_ctx.globals.eye_pos = g_ctx.local()->get_shoot_position();
 
 	if (cfg.misc.airstrafe)

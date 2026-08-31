@@ -143,24 +143,29 @@ float antiaim::get_yaw(CUserCmd* m_pcmd) // fixed by semmxz
 		else
 			final_manual_side = manual_side;
 
+		// fix
 		auto base_angle = m_pcmd->m_viewangles.y + 180.0f;
 
-		if (final_manual_side == SIDE_LEFT)
-			base_angle -= 90.0f;
-		else if (cfg.antiaim.type[type].base_angle != 1)
+		if (cfg.antiaim.type[type].base_angle == 1)
 			base_angle = at_targets();
-		else 
-			base_angle;
 
-		if (final_manual_side == SIDE_RIGHT)
-			base_angle += 90.0f;
-		else if (cfg.antiaim.type[type].base_angle != 1)
-			base_angle = at_targets();
-		else
-			base_angle;
-
-		if (cfg.antiaim.type[type].base_angle && manual_side == SIDE_NONE)
-			base_angle = at_targets();
+		switch (final_manual_side)
+		{
+		case SIDE_LEFT:
+			base_angle = m_pcmd->m_viewangles.y + 90.0f;
+			break;
+		case SIDE_RIGHT:
+			base_angle = m_pcmd->m_viewangles.y - 90.0f;
+			break;
+		case SIDE_BACK:
+			base_angle = m_pcmd->m_viewangles.y + 180.0f;
+			break;
+		case SIDE_FORWARD:
+			base_angle = m_pcmd->m_viewangles.y;
+			break;
+		default:
+			break;
+		}
 
 		if (cfg.antiaim.type[type].desync != 2 && (cfg.antiaim.flip_desync.key <= KEY_NONE || cfg.antiaim.flip_desync.key >= KEY_MAX))
 		{
@@ -405,11 +410,11 @@ float antiaim::at_targets()
 	player_t* target = nullptr;
 	auto best_fov = FLT_MAX;
 
-	for (auto i = 1; i < m_globals()->m_maxclients; i++)
+	for (auto i = 1; i <= m_globals()->m_maxclients; i++)
 	{
 		auto e = static_cast<player_t*>(m_entitylist()->GetClientEntity(i));
 
-		if (!e->valid(true))
+		if (!e || !e->valid(true))
 			continue;
 
 		auto weapon = e->m_hActiveWeapon().Get();
@@ -432,17 +437,10 @@ float antiaim::at_targets()
 		}
 	}
 
-	auto angle = 180.0f;
-
-	if (manual_side == SIDE_LEFT)
-		angle = 90.0f;
-	else if (manual_side == SIDE_RIGHT)
-		angle = -90.0f;
-
 	if (!target)
-		return g_ctx.get_command()->m_viewangles.y + angle;
+		return g_ctx.get_command()->m_viewangles.y + 180.0f;
 
-	return math::calculate_angle(g_ctx.globals.eye_pos, target->GetAbsOrigin()).y + angle;
+	return math::calculate_angle(g_ctx.globals.eye_pos, target->GetAbsOrigin()).y + 180.0f;
 }
 
 bool antiaim::automatic_direction()

@@ -316,16 +316,15 @@ void __fastcall hooks::hooked_painttraverse(void* ecx, void* edx, vgui::VPANEL p
 
 		if (nci)
 		{
-			auto latency = m_engine()->IsPlayingDemo() ? 0.0f : nci->GetAvgLatency(FLOW_OUTGOING);
-
-			if (latency)
-			{
-				static auto cl_updaterate = m_cvar()->FindVar(crypt_str("cl_updaterate"));
-				latency -= 0.5f / cl_updaterate->GetFloat();
-			}
+			// fix
+			auto latency = m_engine()->IsPlayingDemo() || nci->IsLoopback()
+				? 0.0f
+				: nci->GetLatency(FLOW_OUTGOING);
 
 			g_ctx.globals.ping = (int)(max(0.0f, latency) * 1000.0f);
 		}
+		else
+			g_ctx.globals.ping = 0;
 
 		time_t lt;
 		struct tm* t_m;

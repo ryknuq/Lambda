@@ -100,7 +100,7 @@ private:
 	float preview_alpha = 1.f;
 
 	int active_tab_index;
-	int width = 850, height = 560;
+	int width = 1050, height = 600;
 	int active_tab;
 	int current_profile = -1;
 

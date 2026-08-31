@@ -9,7 +9,7 @@ void lagcompensation::fsn(ClientFrameStage_t stage) // Паста
 {
 	if (stage != FRAME_NET_UPDATE_END)
 		return;
-	for (auto i = 1; i < m_globals()->m_maxclients; i++) //-V807
+	for (auto i = 1; i <= m_globals()->m_maxclients; i++) //-V807
 	{
 		auto e = static_cast<player_t*>(m_entitylist()->GetClientEntity(i));
 
@@ -180,9 +180,9 @@ void lagcompensation::extrapolation(player_t* player, Vector& origin, Vector& ve
 
 bool lagcompensation::valid(int i, player_t* e)
 {
-	if (!cfg.ragebot.enable || !e->valid(false))
+	if (!cfg.ragebot.enable || !e || !e->valid(false))
 	{
-		if (!e->is_alive())
+		if (!e || !e->is_alive())
 		{
 			is_dormant[i] = false;
 			player_resolver[i].reset();
@@ -222,6 +222,15 @@ void lagcompensation::update_player_animations(player_t* e)
 		previous_record = &records->at(1);
 
 	auto record = &records->front();
+	record->store_data(e, false);
+	record->bot = player_info.fakeplayer;
+
+	auto weapon = e->m_hActiveWeapon().Get();
+	if (previous_record && weapon && !weapon->is_grenade() && !weapon->is_knife())
+	{
+		const auto shot_time = weapon->m_fLastShotTime();
+		record->shot = shot_time > previous_record->simulation_time && shot_time <= record->simulation_time;
+	}
 
 	AnimationLayer animlayers[13];
 	float pose_parametrs[24];
@@ -237,6 +246,10 @@ void lagcompensation::update_player_animations(player_t* e)
 	auto backup_duck_amount = e->m_flDuckAmount();
 	auto backup_flags = e->m_fFlags();
 	auto backup_eflags = e->m_iEFlags();
+	auto backup_velocity = e->m_vecVelocity();
+	auto backup_abs_velocity = e->m_vecAbsVelocity();
+	auto backup_abs_origin = e->GetAbsOrigin();
+	auto backup_abs_angles = e->GetAbsAngles();
 
 	auto backup_curtime = m_globals()->m_curtime; //-V807
 	auto backup_frametime = m_globals()->m_frametime;
@@ -250,8 +263,7 @@ void lagcompensation::update_player_animations(player_t* e)
 
 	if (previous_record)
 	{
-		auto velocity = e->m_vecVelocity();
-		auto was_in_air = e->m_fFlags() & FL_ONGROUND && previous_record->flags & FL_ONGROUND;
+		auto was_in_air = !(e->m_fFlags() & FL_ONGROUND) || !(previous_record->flags & FL_ONGROUND);
 
 		auto time_difference = max(m_globals()->m_intervalpertick, e->m_flSimulationTime() - previous_record->simulation_time);
 		auto origin_delta = e->m_vecOrigin() - previous_record->origin;
@@ -278,7 +290,7 @@ void lagcompensation::update_player_animations(player_t* e)
 					float previous_weight = previous_record->layers[6].m_flWeight;
 					float loop_weight = animlayers[11].m_flWeight;
 
-					float length_2d = record->velocity.Length2D();
+					float length_2d = e->m_vecVelocity().Length2D();
 
 					if ((loop_weight <= 0.f || loop_weight >= 1.f) && length_2d >= 0.1f)
 					{
@@ -405,7 +417,7 @@ void lagcompensation::update_player_animations(player_t* e)
 
 			auto duck_amount_per_tick = (e->m_flDuckAmount() - previous_record->duck_amount) / ticks_chocked;
 
-			for (auto i = 0; i < ticks_chocked; ++i)
+			for (auto i = 1; i <= ticks_chocked; ++i)
 			{
 
 				auto lby_delta = fabs(math::normalize_yaw(e->m_flLowerBodyYawTarget() - previous_record->lby));
@@ -478,7 +490,7 @@ void lagcompensation::update_player_animations(player_t* e)
 
 	memcpy(animstate, &state, sizeof(c_baseplayeranimationstate));
 
-	auto setup_matrix = [&](player_t* e, AnimationLayer* layers, const int& matrix) -> void
+	auto setup_matrix = [&](player_t* e, AnimationLayer* layers, const int& matrix) -> bool
 		{
 			e->invalidate_physics_recursive(8);
 
@@ -486,26 +498,28 @@ void lagcompensation::update_player_animations(player_t* e)
 			memcpy(backup_layers, e->get_animlayers(), e->animlayer_count() * sizeof(AnimationLayer));
 			memcpy(e->get_animlayers(), layers, e->animlayer_count() * sizeof(AnimationLayer));
 
+			bool result = false;
 			switch (matrix)
 			{
 			case MAIN:
-				e->setup_bones_fixed(record->matrixes_data.main, BONE_USED_BY_ANYTHING);
+				result = e->setup_bones_fixed(record->matrixes_data.main, BONE_USED_BY_ANYTHING);
 				break;
 			case NONE:
-				e->setup_bones_fixed(record->matrixes_data.zero, BONE_USED_BY_HITBOX);
+				result = e->setup_bones_fixed(record->matrixes_data.zero, BONE_USED_BY_HITBOX);
 				break;
 			case FIRST:
-				e->setup_bones_fixed(record->matrixes_data.first, BONE_USED_BY_HITBOX);
+				result = e->setup_bones_fixed(record->matrixes_data.first, BONE_USED_BY_HITBOX);
 				break;
 			case SECOND:
-				e->setup_bones_fixed(record->matrixes_data.second, BONE_USED_BY_HITBOX);
+				result = e->setup_bones_fixed(record->matrixes_data.second, BONE_USED_BY_HITBOX);
 				break;
 			case THIRD:
-				e->setup_bones_fixed(record->matrixes_data.third, BONE_USED_BY_HITBOX);
+				result = e->setup_bones_fixed(record->matrixes_data.third, BONE_USED_BY_HITBOX);
 				break;
 			}
 
 			memcpy(e->get_animlayers(), backup_layers, e->animlayer_count() * sizeof(AnimationLayer));
+			return result;
 		};
 
 	if (!player_info.fakeplayer && g_ctx.local()->is_alive() && e->m_iTeamNum() != g_ctx.local()->m_iTeamNum() && ticks_chocked >= 1)
@@ -520,6 +534,9 @@ void lagcompensation::update_player_animations(player_t* e)
 		previous_goal_feet_yaw[e->EntIndex()] = animstate->m_flGoalFeetYaw;
 		memcpy(animstate, &state, sizeof(c_baseplayeranimationstate));
 
+		const auto max_delta = std::clamp(std::fabs(e->get_max_desync_delta()), 25.0f, 60.0f);
+
+		memcpy(&e->m_flPoseParameter(), pose_parametrs, 24 * sizeof(float));
 		animstate->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y); //-V807
 
 		g_ctx.globals.updating_animation = true;
@@ -529,8 +546,9 @@ void lagcompensation::update_player_animations(player_t* e)
 		setup_matrix(e, animlayers, NONE);
 		memcpy(record->resolver_layers[0], e->get_animlayers(), sizeof(AnimationLayer) * 13);
 		memcpy(animstate, &state, sizeof(c_baseplayeranimationstate));
+		memcpy(&e->m_flPoseParameter(), pose_parametrs, 24 * sizeof(float));
 
-		animstate->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y + 60.0f);
+		animstate->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y + max_delta);
 
 		g_ctx.globals.updating_animation = true;
 		e->update_clientside_animation();
@@ -539,8 +557,9 @@ void lagcompensation::update_player_animations(player_t* e)
 		setup_matrix(e, animlayers, FIRST);
 		memcpy(record->resolver_layers[1], e->get_animlayers(), sizeof(AnimationLayer) * 13);
 		memcpy(animstate, &state, sizeof(c_baseplayeranimationstate));
+		memcpy(&e->m_flPoseParameter(), pose_parametrs, 24 * sizeof(float));
 
-		animstate->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y - 60.0f);
+		animstate->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y - max_delta);
 
 		g_ctx.globals.updating_animation = true;
 		e->update_clientside_animation();
@@ -549,8 +568,9 @@ void lagcompensation::update_player_animations(player_t* e)
 		setup_matrix(e, animlayers, SECOND);
 		memcpy(record->resolver_layers[2], e->get_animlayers(), sizeof(AnimationLayer) * 13);
 		memcpy(animstate, &state, sizeof(c_baseplayeranimationstate));
+		memcpy(&e->m_flPoseParameter(), pose_parametrs, 24 * sizeof(float));
 
-		animstate->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y - 30.0f);
+		animstate->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y - max_delta * 0.5f);
 
 		g_ctx.globals.updating_animation = true;
 		e->update_clientside_animation();
@@ -573,16 +593,16 @@ void lagcompensation::update_player_animations(player_t* e)
 			e->get_animation_state()->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y);
 			break;
 		case RESOLVER_FIRST:
-			e->get_animation_state()->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y + 58.0f);
+			e->get_animation_state()->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y + max_delta);
 			break;
 		case RESOLVER_SECOND:
-			e->get_animation_state()->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y - 58.0f);
+			e->get_animation_state()->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y - max_delta);
 			break;
 		case RESOLVER_LOW_FIRST:
-			e->get_animation_state()->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y + 25.0f);
+			e->get_animation_state()->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y + max_delta * 0.5f);
 			break;
 		case RESOLVER_LOW_SECOND:
-			e->get_animation_state()->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y - 25.0f);
+			e->get_animation_state()->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y - max_delta * 0.5f);
 			break;
 		case RESOLVER_HIGH_FIRST:
 			e->get_animation_state()->m_flGoalFeetYaw = math::normalize_yaw(e->m_angEyeAngles().y + e->get_max_desync_delta() * 2);
@@ -617,72 +637,30 @@ void lagcompensation::update_player_animations(player_t* e)
 	e->update_clientside_animation();
 	g_ctx.globals.updating_animation = false;
 
-	setup_matrix(e, animlayers, MAIN);
-	memcpy(e->m_CachedBoneData().Base(), record->matrixes_data.main, e->m_CachedBoneData().Count() * sizeof(matrix3x4_t));
+	record->invalid = !setup_matrix(e, animlayers, MAIN);
+	const auto cached_count = std::clamp(e->m_CachedBoneData().Count(), 0, MAXSTUDIOBONES);
+	memcpy(e->m_CachedBoneData().Base(), record->matrixes_data.main, cached_count * sizeof(matrix3x4_t));
 
 	m_globals()->m_curtime = backup_curtime;
 	m_globals()->m_frametime = backup_frametime;
+	m_globals()->m_realtime = backup_realtime;
+	m_globals()->m_framecount = backup_framecount;
+	m_globals()->m_tickcount = backup_tickcount;
+	m_globals()->m_interpolation_amount = backup_interpolation_amount;
 
 	e->m_flLowerBodyYawTarget() = backup_lower_body_yaw_target;
 	e->m_flDuckAmount() = backup_duck_amount;
 	e->m_fFlags() = backup_flags;
 	e->m_iEFlags() = backup_eflags;
+	e->m_vecVelocity() = backup_velocity;
+	e->m_vecAbsVelocity() = backup_abs_velocity;
+	e->set_abs_origin(backup_abs_origin);
+	e->set_abs_angles(backup_abs_angles);
 
 	memcpy(e->get_animlayers(), animlayers, e->animlayer_count() * sizeof(AnimationLayer));
+	memcpy(&e->m_flPoseParameter(), pose_parametrs, 24 * sizeof(float));
 	memcpy(player_resolver[e->EntIndex()].previous_layers, animlayers, sizeof(AnimationLayer) * 13);
 	record->store_data(e, false);
-
-	// Premium Shot Detection
-	if (previous_record && !is_dormant[e->EntIndex()])
-	{
-		auto weapon = e->m_hActiveWeapon().Get();
-		if (weapon)
-		{
-			// Filter out PVS entry (previous == 0) and use epsilon for floating point precision
-			bool shot_in_window = previous_record->last_shot_time > 0.0f && 
-								  record->last_shot_time > previous_record->last_shot_time + 0.0001f && 
-								  record->last_shot_time <= record->simulation_time;
-
-			bool ammo_decreased = false;
-			if (!weapon->is_grenade() && !weapon->is_knife())
-			{
-				// Robust ammo check: must decrease from a valid previous count
-				if (previous_record->ammo_count > 0 && record->ammo_count < previous_record->ammo_count && record->ammo_count != -1)
-					ammo_decreased = true;
-			}
-
-			// Layer 1 Activity check (High Precision Fire Detection)
-			bool layer1_activity_matches = false;
-			if (record->weapon_sequence != -1)
-			{
-				auto activity = e->sequence_activity(record->weapon_sequence);
-				if (activity == ACT_CSGO_FIRE_PRIMARY || activity == ACT_CSGO_FIRE_SECONDARY)
-					layer1_activity_matches = true;
-				else if (record->weapon_sequence != previous_record->weapon_sequence && record->weapon_cycle < 0.15f)
-				{
-					// Fallback for custom or unidentified fire sequences
-					// Only triggers if it's the start of a new sequence
-					layer1_activity_matches = true; 
-				}
-			}
-
-			// Final shot validation: Requires ammo decrease OR a valid networked shot time confirmed by animation
-			if (ammo_decreased || (shot_in_window && layer1_activity_matches))
-			{
-				record->shot = true;
-			}
-		}
-
-		// Tickbase shift detection (Hide Shots)
-		if (abs(record->tickbase - previous_record->tickbase) > 1)
-		{
-			record->exploited = true;
-			
-			// Force bone rebuild for exploited records to ensure accuracy
-			e->invalidate_bone_cache();
-			setup_matrix(e, animlayers, MAIN);
-		}
-	}
 
 	if (e->m_flSimulationTime() < e->m_flOldSimulationTime())
 		record->invalid = true;

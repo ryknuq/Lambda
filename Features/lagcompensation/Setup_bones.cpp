@@ -628,6 +628,17 @@ bool setup_bones_riptide(player_t* player, matrix3x4_t* matrix, int mask, float 
 
 	alignas(16) Vector position[256];
 	alignas(16) Quaternion rotation[256];
+	alignas(16) uint8_t temporary_ik_storage[0x1070] = {};
+	auto temporary_ik = reinterpret_cast<CIKContext*>(temporary_ik_storage);
+	auto& player_ik = *reinterpret_cast<CIKContext**>(reinterpret_cast<uintptr_t>(player) + bone_data.ik_offset);
+	auto backup_ik = player_ik;
+	const auto backup_lean_weight = player->animlayer_count() > 12 ? layers[12].m_flWeight : 0.0f;
+
+	// fix
+	temporary_ik->Construct();
+	player_ik = temporary_ik;
+	if (player->animlayer_count() > 12 && player != g_ctx.local())
+		layers[12].m_flWeight = 0.0f;
 
 	CSetupBones bones;
 
@@ -636,9 +647,9 @@ bool setup_bones_riptide(player_t* player, matrix3x4_t* matrix, int mask, float 
 	bones.m_pHdr = hdr;
 	bones.m_vecBones = position;
 	bones.m_quatBones = rotation;
-	bones.m_vecOrigin = player->GetRenderOrigin();
-	bones.m_angAngles = player->GetRenderAngles();
-	bones.m_bShouldDoIK = false;
+	bones.m_vecOrigin = player->GetAbsOrigin();
+	bones.m_angAngles = player->GetAbsAngles();
+	bones.m_bShouldDoIK = true;
 	bones.m_bShouldAttachment = (mask & BONE_USED_BY_ATTACHMENT) != 0;
 	bones.m_bShouldDispatch = true;
 	bones.m_bShouldWriteCache = false;
@@ -656,6 +667,11 @@ bool setup_bones_riptide(player_t* player, matrix3x4_t* matrix, int mask, float 
 	}
 
 	bones.setup();
+
+	if (player->animlayer_count() > 12)
+		layers[12].m_flWeight = backup_lean_weight;
+	player_ik = backup_ik;
+	temporary_ik->Destructor();
 
 	return true;
 }

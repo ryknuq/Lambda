@@ -481,10 +481,48 @@ void c_menu::menu_setup(ImGuiStyle& style)
 	c[ImGuiCol_ResizeGripHovered]    = ImVec4(0.357f, 0.549f, 1.f, 0.5f);
 	c[ImGuiCol_ResizeGripActive]     = ImVec4(0.357f, 0.549f, 1.f, 0.9f);
 	
-	style.FrameRounding = 3.0f;
-	style.PopupRounding = 3.0f;
-	style.FrameBorderSize = 1.0f;
-	style.PopupBorderSize = 1.0f;
+	c[ImGuiCol_WindowBg] = ImVec4(0.035f, 0.037f, 0.051f, 1.f);
+	c[ImGuiCol_ChildBg] = ImVec4(0.047f, 0.049f, 0.066f, 1.f);
+	c[ImGuiCol_PopupBg] = ImVec4(0.043f, 0.044f, 0.059f, 0.99f);
+	c[ImGuiCol_Border] = ImVec4(0.105f, 0.105f, 0.14f, 1.f);
+	c[ImGuiCol_FrameBg] = ImVec4(0.075f, 0.076f, 0.098f, 1.f);
+	c[ImGuiCol_FrameBgHovered] = ImVec4(0.095f, 0.096f, 0.125f, 1.f);
+	c[ImGuiCol_FrameBgActive] = ImVec4(0.11f, 0.105f, 0.145f, 1.f);
+	c[ImGuiCol_ScrollbarBg] = ImVec4(0.f, 0.f, 0.f, 0.f);
+	c[ImGuiCol_ScrollbarGrab] = ImVec4(0.31f, 0.29f, 0.42f, 0.55f);
+	c[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.39f, 0.36f, 0.54f, 0.75f);
+	c[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.46f, 0.42f, 0.63f, 1.f);
+	c[ImGuiCol_CheckMark] = ImVec4(0.72f, 0.68f, 0.91f, 1.f);
+	c[ImGuiCol_SliderGrab] = ImVec4(0.45f, 0.41f, 0.62f, 0.9f);
+	c[ImGuiCol_SliderGrabActive] = ImVec4(0.58f, 0.53f, 0.76f, 1.f);
+	c[ImGuiCol_Button] = ImVec4(0.075f, 0.076f, 0.098f, 1.f);
+	c[ImGuiCol_ButtonHovered] = ImVec4(0.105f, 0.102f, 0.14f, 1.f);
+	c[ImGuiCol_ButtonActive] = ImVec4(0.16f, 0.15f, 0.22f, 1.f);
+	c[ImGuiCol_Header] = ImVec4(0.23f, 0.21f, 0.31f, 0.55f);
+	c[ImGuiCol_HeaderHovered] = ImVec4(0.29f, 0.27f, 0.39f, 0.7f);
+	c[ImGuiCol_HeaderActive] = ImVec4(0.36f, 0.33f, 0.48f, 0.85f);
+	c[ImGuiCol_Separator] = ImVec4(0.105f, 0.105f, 0.14f, 1.f);
+	c[ImGuiCol_SeparatorHovered] = ImVec4(0.43f, 0.39f, 0.58f, 0.7f);
+	c[ImGuiCol_SeparatorActive] = ImVec4(0.56f, 0.51f, 0.73f, 1.f);
+	c[ImGuiCol_Text] = ImVec4(0.78f, 0.78f, 0.83f, 1.f);
+	c[ImGuiCol_TextDisabled] = ImVec4(0.34f, 0.34f, 0.4f, 1.f);
+
+	style.WindowPadding = ImVec2(0.f, 0.f);
+	style.FramePadding = ImVec2(7.f, 4.f);
+	style.ItemSpacing = ImVec2(8.f, 5.f);
+	style.ItemInnerSpacing = ImVec2(7.f, 5.f);
+	style.WindowRounding = 12.f;
+	style.ChildRounding = 7.f;
+	style.FrameRounding = 4.f;
+	style.PopupRounding = 6.f;
+	style.ScrollbarRounding = 4.f;
+	style.GrabRounding = 3.f;
+	style.ScrollbarSize = 4.f;
+	style.GrabMinSize = 8.f;
+	style.FrameBorderSize = 0.f;
+	style.PopupBorderSize = 1.f;
+	style.ChildBorderSize = 0.f;
+	style.WindowBorderSize = 0.f;
 
 	ImGui::SetNextWindowSize(ImVec2(width, height), ImGuiCond_Once);
 	ImGui::SetNextWindowBgAlpha(min(style.Alpha, 0.94f));
@@ -544,7 +582,7 @@ void c_menu::rage_tab() // rage tab
 {
 	if (rg_tab == 0)
 	{
-		ImGui::SetCursorPos(ImVec2(74, 90));
+		ImGui::SetCursorPos(ImVec2(180, 96));
 		ImGui::MenuChild("General", ImVec2(410, 280));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
@@ -552,7 +590,7 @@ void c_menu::rage_tab() // rage tab
 		}
 		ImGui::EndChild();
 
-		ImGui::SetCursorPos(ImVec2(496, 90));
+		ImGui::SetCursorPos(ImVec2(602, 96));
 		ImGui::MenuChild("Other", ImVec2(410, 280));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
@@ -562,7 +600,7 @@ void c_menu::rage_tab() // rage tab
 		}
 		ImGui::EndChild();
 
-		ImGui::SetCursorPos(ImVec2(496, 380));
+		ImGui::SetCursorPos(ImVec2(602, 386));
 		ImGui::MenuChild("Exploits", ImVec2(410, 165));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
@@ -582,7 +620,7 @@ void c_menu::rage_tab() // rage tab
 		}
 		ImGui::EndChild();
 
-		ImGui::SetCursorPos(ImVec2(74, 380));
+		ImGui::SetCursorPos(ImVec2(180, 386));
 		ImGui::MenuChild("Main", ImVec2(410, 165));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
@@ -595,7 +633,7 @@ void c_menu::rage_tab() // rage tab
 	{
 		const char* rage_weapon[8] = { crypt_str("Heavy Pistols"), crypt_str("Pistols"), crypt_str("SMG"), crypt_str("Rifles"), crypt_str("Auto Sniper"), crypt_str("Scout"), crypt_str("AWP"), crypt_str("Heavy") };
 
-		ImGui::SetCursorPos(ImVec2(74, 90));
+		ImGui::SetCursorPos(ImVec2(180, 96));
 		ImGui::MenuChild("Settings", ImVec2(410, 460));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
@@ -620,7 +658,7 @@ void c_menu::rage_tab() // rage tab
 		}
 		ImGui::EndChild();
 
-		ImGui::SetCursorPos(ImVec2(496, 90));
+		ImGui::SetCursorPos(ImVec2(602, 96));
 
 		ImGui::MenuChild("Extra", ImVec2(410, 460));
 		{
@@ -661,7 +699,7 @@ void c_menu::rage_tab() // rage tab
 void c_menu::aa_tab() // antiaim tab
 {
 	static auto type = 0;
-	ImGui::SetCursorPos(ImVec2(74, 90));
+	ImGui::SetCursorPos(ImVec2(180, 96));
 	ImGui::MenuChild("General", ImVec2(410, 460));
 	{
 		ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
@@ -754,7 +792,7 @@ void c_menu::aa_tab() // antiaim tab
 	}
 	ImGui::EndChild();
 
-	ImGui::SetCursorPos(ImVec2(496, 90));
+	ImGui::SetCursorPos(ImVec2(602, 96));
 
 	ImGui::MenuChild("Extra", ImVec2(410, 460));
 	{
@@ -816,7 +854,7 @@ void c_menu::visuals_tab() // players + visuals
 
 	if (vis_tab == 0)
 	{
-		ImGui::SetCursorPos(ImVec2(74, 90));
+		ImGui::SetCursorPos(ImVec2(180, 96));
 		ImGui::MenuChild("Esp", ImVec2(410, 460));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
@@ -892,7 +930,7 @@ void c_menu::visuals_tab() // players + visuals
 		}
 		ImGui::EndChild();
 
-		ImGui::SetCursorPos(ImVec2(496, 90));
+		ImGui::SetCursorPos(ImVec2(602, 96));
 
 		ImGui::MenuChild("Chams", ImVec2(410, 460));
 		{
@@ -1015,7 +1053,7 @@ void c_menu::visuals_tab() // players + visuals
 	}
 	else if (vis_tab == 1)
 	{
-		ImGui::SetCursorPos(ImVec2(74, 90));
+		ImGui::SetCursorPos(ImVec2(180, 96));
 		ImGui::MenuChild("World", ImVec2(410, 460));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
@@ -1083,7 +1121,7 @@ void c_menu::visuals_tab() // players + visuals
 		}
 		ImGui::EndChild();
 
-		ImGui::SetCursorPos(ImVec2(496, 90));
+		ImGui::SetCursorPos(ImVec2(602, 96));
 
 		ImGui::MenuChild("Render", ImVec2(410, 460));
 		{
@@ -1227,7 +1265,7 @@ void c_menu::misc_tab() // misc
 {
 	if (mi_tab == 0)
 	{
-		ImGui::SetCursorPos(ImVec2(74, 90));
+		ImGui::SetCursorPos(ImVec2(180, 96));
 		ImGui::MenuChild("Movement", ImVec2(410, 460));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
@@ -1266,7 +1304,7 @@ void c_menu::misc_tab() // misc
 		}
 		ImGui::EndChild();
 
-		ImGui::SetCursorPos(ImVec2(496, 90));
+		ImGui::SetCursorPos(ImVec2(602, 96));
 
 		ImGui::MenuChild("Extra", ImVec2(410, 460));
 		{
@@ -1297,7 +1335,7 @@ void c_menu::misc_tab() // misc
 	}
 	else if (mi_tab == 1)
 	{
-		ImGui::SetCursorPos(ImVec2(74, 90));
+		ImGui::SetCursorPos(ImVec2(180, 96));
 		ImGui::MenuChild("Info", ImVec2(410, 460));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
@@ -1326,7 +1364,7 @@ void c_menu::misc_tab() // misc
 		}
 		ImGui::EndChild();
 
-		ImGui::SetCursorPos(ImVec2(496, 90));
+		ImGui::SetCursorPos(ImVec2(602, 96));
 
 		ImGui::MenuChild("Extra", ImVec2(410, 460));
 		{
@@ -1356,7 +1394,7 @@ void c_menu::settings_tab() // cfg + lua
 		static std::string selected_name = "";
 		static char config_name[30] = "\0";
 
-		ImGui::SetCursorPos(ImVec2(74, 90));
+		ImGui::SetCursorPos(ImVec2(180, 96));
 		ImGui::MenuChild("Config List", ImVec2(410, 460));
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
@@ -1392,7 +1430,7 @@ void c_menu::settings_tab() // cfg + lua
 		}
 		ImGui::EndChild();
 
-		ImGui::SetCursorPos(ImVec2(496, 90));
+		ImGui::SetCursorPos(ImVec2(602, 96));
 
 		ImGui::MenuChild("Config Settings", ImVec2(410, 460));
 		{
@@ -1502,14 +1540,14 @@ void c_menu::skins_tab() // skins
 	static int seed = 0;
 	bool stat_trak = false;
 	static float wear = 0.0f;
-	ImGui::SetCursorPos(ImVec2(74, 90));
+	ImGui::SetCursorPos(ImVec2(180, 96));
 	ImGui::MenuChild("Deployed", ImVec2(410, 460));
 	{
 
 	}
 	ImGui::EndChild();
 
-	ImGui::SetCursorPos(ImVec2(496, 90));
+	ImGui::SetCursorPos(ImVec2(602, 96));
 
 	ImGui::MenuChild("Extra", ImVec2(410, 460));
 	{
@@ -1529,81 +1567,68 @@ void c_menu::skins_tab() // skins
 
 void c_menu::subtabs()
 {
-	// Subtab bar background strip (drawn in content area, y=50..85)
 	auto wpos = ImGui::GetWindowPos();
 	auto wdl  = ImGui::GetWindowDrawList();
-
-	// Separator line below subtab bar
 	wdl->AddLine(
-		ImVec2(wpos.x + 62, wpos.y + 85),
-		ImVec2(wpos.x + 916, wpos.y + 85),
-		ImColor(40, 40, 40), 1.f);
+		ImVec2(wpos.x + 164, wpos.y + 76),
+		ImVec2(wpos.x + 1050, wpos.y + 76),
+		ImColor(24, 24, 33), 1.f);
 
-	if (tab_static == 2) // Visuals
+	if (tab_static == 2)
 	{
-		ImGui::SetCursorPos(ImVec2{ 68, 54 });
+		ImGui::SetCursorPos(ImVec2{ 844, 25 });
 		ImGui::PushFont(c_menu::get().g_cxm);
-		if (ImGui::subtab("", "Players", vis_tab == 0)) vis_tab = 0;
+		if (ImGui::subtab("", "players", vis_tab == 0)) vis_tab = 0;
 
-		ImGui::SetCursorPos(ImVec2{ 152, 54 });
-		if (ImGui::subtab("", "World", vis_tab == 1)) vis_tab = 1;
+		ImGui::SetCursorPos(ImVec2{ 936, 25 });
+		if (ImGui::subtab("", "world", vis_tab == 1)) vis_tab = 1;
 		ImGui::PopFont();
 	}
-	else if (tab_static == 0) // Rage
+	else if (tab_static == 0)
 	{
-		ImGui::SetCursorPos(ImVec2{ 68, 54 });
+		ImGui::SetCursorPos(ImVec2{ 844, 25 });
 		ImGui::PushFont(c_menu::get().g_cxm);
-		if (ImGui::subtab("", "General", rg_tab == 0)) rg_tab = 0;
+		if (ImGui::subtab("", "general", rg_tab == 0)) rg_tab = 0;
 
-		ImGui::SetCursorPos(ImVec2{ 152, 54 });
-		if (ImGui::subtab("", "Weapons", rg_tab == 1)) rg_tab = 1;
+		ImGui::SetCursorPos(ImVec2{ 936, 25 });
+		if (ImGui::subtab("", "weapons", rg_tab == 1)) rg_tab = 1;
 		ImGui::PopFont();
 	}
-	else if (tab_static == 3) // Misc
+	else if (tab_static == 3)
 	{
-		ImGui::SetCursorPos(ImVec2{ 68, 54 });
+		ImGui::SetCursorPos(ImVec2{ 844, 25 });
 		ImGui::PushFont(c_menu::get().g_cxm);
-		if (ImGui::subtab("", "Info", mi_tab == 0)) mi_tab = 0;
+		if (ImGui::subtab("", "info", mi_tab == 0)) mi_tab = 0;
 
-		ImGui::SetCursorPos(ImVec2{ 152, 54 });
-		if (ImGui::subtab("", "Extra", mi_tab == 1)) mi_tab = 1;
+		ImGui::SetCursorPos(ImVec2{ 936, 25 });
+		if (ImGui::subtab("", "extra", mi_tab == 1)) mi_tab = 1;
 		ImGui::PopFont();
 	}
-	else if (tab_static == 4) // Settings
+	else if (tab_static == 4)
 	{
-		ImGui::SetCursorPos(ImVec2{ 68, 54 });
+		ImGui::SetCursorPos(ImVec2{ 844, 25 });
 		ImGui::PushFont(c_menu::get().g_cxm);
-		if (ImGui::subtab("", "Configs", lua_tab == 0)) lua_tab = 0;
+		if (ImGui::subtab("", "configs", lua_tab == 0)) lua_tab = 0;
 
-		ImGui::SetCursorPos(ImVec2{ 152, 54 });
-		if (ImGui::subtab("", "Scripts", lua_tab == 1)) lua_tab = 1;
+		ImGui::SetCursorPos(ImVec2{ 936, 25 });
+		if (ImGui::subtab("", "scripts", lua_tab == 1)) lua_tab = 1;
 		ImGui::PopFont();
 	}
 };
 
 void c_menu::tabs()
 {
-	// Sidebar tabs - vertically centered in the sidebar (x=0..60)
-	// 6 tabs, each 44px tall, with 8px spacing = 6*44 + 5*8 = 304px total
-	// Center in (560 - 50 = 510px) content height: start_y = 50 + (510 - 304) / 2 = 153
-	const float tab_start_y = 153.f;
-	const float tab_h = 44.f;
-	const float tab_gap = 8.f;
-
-	ImGui::PushFont(g_icons);
-
+	const char* icons[] = { "F", "D", "G", "A", "V", "C" };
+	const char* labels[] = { "ragebot", "anti-aim", "visuals", "misc", "settings", "skins" };
+	const float positions[] = { 112.f, 150.f, 226.f, 302.f, 378.f, 416.f };
 	for (int i = 0; i < 6; i++)
 	{
-		ImGui::SetCursorPos(ImVec2(0, tab_start_y + i * (tab_h + tab_gap)));
-		ImGui::BeginGroup();
-		const char* icons[] = { "F", "D", "G", "A", "V", "C" };
-		if (ImGui::tab(icons[i], "", tab_static == i)) tab_static = i;
-		ImGui::EndGroup();
+		ImGui::SetCursorPos(ImVec2(12.f, positions[i]));
+		if (ImGui::tab(icons[i], labels[i], tab_static == i))
+			tab_static = i;
 	}
 
-	ImGui::PopFont();
-
-	// Tab alpha animation
+	// animation
 	static float tab_alpha = 1.0f;
 	static int last_tab = -1;
 	if (last_tab != tab_static)
@@ -1639,21 +1664,11 @@ void c_menu::draw(bool is_open)
 		return;
 
 	auto& ss = ImGui::GetStyle();
-	ss.FrameRounding = 5;
-	ss.ChildRounding = 8;
-	ss.PopupRounding = 6;
-	ss.ScrollbarRounding = 3;
-	ss.ScrollbarSize = 3; // Minimalist scrollbar
-	ss.WindowRounding = 18; 
-	ss.WindowBorderSize = 0;
-	ss.FramePadding = ImVec2(6, 3);
-	ss.Colors[ImGuiCol_ScrollbarBg] = ImColor(0, 0, 0, 0); // Transparent background
-	ss.Colors[ImGuiCol_ScrollbarGrab] = ImColor(255, 255, 255, 30); // Subtle grab
-	ss.Colors[ImGuiCol_ScrollbarGrabHovered] = ImColor(255, 255, 255, 50);
-	ss.Colors[ImGuiCol_ScrollbarGrabActive] = ImColor(91, 140, 255, 150);
+	ImGuiStyle previous_style = ss;
+	menu_setup(ss);
 
-	// Window: 916 x 646
-	ImGui::SetNextWindowSize(ImVec2(916, 560));
+	ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImClamp(public_alpha, 0.f, 1.f));
+	ImGui::SetNextWindowSize(ImVec2(1050, 600), ImGuiCond_Always);
 	if (ImGui::Begin(("Lambda"), nullptr,
 		ImGuiWindowFlags_NoDecoration |
 		ImGuiWindowFlags_NoScrollWithMouse |
@@ -1661,54 +1676,42 @@ void c_menu::draw(bool is_open)
 	{
 		auto wp  = ImGui::GetWindowPos();
 		auto dl  = ImGui::GetWindowDrawList();
-		float W  = 916.f, H = 560.f;
+		float W  = 1050.f, H = 600.f;
 
-		// ── Background layers ──────────────────────────────────────────
+		// background
 
-		// Outer window bg (whole area) - Round all 4 corners
-		dl->AddRectFilled(wp, wp + ImVec2(W, H), ImColor(12, 12, 12, 255), 18);
-
-		// Sidebar background (Bottom-left rounded)
-		dl->AddRectFilled(wp + ImVec2(0, 50), wp + ImVec2(64, H), ImColor(18, 18, 22, 240), 18, ImDrawCornerFlags_BotLeft);
-		
-		// Subtle right border for sidebar
-		dl->AddLine(wp + ImVec2(64, 50), wp + ImVec2(64, H), ImColor(45, 45, 45, 100), 1.0f);
-
-		// Full-width header strip (Top rounded)
-		dl->AddRectFilled(wp, wp + ImVec2(W, 50), ImColor(20, 20, 20, 255), 18, ImDrawCornerFlags_Top);
-
-		// Header bottom separator (full width)
-		dl->AddLine(wp + ImVec2(0, 50), wp + ImVec2(W, 50), ImColor(35, 35, 35), 1.f);
-
-		// Sidebar overlay (Bottom-left rounded)
-		dl->AddRectFilled(wp + ImVec2(0, 51), wp + ImVec2(60, H), ImColor(18, 18, 18, 255), 18, ImDrawCornerFlags_BotLeft);
-
-		// Sidebar right border (below header only)
-		dl->AddLine(wp + ImVec2(60, 51), wp + ImVec2(60, H), ImColor(32, 32, 32), 1.f);
-
-		// Content area bg (Bottom-right rounded)
-		dl->AddRectFilled(wp + ImVec2(61, 51), wp + ImVec2(W, H), ImColor(16, 16, 16), 18, ImDrawCornerFlags_BotRight);
+		dl->AddRectFilled(wp, wp + ImVec2(W, H), ImColor(8, 9, 13, 255), 12.f);
+		dl->AddRectFilled(wp, wp + ImVec2(164, H), ImColor(11, 12, 18, 255), 12.f, ImDrawCornerFlags_Left);
+		dl->AddRectFilled(wp + ImVec2(164, 0), wp + ImVec2(W, 76), ImColor(9, 10, 15, 255), 12.f, ImDrawCornerFlags_TopRight);
+		dl->AddLine(wp + ImVec2(164, 0), wp + ImVec2(164, H), ImColor(24, 24, 33), 1.f);
+		dl->AddRect(wp + ImVec2(0.5f, 0.5f), wp + ImVec2(W - 0.5f, H - 0.5f), ImColor(22, 22, 30), 12.f, ImDrawCornerFlags_All, 1.f);
 
 
 
 
 
 
-		// ── Header text ───────────────────────────────────────────────
-		ImGui::PushFont(g_cxm_large);
-		ImVec2 title_size = ImGui::CalcTextSize("Lambda");
-		dl->AddText(wp + ImVec2(16, 12), ImColor(220, 220, 220), "Lambda");
+		// header
+		ImGui::PushFont(g_cxmenufont);
+		dl->AddText(wp + ImVec2(20, 20), ImColor(205, 202, 218), "lambda");
 		ImGui::PopFont();
 		
 		ImGui::PushFont(g_cxm);
-		// Level subtitle to baseline (Lambda 30px -> ~24px baseline, subtitle 16px -> ~12px baseline)
-		// Snapped closer (6px offset)
-		dl->AddText(wp + ImVec2(16 + title_size.x + 6, 25), ImColor(80, 80, 80), "for Counter-Strike: Global Offensive");
+		dl->AddText(wp + ImVec2(180, 21), ImColor(112, 108, 126), "lambda");
+		dl->AddText(wp + ImVec2(224, 21), ImColor(55, 53, 65), "/");
+		const char* section_names[] = { "ragebot", "anti-aim", "visuals", "misc", "settings", "skins" };
+		dl->AddText(wp + ImVec2(237, 21), ImColor(185, 181, 201), section_names[tab_static]);
+		dl->AddText(wp + ImVec2(18, 83), ImColor(63, 61, 75), "aimbot");
+		dl->AddText(wp + ImVec2(18, 197), ImColor(63, 61, 75), "visuals");
+		dl->AddText(wp + ImVec2(18, 273), ImColor(63, 61, 75), "miscellaneous");
+		dl->AddText(wp + ImVec2(18, 349), ImColor(63, 61, 75), "utils");
+		dl->AddText(wp + ImVec2(20, 548), ImColor(154, 150, 170), "lambda user");
+		dl->AddText(wp + ImVec2(20, 568), ImColor(67, 64, 78), "release build");
 		ImGui::PopFont();
 
 
 
-		// ── Render subtabs and tabs ───────────────────────────────────
+		// render
 		{
 			ImGui::PushFont(g_cxm);
 			subtabs();
@@ -1717,4 +1720,7 @@ void c_menu::draw(bool is_open)
 		}
 	}
 	ImGui::End();
+	ImGui::PopStyleVar();
+	ss = previous_style;
+	menu_setupped = false;
 }

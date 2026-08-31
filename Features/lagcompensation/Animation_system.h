@@ -177,8 +177,9 @@ public:
 	AnimationLayer layers[13];
 	AnimationLayer Animlayers[4][13];
 	matrixes matrixes_data;
-	AnimationLayer resolver_layers[3][15];
-	AnimationLayer m_pResolveLayers[3][15];
+	// fix
+	AnimationLayer resolver_layers[4][15];
+	AnimationLayer m_pResolveLayers[4][15];
 	AnimationLayer pre_orig[13] = {};
 	resolver_type type;
 	resolver_side side;
@@ -248,6 +249,8 @@ public:
 		weapon_sequence = -1;
 
 		std::memset(this->pre_orig, 0, sizeof(pre_orig));
+		std::memset(&matrixes_data, 0, sizeof(matrixes_data));
+		std::memset(resolver_layers, 0, sizeof(resolver_layers));
 
 		simulation_time = 0.0f;
 		duck_amount = 0.0f;
@@ -280,19 +283,21 @@ public:
 		player = e;
 		i = player->EntIndex();
 
+		bone_count = std::clamp(player->m_CachedBoneData().Count(), 0, MAXSTUDIOBONES);
+
 		if (store)
 		{
 			memcpy(layers, e->get_animlayers(), e->animlayer_count() * sizeof(AnimationLayer));
-			memcpy(matrixes_data.main, player->m_CachedBoneData().Base(), player->m_CachedBoneData().Count() * sizeof(matrix3x4_t));
+			memcpy(matrixes_data.main, player->m_CachedBoneData().Base(), bone_count * sizeof(matrix3x4_t));
 		}
 
 		immune = player->m_bGunGameImmunity() || player->m_fFlags() & FL_FROZEN;
 		dormant = player->IsDormant();
 
-		bot = false;
+		player_info_t info{};
+		bot = m_engine()->GetPlayerInfo(i, &info) && info.fakeplayer;
 
 		flags = player->m_fFlags();
-		bone_count = player->m_CachedBoneData().Count();
 		tickbase = player->m_nTickBase();
 
 		simulation_time = player->m_flSimulationTime();
@@ -327,10 +332,12 @@ public:
 			return;
 
 		memcpy(player->get_animlayers(), layers, player->animlayer_count() * sizeof(AnimationLayer));
-		memcpy(player->m_CachedBoneData().Base(), matrixes_data.main, player->m_CachedBoneData().Count() * sizeof(matrix3x4_t));
+		auto count = player->m_CachedBoneData().Count() < bone_count ? player->m_CachedBoneData().Count() : bone_count;
+		count = std::clamp(count, 0, MAXSTUDIOBONES);
+		memcpy(player->m_CachedBoneData().Base(), matrixes_data.main, count * sizeof(matrix3x4_t));
 
 		player->m_fFlags() = flags;
-		player->m_CachedBoneData().m_Size = bone_count;
+		player->m_CachedBoneData().m_Size = count;
 
 		player->m_flSimulationTime() = simulation_time;
 		player->m_flDuckAmount() = duck_amount;

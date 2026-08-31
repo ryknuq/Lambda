@@ -653,21 +653,39 @@ void player_t::modify_eye_position(Vector& eye_position)
 	if (!this)
 		return;
 
-	if (!local_animations::get().local_data.prediction_animstate)
+	auto state = local_animations::get().local_data.prediction_animstate;
+	if (!state)
+		state = get_animation_state();
+
+	if (!state)
 		return;
 
-	if (!local_animations::get().local_data.prediction_animstate->m_bInHitGroundAnimation && local_animations::get().local_data.prediction_animstate->m_fDuckAmount <= 0.0f)
+	if (!state->m_bInHitGroundAnimation && state->m_fDuckAmount <= 0.0f)
 		return;
 
-	local_animations::get().local_data.prediction_animstate->m_pBaseEntity = this;
+	// fix
+	if (!g_ctx.globals.prediction_matrix_valid)
+	{
+		g_ctx.globals.prediction_matrix_valid = setup_bones_fixed(
+			g_ctx.globals.prediction_matrix, BONE_USED_BY_ANYTHING);
+	}
+
+	if (!g_ctx.globals.prediction_matrix_valid)
+		return;
 
 	static auto lookup_bone = reinterpret_cast <int(__thiscall*)(void*, const char*)> (util::FindSignature(crypt_str("client.dll"), crypt_str("55 8B EC 53 56 8B F1 57 83 BE ?? ?? ?? ?? ?? 75 14")));
-	auto head_bone = lookup_bone(local_animations::get().local_data.prediction_animstate->m_pBaseEntity, crypt_str("head_0"));
+	if (!lookup_bone)
+		return;
 
-	if (head_bone == -1)
+	auto head_bone = lookup_bone(this, crypt_str("head_0"));
+
+	if (head_bone < 0 || head_bone >= MAXSTUDIOBONES)
 		return;
 
 	auto head_position = Vector(g_ctx.globals.prediction_matrix[head_bone][0][3], g_ctx.globals.prediction_matrix[head_bone][1][3], g_ctx.globals.prediction_matrix[head_bone][2][3] + 1.7f);
+	const auto relative_head_height = head_position.z - GetAbsOrigin().z;
+	if (relative_head_height < 20.0f || relative_head_height > 90.0f)
+		return;
 
 	if (head_position.z >= eye_position.z)
 		return;
@@ -1008,10 +1026,15 @@ CStudioHdr* player_t::m_pStudioHdr()
 
 bool player_t::setup_bones_fixed(matrix3x4_t* matrix, int mask) // semxxz lox
 {
-	auto done = false;
-
-	if (!this) //-V704
+	if (!this || !matrix || !m_globals()) //-V704
 		return false;
+
+	auto anims = get_animation_state();
+	if (!anims)
+		return false;
+
+	auto done = false;
+	const auto bone_time = this == g_ctx.local() ? m_globals()->m_curtime : m_flSimulationTime();
 
 	auto backup_curtime = m_globals()->m_curtime;
 	auto backup_frametime = m_globals()->m_frametime;
@@ -1026,37 +1049,52 @@ bool player_t::setup_bones_fixed(matrix3x4_t* matrix, int mask) // semxxz lox
 	auto backup_effects = m_fEffects();
 	m_fEffects() |= 8;
 
-	auto anims = get_animation_state();
 	auto previous_weapon = anims ? anims->m_pLastBoneSetupWeapon : nullptr;
 
 	if (previous_weapon)
 		anims->m_pLastBoneSetupWeapon = anims->m_pActiveWeapon;
 
-	auto poss = anims->m_flLastOriginZ;
-
 	auto backup_abs_origin = GetAbsOrigin();
+	auto backup_abs_angles = GetAbsAngles();
+
+	m_globals()->m_curtime = bone_time;
+	m_globals()->m_realtime = bone_time;
+	m_globals()->m_frametime = m_globals()->m_intervalpertick;
+	m_globals()->m_framecount = TIME_TO_TICKS(bone_time);
+	m_globals()->m_tickcount = TIME_TO_TICKS(bone_time);
+	m_globals()->m_interpolation_amount = 0.0f;
 
 	if (this != g_ctx.local())
 		set_abs_origin(m_vecOrigin());
+	set_abs_angles(Vector(0.0f, anims->m_flGoalFeetYaw, 0.0f));
 
 	g_ctx.globals.setuping_bones = true;
 	invalidate_bone_cache();
 
-	done = setup_bones_riptide(this, matrix, mask, m_flSimulationTime());
+	mask |= BONE_USED_BY_ANYTHING;
+	done = setup_bones_riptide(this, matrix, mask, bone_time);
 
 	if (!done)
-		SetupBones(matrix, matrix ? MAXSTUDIOBONES : -4, mask, m_flSimulationTime());
+		done = SetupBones(matrix, MAXSTUDIOBONES, mask, bone_time);
 
 	g_ctx.globals.setuping_bones = false;
 
 	if (this != g_ctx.local())
 		set_abs_origin(backup_abs_origin);
+	set_abs_angles(backup_abs_angles);
 
 	if (previous_weapon)
 		anims->m_pLastBoneSetupWeapon = previous_weapon;
 
 	m_fEffects() = backup_effects;
 	*(uint8_t*)((uintptr_t)this + 0x274) = backup;
+
+	m_globals()->m_curtime = backup_curtime;
+	m_globals()->m_frametime = backup_frametime;
+	m_globals()->m_realtime = backup_realtime;
+	m_globals()->m_framecount = backup_framecount;
+	m_globals()->m_tickcount = backup_tickcount;
+	m_globals()->m_interpolation_amount = backup_interpolation_amount;
 
 	return done;
 }

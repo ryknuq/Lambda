@@ -12,6 +12,7 @@ void engineprediction::store_netvars()
 	data->m_aimPunchAngleVel = g_ctx.local()->m_aimPunchAngleVel();
 	data->m_viewPunchAngle = g_ctx.local()->m_viewPunchAngle();
 	data->m_vecViewOffset = g_ctx.local()->m_vecViewOffset();
+	data->m_velocity_modifier = g_ctx.local()->m_flVelocityModifier();
 }
 
 void engineprediction::restore_netvars()
@@ -49,7 +50,7 @@ void engineprediction::restore_netvars()
 	if (std::abs(offset_delta.x) < 0.03125f &&
 		std::abs(offset_delta.y) < 0.03125f &&
 		std::abs(offset_delta.z) < 0.03125f)
-		g_ctx.local()->m_vecViewOffset() - data->m_vecViewOffset;
+		g_ctx.local()->m_vecViewOffset() = data->m_vecViewOffset;
 
 	if (std::abs(modifier_delta) < 0.03125f)
 		g_ctx.local()->m_flVelocityModifier() = data->m_velocity_modifier;

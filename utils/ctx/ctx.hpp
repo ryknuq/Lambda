@@ -71,6 +71,7 @@ struct aim_shot
 	Vector target_position_at_fire = ZERO;
 	Vector target_position_at_impact = ZERO;
 	Vector impact_position = ZERO;
+	Vector shoot_position = ZERO;
 	Vector point_was_visible = ZERO;
 	Vector point_was_safe = ZERO;
 
@@ -213,6 +214,7 @@ public:
 		Vector dormant_origin[65];
 
 		matrix3x4_t prediction_matrix[MAXSTUDIOBONES];
+		bool prediction_matrix_valid = false;
 		matrix3x4_t fake_matrix[MAXSTUDIOBONES];
 
 		IClientNetworkable* m_networkable = nullptr;

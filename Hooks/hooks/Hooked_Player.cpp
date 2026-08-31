@@ -4,50 +4,41 @@
 
 _declspec(noinline)bool hooks::setupbones_detour(void* ecx, matrix3x4_t* bone_world_out, int max_bones, int bone_mask, float current_time)
 {
-	auto result = true;
-
 	static auto r_jiggle_bones = m_cvar()->FindVar(crypt_str("r_jiggle_bones"));
-	auto r_jiggle_bones_backup = r_jiggle_bones->GetInt();
+	const auto jiggle_backup = r_jiggle_bones ? r_jiggle_bones->GetInt() : 0;
+	if (r_jiggle_bones)
+		r_jiggle_bones->SetValue(0);
 
-	r_jiggle_bones->SetValue(0);
-
-	if (!ecx)
-		result = ((SetupBonesFn)original_setupbones)(ecx, bone_world_out, max_bones, bone_mask, current_time);
-	else if (!cfg.ragebot.enable)
-		result = ((SetupBonesFn)original_setupbones)(ecx, bone_world_out, max_bones, bone_mask, current_time);
-	else
+	if (!ecx || !original_setupbones)
 	{
-		auto player = (player_t*)((uintptr_t)ecx - 0x4);
-
-		if (!player->valid(false, false))
-			result = ((SetupBonesFn)original_setupbones)(ecx, bone_world_out, max_bones, bone_mask, current_time);
-		else
-		{
-			auto animstate = player->get_animation_state();
-			auto previous_weapon = animstate ? animstate->m_pLastBoneSetupWeapon : nullptr;
-
-			if (previous_weapon)
-				animstate->m_pLastBoneSetupWeapon = animstate->m_pActiveWeapon; //-V1004
-
-			if (g_ctx.globals.setuping_bones)
-				result = ((SetupBonesFn)original_setupbones)(ecx, bone_world_out, max_bones, bone_mask, current_time);
-			else if (player != g_ctx.local())
-				result = ((SetupBonesFn)original_setupbones)(ecx, bone_world_out, max_bones, bone_mask, current_time);
-			else if (!g_ctx.local()->is_alive())
-				result = ((SetupBonesFn)original_setupbones)(ecx, bone_world_out, max_bones, bone_mask, current_time);
-			else if (player == g_ctx.local())
-				result = ((SetupBonesFn)original_setupbones)(ecx, bone_world_out, max_bones, bone_mask, current_time);
-			else if (!player->m_CachedBoneData().Count()) //-V807
-				result = ((SetupBonesFn)original_setupbones)(ecx, bone_world_out, max_bones, bone_mask, current_time);
-			else if (bone_world_out && max_bones != -1)
-				memcpy(bone_world_out, player->m_CachedBoneData().Base(), player->m_CachedBoneData().Count() * sizeof(matrix3x4_t));
-
-			if (previous_weapon)
-				animstate->m_pLastBoneSetupWeapon = previous_weapon;
-		}
+		if (r_jiggle_bones)
+			r_jiggle_bones->SetValue(jiggle_backup);
+		return false;
 	}
 
-	r_jiggle_bones->SetValue(r_jiggle_bones_backup);
+	auto player = reinterpret_cast<player_t*>(reinterpret_cast<uintptr_t>(ecx) - 0x4);
+	auto result = false;
+
+	// fix
+	if (!g_ctx.globals.setuping_bones && player &&
+		(m_prediction()->InPrediction || g_ctx.globals.in_createmove) &&
+		player->m_CachedBoneData().Base() && player->m_CachedBoneData().Count() > 0)
+	{
+		if (bone_world_out && max_bones > 0)
+		{
+			const auto count = min(max_bones, player->m_CachedBoneData().Count());
+			memcpy(bone_world_out, player->m_CachedBoneData().Base(), count * sizeof(matrix3x4_t));
+		}
+		result = true;
+	}
+	else
+	{
+		bone_mask |= BONE_USED_BY_ANYTHING;
+		result = ((SetupBonesFn)original_setupbones)(ecx, bone_world_out, max_bones, bone_mask, current_time);
+	}
+
+	if (r_jiggle_bones)
+		r_jiggle_bones->SetValue(jiggle_backup);
 	return result;
 }
 

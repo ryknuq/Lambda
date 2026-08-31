@@ -158,7 +158,7 @@ void C_HookedEvents::FireGameEvent(IGameEvent* event)
 				trace_t trace, trace_zero, trace_first, trace_second;
 				Ray_t ray;
 
-				ray.Init(aim::get().last_shoot_position, position);
+				ray.Init(current_shot->shoot_position, position);
 				m_trace()->ClipRayToEntity(ray, MASK_SHOT_HULL | CONTENTS_HITBOX, aim::get().last_target[current_shot->last_target].record.player, &trace);
 
 				if (aim::get().last_target[current_shot->last_target].data.point.safe)
@@ -173,17 +173,18 @@ void C_HookedEvents::FireGameEvent(IGameEvent* event)
 					m_trace()->ClipRayToEntity(ray, MASK_SHOT_HULL | CONTENTS_HITBOX, aim::get().last_target[current_shot->last_target].record.player, &trace_second);
 				}
 
+				// fix
 				auto hit = trace.hit_entity == aim::get().last_target[current_shot->last_target].record.player;
-
-				if (aim::get().last_target[current_shot->last_target].data.point.safe)
-					hit = hit && trace_zero.hit_entity == aim::get().last_target[current_shot->last_target].record.player && trace_first.hit_entity == aim::get().last_target[current_shot->last_target].record.player && trace_second.hit_entity == aim::get().last_target[current_shot->last_target].record.player;
 
 				if (hit)
 					current_shot->impact_hit_player = true;
-				else if (aim::get().last_shoot_position.DistTo(position) > aim::get().last_target[current_shot->last_target].distance)
-					current_shot->occlusion = true;
 				else
-					current_shot->occlusion = false;
+				{
+					const auto impact_distance = current_shot->shoot_position.DistTo(position);
+					const auto aim_distance = current_shot->shoot_position.DistTo(current_shot->shot_info.aim_point);
+					// fix
+					current_shot->occlusion = impact_distance + 1.0f < aim_distance;
+				}
 
 				current_shot->impacts = true;
 				backup_data.adjust_player();

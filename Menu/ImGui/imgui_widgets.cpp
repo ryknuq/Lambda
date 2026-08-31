@@ -1000,7 +1000,7 @@ bool ImGui::KeybindButton(const char* label, const char* unique_id, const ImVec2
     // Glow if clicked (listening)
     if (clicked || hit->second > 0.01f)
     {
-        ImColor glow = ImColor(91, 140, 255, int((clicked ? 150 : 80 * hit->second) * g.Style.Alpha));
+        ImColor glow = ImColor(132, 121, 171, int((clicked ? 150 : 80 * hit->second) * g.Style.Alpha));
         window->DrawList->AddRect(bb.Min, bb.Max, glow, 4, 15, 1.5f);
     }
 
@@ -1615,7 +1615,7 @@ struct checbox_anim
     int active_rect_alpha;
 };
 
-int accent_color[4] = { 138, 168, 226 };
+int accent_color[4] = { 132, 121, 171 };
 bool ImGui::Checkbox(const char* label, bool* v)
 {
     auto aslpha = float(ImGui::GetStyle().Alpha);
@@ -1630,9 +1630,9 @@ bool ImGui::Checkbox(const char* label, bool* v)
 
     const float dpi = c_menu::get().dpi_scale;
     const ImVec2 pos = window->DC.CursorPos + ImVec2(10 * dpi, 2 * dpi);
-    const float height = 18.0f * dpi;
-    const float width = 34.0f * dpi;
-    const ImRect total_bb(pos, pos + ImVec2(width + (label_size.x > 0.0f ? 10.0f * dpi + label_size.x : 0.0f), height + 4 * dpi));
+    const float height = 14.0f * dpi;
+    const float width = 14.0f * dpi;
+    const ImRect total_bb(pos, pos + ImVec2(width + (label_size.x > 0.0f ? 9.0f * dpi + label_size.x : 0.0f), height + 5 * dpi));
     
     ItemSize(total_bb, style.FramePadding.y);
     if (!ItemAdd(total_bb, id))
@@ -1663,36 +1663,23 @@ bool ImGui::Checkbox(const char* label, bool* v)
 
     const ImRect check_bb(pos, pos + ImVec2(width, height));
     
-    // Background of the pill with active glow
-    ImColor bg_col = ImLerp(ImVec4(0.12f, 0.12f, 0.12f, aslpha), ImVec4(0.35f, 0.55f, 1.0f, 0.45f * aslpha), it->second);
-    
-    // Soft glow when active
-    if (it->second > 0.05f)
-    {
-        for (int i = 0; i < 4; i++)
-            window->DrawList->AddRect(check_bb.Min - ImVec2(i * dpi, i * dpi), check_bb.Max + ImVec2(i * dpi, i * dpi), ImColor(91, 140, 255, int((10 - i * 2) * it->second * aslpha)), height / 2.0f + i * dpi, ImDrawCornerFlags_All, 1.0f);
-    }
+    ImColor bg_col = ImLerp(ImVec4(0.075f, 0.076f, 0.098f, aslpha), ImVec4(0.38f, 0.35f, 0.51f, aslpha), it->second);
+    ImColor border_col = ImLerp(ImVec4(0.18f, 0.18f, 0.23f, aslpha), ImVec4(0.53f, 0.48f, 0.68f, aslpha), it->second);
+    window->DrawList->AddRectFilled(check_bb.Min, check_bb.Max, bg_col, 3.f * dpi);
+    window->DrawList->AddRect(check_bb.Min, check_bb.Max, border_col, 3.f * dpi, ImDrawCornerFlags_All, 1.f);
 
-    window->DrawList->AddRectFilled(check_bb.Min, check_bb.Max, bg_col, height / 2.0f);
-    
-    // Hover highlight
     if (hit->second > 0.01f)
-        window->DrawList->AddRect(check_bb.Min, check_bb.Max, ImColor(1.0f, 1.0f, 1.0f, 0.15f * hit->second * aslpha), height / 2.0f, ImDrawCornerFlags_All, 1.0f);
-    else
-        window->DrawList->AddRect(check_bb.Min, check_bb.Max, ImColor(0.25f, 0.25f, 0.25f, 0.7f * aslpha), height / 2.0f, ImDrawCornerFlags_All, 1.0f);
+        window->DrawList->AddRect(check_bb.Min - ImVec2(1, 1), check_bb.Max + ImVec2(1, 1), ImColor(133, 122, 171, int(45 * hit->second * aslpha)), 4.f * dpi, ImDrawCornerFlags_All, 1.f);
 
-    // Knob (circle)
-    float knob_radius = (height - 6.0f * dpi) / 2.0f;
-    float knob_pos_x = ImLerp(check_bb.Min.x + 3.0f * dpi + knob_radius, check_bb.Max.x - 3.0f * dpi - knob_radius, it->second);
-    ImColor knob_col = ImLerp(ImVec4(0.6f, 0.6f, 0.6f, aslpha), ImVec4(1.0f, 1.0f, 1.0f, aslpha), it->second);
-    window->DrawList->AddCircleFilled(ImVec2(knob_pos_x, check_bb.GetCenter().y), knob_radius, knob_col, 16);
+    if (it->second > 0.01f)
+        RenderCheckMark(window->DrawList, check_bb.Min + ImVec2(2.5f * dpi, 2.f * dpi), ImColor(222, 216, 235, int(255 * it->second * aslpha)), 9.f * dpi);
 
     // Text label
     if (label_size.x > 0.0f)
     {
         ImGui::PushFont(c_menu::get().g_cxm);
-        ImColor text_col = ImLerp(ImVec4(0.65f, 0.65f, 0.65f, aslpha), ImVec4(0.95f, 0.95f, 0.95f, aslpha), it->second);
-        window->DrawList->AddText(ImVec2(check_bb.Max.x + 10 * dpi, check_bb.Min.y + (height - label_size.y) / 2.0f), text_col, label);
+        ImColor text_col = ImLerp(ImVec4(0.48f, 0.47f, 0.54f, aslpha), ImVec4(0.78f, 0.76f, 0.83f, aslpha), it->second);
+        window->DrawList->AddText(ImVec2(check_bb.Max.x + 9 * dpi, check_bb.Min.y + (height - label_size.y) / 2.0f), text_col, label);
         ImGui::PopFont();
     }
 
@@ -2852,12 +2839,12 @@ bool ImGui::DragScalar(const char* label, ImGuiDataType data_type, void* p_data,
     // Active fill
     if (grab_bb.Max.x > grab_bb.Min.x)
     {
-        ImColor accent = ImColor(91, 140, 255, int(220 * g.Style.Alpha));
+        ImColor accent = ImColor(132, 121, 171, int(220 * g.Style.Alpha));
         window->DrawList->AddRectFilled(track_bb.Min, ImVec2(grab_bb.Max.x, track_bb.Max.y), accent, 4);
         
         // Hover glow
         if (hit->second > 0.01f)
-            window->DrawList->AddRect(track_bb.Min, ImVec2(grab_bb.Max.x, track_bb.Max.y), ImColor(91, 140, 255, int(80 * hit->second * g.Style.Alpha)), 4, ImDrawCornerFlags_All, 2.0f);
+            window->DrawList->AddRect(track_bb.Min, ImVec2(grab_bb.Max.x, track_bb.Max.y), ImColor(132, 121, 171, int(80 * hit->second * g.Style.Alpha)), 4, ImDrawCornerFlags_All, 2.0f);
     }
 
     // Value text on the right
@@ -3313,13 +3300,13 @@ bool ImGui::SliderScalar(const char* label, ImGuiDataType data_type, void* p_dat
     if (grab_bb.Max.x > grab_bb.Min.x)
     {
         // Vibrant active fill
-        window->DrawList->AddRectFilled(track_bb.Min, ImVec2(grab_bb.Max.x, track_bb.Max.y), ImColor(91, 140, 255, int(255 * g.Style.Alpha)), 4);
+        window->DrawList->AddRectFilled(track_bb.Min, ImVec2(grab_bb.Max.x, track_bb.Max.y), ImColor(132, 121, 171, int(255 * g.Style.Alpha)), 4);
 
         // Vibrant glow for the active fill
         if (hit->second > 0.01f) // Glow on hover or when interacting
         {
             for (int i = 0; i < 4; i++)
-                window->DrawList->AddRect(track_bb.Min - ImVec2(i, i), ImVec2(grab_bb.Max.x + i, track_bb.Max.y + i), ImColor(91, 140, 255, int((15 - i * 3) * g.Style.Alpha)), 4 + i);
+                window->DrawList->AddRect(track_bb.Min - ImVec2(i, i), ImVec2(grab_bb.Max.x + i, track_bb.Max.y + i), ImColor(132, 121, 171, int((15 - i * 3) * g.Style.Alpha)), 4 + i);
         }
     }
 
@@ -8015,20 +8002,12 @@ bool ImGui::beginchildex(const char* name, ImGuiID id, const ImVec2& size_arg, b
     auto pos = ImGui::GetWindowPos();
     auto p = ImGui::GetWindowPos();
 
-    // Panel background with subtle vertical gradient
-    parent_window->DrawList->AddRectFilled(pos, pos + size_arg, ImColor(20, 20, 20, int(255 * alpha)), 6);
-    
-    // Smooth rounding (6px)
-    parent_window->DrawList->AddRect(pos, pos + size_arg, ImColor(45, 45, 45, int(180 * alpha)), 6, ImDrawCornerFlags_All, 1.f);
+    parent_window->DrawList->AddRectFilled(pos, pos + size_arg, ImColor(11, 12, 18, int(245 * alpha)), 7);
+    parent_window->DrawList->AddRect(pos, pos + size_arg, ImColor(25, 25, 35, int(220 * alpha)), 7, ImDrawCornerFlags_All, 1.f);
+    parent_window->DrawList->AddCircleFilled(pos + ImVec2(14, 17), 2.f, ImColor(116, 106, 151, int(255 * alpha)), 12);
 
-
-
-    // Left accent bar for Header (4px wide, 14px tall)
-    parent_window->DrawList->AddRectFilled(pos + ImVec2(0, 10), pos + ImVec2(3, 24), ImColor(91, 140, 255, int(255 * alpha)), 2, ImDrawCornerFlags_Right);
-
-    // Title text (indented to clear the accent bar)
     ImGui::PushFont(c_menu::get().g_cxm);
-    parent_window->DrawList->AddText(pos + ImVec2(10, 10), ImColor(200, 200, 200, int(255 * alpha)), name);
+    parent_window->DrawList->AddText(pos + ImVec2(23, 10), ImColor(139, 136, 153, int(255 * alpha)), name);
     ImGui::PopFont();
 
     return ret;
@@ -8054,9 +8033,8 @@ bool ImGui::subtab(const char* icon, const char* label, bool selected) {
     const ImGuiID id = window->GetID(std::string(icon + std::string(label)).c_str());
     const ImVec2 icon_size = ImGui::CalcTextSize(icon);
 
-    // Pill-style horizontal subtab: 80x28
     ImVec2 pos = window->DC.CursorPos;
-    ImVec2 size = { 80.f, 28.f };
+    ImVec2 size = { 86.f, 26.f };
     const ImRect bb(pos, ImVec2(pos.x + size.x, pos.y + size.y));
     ImGui::ItemSize(size, 0);
     if (!ImGui::ItemAdd(bb, id))
@@ -8085,31 +8063,23 @@ bool ImGui::subtab(const char* icon, const char* label, bool selected) {
     auto dl = window->DrawList;
     float alpha = GetStyle().Alpha;
 
-    // Active pill background
     if (it->second > 0.01f)
-        dl->AddRectFilled(bb.Min, bb.Max, ImColor(91, 140, 255, int(40 * it->second * alpha)), 6);
+        dl->AddRectFilled(bb.Min, bb.Max, ImColor(49, 46, 65, int(210 * it->second * alpha)), 5);
 
-    // Hover background
     if (hit->second > 0.01f)
-        dl->AddRectFilled(bb.Min, bb.Max, ImColor(255, 255, 255, int(12 * hit->second * alpha)), 6);
+        dl->AddRectFilled(bb.Min, bb.Max, ImColor(255, 255, 255, int(8 * hit->second * alpha)), 5);
 
-    // Bottom accent line with soft glow when active
     if (it->second > 0.01f)
     {
-        ImVec2 line_min(bb.Min.x + 8, bb.Max.y - 2);
-        ImVec2 line_max(bb.Max.x - 8, bb.Max.y);
-        
-        // Soft glow behind the line
-        for (int i = 0; i < 4; i++)
-            dl->AddRectFilled(line_min - ImVec2(i, i), line_max + ImVec2(i, i), ImColor(91, 140, 255, int((12 - i * 2) * it->second * alpha)), 2);
-            
-        dl->AddRectFilled(line_min, line_max, ImColor(91, 140, 255, int(255 * it->second * alpha)), 2);
+        ImVec2 line_min(bb.Min.x + 11, bb.Max.y - 1);
+        ImVec2 line_max(bb.Max.x - 11, bb.Max.y);
+        dl->AddRectFilled(line_min, line_max, ImColor(132, 121, 171, int(220 * it->second * alpha)), 1);
     }
 
     // Icon/Text centered
     ImVec4 text_col = ImLerp(
-        ImVec4(0.45f, 0.45f, 0.45f, alpha),
-        ImVec4(0.9f, 0.9f, 0.9f, alpha),
+        ImVec4(0.36f, 0.35f, 0.41f, alpha),
+        ImVec4(0.76f, 0.74f, 0.82f, alpha),
         it->second);
         
     const char* display_text = (icon && icon[0] != '\0') ? icon : label;
@@ -8131,11 +8101,15 @@ bool ImGui::tab(const char* icon, const char* label, bool selected)
     ImGuiContext& g = *GImGui;
     const ImGuiStyle& style = g.Style;
     const ImGuiID id = window->GetID(std::string(icon + std::string(label)).c_str());
+    ImGui::PushFont(c_menu::get().g_icons);
     const ImVec2 icon_size = ImGui::CalcTextSize(icon);
+    ImGui::PopFont();
+    ImGui::PushFont(c_menu::get().g_cxm);
+    const ImVec2 label_size = ImGui::CalcTextSize(label);
+    ImGui::PopFont();
 
-    // Sidebar tab: full width of sidebar (60px), 44px tall
     ImVec2 pos = window->DC.CursorPos;
-    ImVec2 size = { 60.f, 44.f };
+    ImVec2 size = { 140.f, 32.f };
     const ImRect bb(pos, ImVec2(pos.x + size.x, pos.y + size.y));
     ImGui::ItemSize(size, 0);
     if (!ImGui::ItemAdd(bb, id))
@@ -8164,39 +8138,30 @@ bool ImGui::tab(const char* icon, const char* label, bool selected)
     auto dl = window->DrawList;
     float alpha = GetStyle().Alpha;
 
-    // Active background fill and soft glow
     if (it->second > 0.01f)
-    {
-        // Smooth blue glow behind icon area
-        ImVec2 center = (bb.Min + bb.Max) * 0.5f;
-        for (int i = 0; i < 7; i++) // Stack transparent rects for blur effect
-            dl->AddRectFilled(center - ImVec2(12 + i, 12 + i), center + ImVec2(12 + i, 12 + i), ImColor(91, 140, 255, int((20 - i * 2) * it->second * alpha)), 12);
-        
-        dl->AddRectFilled(bb.Min, bb.Max, ImColor(91, 140, 255, int(35 * it->second * alpha)), 0);
-    }
+        dl->AddRectFilled(bb.Min, bb.Max, ImColor(28, 27, 38, int(230 * it->second * alpha)), 5);
 
-    // Hover background
     if (hit->second > 0.01f)
-        dl->AddRectFilled(bb.Min, bb.Max, ImColor(255, 255, 255, int(15 * hit->second * alpha)), 0);
+        dl->AddRectFilled(bb.Min, bb.Max, ImColor(255, 255, 255, int(7 * hit->second * alpha)), 5);
 
-    // Left accent bar (4px wide, vertically centered)
-    float bar_h = 24.f * it->second;
+    float bar_h = 16.f * it->second;
     float bar_cy = (bb.Min.y + bb.Max.y) * 0.5f;
     dl->AddRectFilled(
-        ImVec2(bb.Min.x, bar_cy - bar_h * 0.5f),
-        ImVec2(bb.Min.x + 4.f, bar_cy + bar_h * 0.5f),
-        ImColor(91, 140, 255, int(255 * it->second * alpha)), 2);
+        ImVec2(bb.Min.x + 1.f, bar_cy - bar_h * 0.5f),
+        ImVec2(bb.Min.x + 3.f, bar_cy + bar_h * 0.5f),
+        ImColor(132, 121, 171, int(235 * it->second * alpha)), 2);
 
-
-    // Icon centered in the button
     ImVec4 text_col = ImLerp(
-        ImVec4(0.38f, 0.38f, 0.38f, alpha),
-        ImVec4(0.92f, 0.92f, 0.92f, alpha),
+        ImVec4(0.31f, 0.30f, 0.36f, alpha),
+        ImVec4(0.72f, 0.69f, 0.79f, alpha),
         it->second);
-    dl->AddText(
-        ImVec2(bb.Min.x + (size.x - icon_size.x) * 0.5f + 2.f,
-               bb.Min.y + (size.y - icon_size.y) * 0.5f),
-        ImColor(text_col), icon);
+
+    ImGui::PushFont(c_menu::get().g_icons);
+    dl->AddText(ImVec2(bb.Min.x + 13.f, bb.Min.y + (size.y - icon_size.y) * 0.5f), ImColor(text_col), icon);
+    ImGui::PopFont();
+    ImGui::PushFont(c_menu::get().g_cxm);
+    dl->AddText(ImVec2(bb.Min.x + 43.f, bb.Min.y + (size.y - label_size.y) * 0.5f), ImColor(text_col), label);
+    ImGui::PopFont();
 
     return pressed;
 }
@@ -8248,11 +8213,11 @@ bool ImGui::TabEx(const char* icon, const char* label, const bool active, const 
 
     if (active)
     {
-        GetWindowDrawList()->AddRectFilledMultiColor(bb.Min, bb.Max, ImColor(77, 125, 253, alpha / 10), ImColor(), ImColor(), ImColor(77, 125, 253, alpha / 10));
-        GetWindowDrawList()->AddRectFilled(bb.Min, ImVec2(bb.Min.x + 2, bb.Max.y), ImColor(77, 125, 253, alpha));
+        GetWindowDrawList()->AddRectFilledMultiColor(bb.Min, bb.Max, ImColor(132, 121, 171, alpha / 10), ImColor(), ImColor(), ImColor(132, 121, 171, alpha / 10));
+        GetWindowDrawList()->AddRectFilled(bb.Min, ImVec2(bb.Min.x + 2, bb.Max.y), ImColor(132, 121, 171, alpha));
     }
 
-    PushStyleColor(ImGuiCol_Text, (ImVec4)ImColor(77, 125, 253));
+    PushStyleColor(ImGuiCol_Text, (ImVec4)ImColor(132, 121, 171));
 
     PushFont(c_menu::get().g_icons);
     RenderTextClipped(bb.Min + ImVec2(15, 0), bb.Max - style.FramePadding, icon, NULL, &icon_size, ImVec2(0, 0.5), &bb);

@@ -48,6 +48,7 @@ public:
 		this->point = point;
 		this->hitbox = hitbox;
 		this->center = center;
+		this->safe = 0.0f;
 	}
 
 	void reset()

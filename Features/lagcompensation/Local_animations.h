@@ -20,7 +20,9 @@ class local_animations : public singleton <local_animations>
 	float real_simulation_time = 0.0f;
 	float fake_simulation_time = 0.0f;
 
-	CBaseHandle* handle = nullptr;
+	CBaseHandle handle;
+	CBaseHandle prediction_handle;
+	float prediction_spawntime = 0.0f;
 
 	float spawntime = 0.0f;
 	float tickcount = 0.0f;

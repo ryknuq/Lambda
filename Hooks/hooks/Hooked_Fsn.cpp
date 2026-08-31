@@ -324,16 +324,17 @@ void __stdcall hooks::hooked_fsn(ClientFrameStage_t stage)
 				if (!current_shot->hurt_player)
 				{
 					misc::get().aimbot_hitboxes();
+					static auto weapon_accuracy_nospread = m_cvar()->FindVar(crypt_str("weapon_accuracy_nospread"));
+					const auto no_spread = weapon_accuracy_nospread && weapon_accuracy_nospread->GetBool();
 
 					// OCCLUSION CHECK FIRST - Must check if autowall actually returned invalid
-					if (current_shot->occlusion && current_shot->impact_hit_player)
+					if (current_shot->occlusion)
 					{
 						// BRANCH 1: OCCLUSION MISS (only if autowall said so AND we hit something)
 						current_shot->shot_info.result = crypt_str("Occlusion");
 						current_shot->shot_info.miss_reason = crypt_str("Occlusion");
 						current_shot->shot_info.was_occluded = true;
 
-						++g_ctx.globals.missed_shots[current_shot->last_target];
 						++g_ctx.globals.miss_reason_count[1];
 
 						if (cfg.misc.events_to_log[EVENTLOG_HIT])
@@ -349,14 +350,13 @@ void __stdcall hooks::hooked_fsn(ClientFrameStage_t stage)
 							eventlogs::get().add(log.str());
 						}
 					}
-					else if (!current_shot->impact_hit_player)
+					else if (!current_shot->impact_hit_player && !no_spread)
 					{
 						// BRANCH 2: SPREAD MISS (checked third)
 						// No impact hit = pure spread/inaccuracy miss
 						current_shot->shot_info.result = crypt_str("Spread");
 						current_shot->shot_info.miss_reason = crypt_str("Spread");
 
-						++g_ctx.globals.missed_shots[current_shot->last_target];
 						++g_ctx.globals.miss_reason_count[0];
 
 						if (cfg.misc.events_to_log[EVENTLOG_HIT])
@@ -379,7 +379,6 @@ void __stdcall hooks::hooked_fsn(ClientFrameStage_t stage)
 						current_shot->shot_info.miss_reason = crypt_str("Prediction");
 						current_shot->shot_info.prediction_error = true;
 
-						++g_ctx.globals.missed_shots[current_shot->last_target];
 						++g_ctx.globals.miss_reason_count[2];
 
 						if (cfg.misc.events_to_log[EVENTLOG_HIT])
@@ -426,17 +425,19 @@ void __stdcall hooks::hooked_fsn(ClientFrameStage_t stage)
 						}
 						else if (is_bot)
 						{
-							miss_reason = crypt_str("Spread");
-							miss_reason_idx = 0;
+							miss_reason = crypt_str("Record mismatch");
+							miss_reason_idx = 3;
 						}
 
 						current_shot->shot_info.result = miss_reason;
 						current_shot->shot_info.miss_reason = miss_reason;
 						current_shot->shot_info.resolver_side = current_shot->side;
 
-						++g_ctx.globals.missed_shots[current_shot->last_target];
+						if (!is_bot)
+							++g_ctx.globals.missed_shots[current_shot->last_target];
 						++g_ctx.globals.miss_reason_count[miss_reason_idx];
-						lagcompensation::get().player_resolver[current_shot->last_target].last_side = (resolver_side)current_shot->side;
+						if (!is_bot)
+							lagcompensation::get().player_resolver[current_shot->last_target].last_side = (resolver_side)current_shot->side;
 
 						if (cfg.misc.events_to_log[EVENTLOG_HIT])
 						{
