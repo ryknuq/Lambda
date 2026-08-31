@@ -9,6 +9,8 @@ extern Memory memory;
 
 namespace SkinChanger
 {
+	bool initialize() noexcept;
+	void reset() noexcept;
 	void InitCustomModels();
 	void run(ClientFrameStage_t stage) noexcept;
 	void scheduleHudUpdate() noexcept;

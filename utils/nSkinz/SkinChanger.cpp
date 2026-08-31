@@ -109,7 +109,7 @@ static const char* mask_models[] = // mask changer??
 
 void SkinChanger::InitCustomModels()
 {
-    if (!LoadPlayerMdlOnce)
+    if (!LoadPlayerMdlOnce && g_ctx.local())
     {
         auto player_ml = 0;
 
@@ -137,6 +137,66 @@ std::vector <SkinChanger::PaintKit> SkinChanger::gloveKits;
 std::vector <SkinChanger::PaintKit> SkinChanger::displayKits;
 
 static std::unordered_map <std::string_view, const char*> iconOverrides;
+static CBaseHandle glove_handle(0);
+
+bool SkinChanger::initialize() noexcept
+{
+    if (!memory.valid())
+        memory.initialize();
+
+    if (!memory.itemSchema)
+        return false;
+
+    auto schema = memory.itemSchema();
+
+    if (!schema || !schema->paintKits.memory || schema->paintKits.lastElement < 0)
+        return false;
+
+    skinKits.clear();
+    gloveKits.clear();
+    displayKits.clear();
+
+    for (auto i = 0; i <= schema->paintKits.lastElement; ++i)
+    {
+        auto kit = schema->paintKits.memory[i].value;
+
+        if (!kit || kit->id < 0 || kit->id == 9001)
+            continue;
+
+        std::string name;
+        const auto token = kit->itemName.buffer;
+
+        if (token && *token && m_localize())
+        {
+            if (const auto localized = m_localize()->Find(token))
+            {
+                char converted[256] = { };
+                m_localize()->ConvertUnicodeToANSI(localized, converted, sizeof(converted));
+                name = converted;
+            }
+        }
+
+        if (name.empty() && kit->name.buffer)
+            name = kit->name.buffer;
+
+        if (name.empty())
+            continue;
+
+        auto internal_name = kit->name.buffer ? kit->name.buffer : "";
+        auto& destination = kit->id < 10000 ? skinKits : gloveKits;
+
+        if (std::none_of(destination.begin(), destination.end(), [kit](const PaintKit& entry) { return entry.id == kit->id; }))
+            destination.emplace_back(kit->id, std::move(name), internal_name);
+    }
+
+    std::sort(skinKits.begin(), skinKits.end());
+    std::sort(gloveKits.begin(), gloveKits.end());
+    skinKits.emplace(skinKits.begin(), 0, std::string("Default"), std::string());
+    gloveKits.emplace(gloveKits.begin(), 0, std::string("Default"), std::string());
+    displayKits = skinKits;
+
+    return true;
+}
 
 static void erase_override_if_exists_by_index(const int definition_index) noexcept
 {
@@ -199,15 +259,20 @@ static auto get_wearable_create_fn() -> CreateClientClassFn
 {
     auto classes = m_client()->GetAllClasses();
 
-    while (classes->m_ClassID != CEconWearable)
+    while (classes && classes->m_ClassID != CEconWearable)
         classes = classes->m_pNext;
 
-    return classes->m_pCreateFn;
+    return classes ? classes->m_pCreateFn : nullptr;
 }
 
 static attributableitem_t* make_glove(int entry, int serial) noexcept
 {
-    get_wearable_create_fn()(entry, serial);
+    auto create = get_wearable_create_fn();
+
+    if (!create)
+        return nullptr;
+
+    create(entry, serial);
     auto glove = static_cast <attributableitem_t*> (m_entitylist()->GetClientEntity(entry));
 
     if (!glove)
@@ -215,6 +280,9 @@ static attributableitem_t* make_glove(int entry, int serial) noexcept
 
     static auto Fn = util::find_pattern(crypt_str("client.dll"), crypt_str("\x55\x8B\xEC\x83\xE4\xF8\x51\x53\x56\x57\x8B\xF1"), crypt_str("xxxxxxxxxxxx"));
     static auto set_abs_origin = reinterpret_cast <void(__thiscall*)(void*, const Vector&)> (Fn);
+
+    if (!set_abs_origin)
+        return nullptr;
 
     set_abs_origin(glove, Vector(16384.0f, 16384.0f, 16384.0f));
     return glove;
@@ -228,8 +296,6 @@ static void post_data_update_start(player_t* local) noexcept
 
     if (!m_engine()->GetPlayerInfo(local->EntIndex(), &player_info))
         return;
-
-    static auto glove_handle = CBaseHandle(0);
 
     auto wearables = local->m_hMyWearables();
     auto glove_config = get_by_definition_index(GLOVE_T_SIDE);
@@ -254,6 +320,9 @@ static void post_data_update_start(player_t* local) noexcept
             glove->GetClientNetworkable()->Release();
         }
 
+        wearables[0] = CBaseHandle(0);
+        glove_handle = CBaseHandle(0);
+
         return;
     }
 
@@ -269,14 +338,27 @@ static void post_data_update_start(player_t* local) noexcept
             glove_handle = wearables[0];
         }
 
-        *reinterpret_cast <int*> (uintptr_t(glove) + 0x64) = -1;
-        apply_config_on_attributable_item(glove, glove_config, player_info.xuid_low);
+        if (glove)
+        {
+            *reinterpret_cast <int*> (uintptr_t(glove) + 0x64) = -1;
+            apply_config_on_attributable_item(glove, glove_config, player_info.xuid_low);
+        }
+    }
+    else if (glove)
+    {
+        glove->GetClientNetworkable()->SetDestroyedOnRecreateEntities();
+        glove->GetClientNetworkable()->Release();
+        wearables[0] = CBaseHandle(0);
+        glove_handle = CBaseHandle(0);
     }
 
     auto weapons = local->m_hMyWeapons();
 
-    for (auto weapon_handle = 0; weapons[weapon_handle].IsValid(); weapon_handle++)
+    for (auto weapon_handle = 0; weapon_handle < 64; ++weapon_handle)
     {
+        if (!weapons[weapon_handle].IsValid())
+            continue;
+
         auto weapon = (weapon_t*)m_entitylist()->GetClientEntityFromHandle(weapons[weapon_handle]); //-V807
 
         if (!weapon)
@@ -320,13 +402,31 @@ static void post_data_update_start(player_t* local) noexcept
 static bool UpdateRequired = false;
 static bool hudUpdateRequired = false;
 
+void SkinChanger::reset() noexcept
+{
+    model_indexes.clear();
+    player_model_indexes.clear();
+    iconOverrides.clear();
+    glove_handle = CBaseHandle(0);
+    UpdateRequired = false;
+    hudUpdateRequired = false;
+    LoadPlayerMdlOnce = false;
+}
+
 void updateHud()
 {
-    if (m_globals()->m_curtime >= last_skins_update)
+    if (!memory.valid())
+        return;
+
+    if (m_globals()->m_realtime >= last_skins_update)
     {
-        if (auto hud_weapons = memory.findHudElement(memory.hud, crypt_str("CCSGO_HudWeaponSelection")) - 0x28)
-            for (auto i = 0; i < *(hud_weapons + 0x20); i++)
+        if (auto hud_element = memory.findHudElement(memory.hud, crypt_str("CCSGO_HudWeaponSelection")))
+        {
+            auto hud_weapons = hud_element - 0x28;
+
+            for (auto i = 0; i < *(hud_weapons + 0x20); ++i)
                 i = memory.clearHudWeapon(hud_weapons, i);
+        }
 
         hudUpdateRequired = false;
     }
@@ -339,6 +439,16 @@ void SkinChanger::run(ClientFrameStage_t stage) noexcept
 
     if (!g_ctx.local())
         return;
+
+    if (skinKits.empty())
+        initialize();
+
+    for (auto i = 0; i < static_cast<int>(cfg.skins.skinChanger.size()); ++i)
+    {
+        auto& item = cfg.skins.skinChanger[i];
+        item.itemIdIndex = i;
+        item.update();
+    }
 
     post_data_update_start(g_ctx.local());
     SkinChanger::InitCustomModels();
@@ -369,8 +479,12 @@ void SkinChanger::run(ClientFrameStage_t stage) noexcept
             break;
         }
 
-        if (player_model)
+        if (player_model > 0 && player_model <= ARRAYSIZE(player_models))
         {
+            auto selected_model = player_model_index[player_model - 1];
+
+            prechace_model(selected_model);
+
             if (!g_ctx.globals.backup_model)
             {
                 auto model = g_ctx.local()->GetModel();
@@ -387,10 +501,14 @@ void SkinChanger::run(ClientFrameStage_t stage) noexcept
                 }
             }
 
-            if (SkinChanger::player_model_indexes.find(player_model_index[player_model - 1]) == SkinChanger::player_model_indexes.end()) //-V522
-                SkinChanger::player_model_indexes.emplace(player_model_index[player_model - 1], m_modelinfo()->GetModelIndex(player_model_index[player_model - 1]));
+            if (SkinChanger::player_model_indexes.find(selected_model) == SkinChanger::player_model_indexes.end()) //-V522
+                SkinChanger::player_model_indexes.emplace(selected_model, m_modelinfo()->GetModelIndex(selected_model));
 
-            g_ctx.local()->set_model_index(SkinChanger::player_model_indexes[player_model_index[player_model - 1]]);
+            auto model_index = SkinChanger::player_model_indexes[selected_model];
+
+            if (model_index > 0)
+                g_ctx.local()->set_model_index(model_index);
+
             g_ctx.globals.backup_model = true;
         }
         else if (g_ctx.globals.backup_model)
@@ -400,10 +518,11 @@ void SkinChanger::run(ClientFrameStage_t stage) noexcept
         }
     }
 
-    if (UpdateRequired)
+    if (UpdateRequired && m_globals()->m_realtime - last_skins_update >= 1.0f)
     {
         UpdateRequired = false;
         hudUpdateRequired = true;
+        last_skins_update = m_globals()->m_realtime;
 
         m_clientstate()->iDeltaTick = -1;
         g_ctx.globals.updating_skins = true;
@@ -417,18 +536,19 @@ void SkinChanger::run(ClientFrameStage_t stage) noexcept
 
 void SkinChanger::scheduleHudUpdate() noexcept
 {
-    if (!g_ctx.local()->is_alive())
-        return;
-
-    if (m_globals()->m_realtime - last_skins_update < 1.0f)
+    if (!g_ctx.local() || !g_ctx.local()->is_alive())
         return;
 
     UpdateRequired = true;
-    last_skins_update = m_globals()->m_realtime;
 }
 
 void SkinChanger::overrideHudIcon(IGameEvent* event) noexcept
 {
-    if (auto iconOverride = iconOverrides[event->GetString(crypt_str("weapon"))])
-        event->SetString(crypt_str("weapon"), iconOverride);
+    if (!event)
+        return;
+
+    const auto override = iconOverrides.find(event->GetString(crypt_str("weapon")));
+
+    if (override != iconOverrides.end() && override->second)
+        event->SetString(crypt_str("weapon"), override->second);
 }

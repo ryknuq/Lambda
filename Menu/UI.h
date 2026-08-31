@@ -48,7 +48,10 @@ public:
 
 	float public_alpha;
 	float color_buffer[4] = { 1.f, 1.f, 1.f, 1.f };
-    float dpi_scale = 1.f;
+	float dpi_scale = 1.f;
+	bool light_mode = false;
+	bool settings_open = false;
+	ImVec4 accent_color = ImVec4(0.68f, 0.68f, 0.72f, 1.0f);
 
 	std::string loaded_config = crypt_str("");
 
@@ -66,7 +69,7 @@ private:
 
 	struct
 	{
-        ImVec2 DisplayWindowPadding;
+		ImVec2 DisplayWindowPadding;
 		ImVec2 DisplaySafeAreaPadding;
 		ImVec2 WindowPadding;
 		ImVec2 WindowMinSize;
@@ -100,7 +103,7 @@ private:
 	float preview_alpha = 1.f;
 
 	int active_tab_index;
-	int width = 1050, height = 600;
+	int width = 760, height = 620;
 	int active_tab;
 	int current_profile = -1;
 

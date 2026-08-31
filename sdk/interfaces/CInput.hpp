@@ -22,13 +22,14 @@ public:
     CUserCmd* m_pCommands; // 0xF4
     CVerifiedUserCmd* m_pVerifiedCommands; // 0xF8
 
-    CUserCmd* CInput::GetUserCmd(int sequence_number)
+    CUserCmd* GetUserCmd(int sequence_number)
     {
         return &m_pCommands[sequence_number % MULTIPLAYER_BACKUP];
     }
-    CUserCmd* CInput::GGetUserCmd(int slot, int sequence_number)
+    CUserCmd* GGetUserCmd(int slot, int sequence_number)
     {
-        return &m_pCommands[slot, sequence_number % MULTIPLAYER_BACKUP];
+		(void)slot;
+        return &m_pCommands[sequence_number % MULTIPLAYER_BACKUP];
     }
     CVerifiedUserCmd* GetVerifiedUserCmd(int sequence_number)
     {

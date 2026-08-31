@@ -15,6 +15,9 @@ struct item_setting
 {
 	void update()
 	{
+		itemIdIndex = std::clamp(itemIdIndex, 0, static_cast<int>(std::size(game_data::weapon_names)) - 1);
+		entity_quality_vector_index = std::clamp(entity_quality_vector_index, 0, static_cast<int>(std::size(game_data::quality_names)) - 1);
+
 		itemId = game_data::weapon_names[itemIdIndex].definition_index;
 		quality = game_data::quality_names[entity_quality_vector_index].index;
 
@@ -25,15 +28,27 @@ struct item_setting
 		{
 			kit_names = &SkinChanger::gloveKits;
 			defindex_names = game_data::glove_names;
+			definition_override_vector_index = std::clamp(definition_override_vector_index, 0, static_cast<int>(std::size(game_data::glove_names)) - 1);
 		}
 		else
 		{
 			kit_names = &SkinChanger::skinKits;
 			defindex_names = game_data::knife_names;
+			definition_override_vector_index = std::clamp(definition_override_vector_index, 0, static_cast<int>(std::size(game_data::knife_names)) - 1);
 		}
 
-		paintKit = (*kit_names)[paint_kit_vector_index].id;
 		definition_override_index = defindex_names[definition_override_vector_index].definition_index;
+
+		if (kit_names->empty())
+		{
+			paint_kit_vector_index = 0;
+			paintKit = 0;
+			skin_name.clear();
+			return;
+		}
+
+		paint_kit_vector_index = std::clamp(paint_kit_vector_index, 0, static_cast<int>(kit_names->size()) - 1);
+		paintKit = (*kit_names)[paint_kit_vector_index].id;
 		skin_name = (*kit_names)[paint_kit_vector_index].skin_name;
 	}
 

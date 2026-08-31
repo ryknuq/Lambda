@@ -7,6 +7,9 @@
 template <typename T>
 static constexpr auto relativeToAbsolute(int* address) noexcept
 {
+	if (!address)
+		return T{};
+
 	return reinterpret_cast<T>(reinterpret_cast<char*>(address + 1) + *address);
 }
 
@@ -16,6 +19,10 @@ reinterpret_cast<type>(findPattern(__VA_ARGS__))
 void Memory::initialize() noexcept
 {
 	auto temp = FIND_PATTERN(std::uintptr_t*, crypt_str("client"), crypt_str("\xB9????\xE8????\x8B\x5D\x08") + 1); // fix
+
+	if (!temp)
+		return;
+
 	hud = *temp;
 	findHudElement = relativeToAbsolute<decltype(findHudElement)>(reinterpret_cast<int*>(reinterpret_cast<char*>(temp) + 5));
 	clearHudWeapon = FIND_PATTERN(decltype(clearHudWeapon), crypt_str("client"), crypt_str("\x55\x8B\xEC\x51\x53\x56\x8B\x75\x08\x8B\xD9\x57\x6B\xFE\x2C"));

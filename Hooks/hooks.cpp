@@ -106,7 +106,7 @@ namespace hooks
 
 	long __stdcall Hooked_EndScene(IDirect3DDevice9* pDevice)
 	{
-		static auto original_fn = directx_hook->get_func_address <EndSceneFn> (42);
+		static auto original_fn = directx_hook->get_func_address <EndSceneFn>(42);
 		return original_fn(pDevice);
 	}
 
@@ -150,7 +150,7 @@ namespace hooks
 		c_menu::get().futura = io.Fonts->AddFontFromMemoryTTF((void*)futuramediumc, sizeof(futuramediumc), 17.f, &m_config, ranges);
 		c_menu::get().futura_large = io.Fonts->AddFontFromMemoryTTF((void*)futuramediumc, sizeof(futuramediumc), 20.f, &m_config, ranges);
 		c_menu::get().gotham = io.Fonts->AddFontFromMemoryTTF((void*)GothamPro, sizeof(GothamPro), 11.f, &m_config, ranges);
-	
+
 		// Icon fonts
 		c_menu::get().ico_menu = io.Fonts->AddFontFromMemoryTTF((void*)icomenu, sizeof(icomenu), 20.f, &m_config, io.Fonts->GetGlyphRangesCyrillic());
 		c_menu::get().ico_bottom = io.Fonts->AddFontFromMemoryTTF((void*)iconbot, sizeof(iconbot), 20.f, &m_config, io.Fonts->GetGlyphRangesCyrillic());
@@ -170,11 +170,13 @@ namespace hooks
 		c_menu::get().New_icons = io.Fonts->AddFontFromMemoryTTF(idi_nahuj, sizeof(idi_nahuj), 36, NULL, io.Fonts->GetGlyphRangesCyrillic());
 
 		// New menu 
-		c_menu::get().g_icons = io.Fonts->AddFontFromMemoryTTF(icoo, sizeof(icoo), 27, NULL, io.Fonts->GetGlyphRangesCyrillic());
+		ImFontConfig menu_font_config = m_config;
+		menu_font_config.RasterizerMultiply = 1.08f;
+		c_menu::get().g_icons = io.Fonts->AddFontFromMemoryTTF(icoo, sizeof(icoo), 18, &menu_font_config, io.Fonts->GetGlyphRangesCyrillic());
 		c_menu::get().g_last = io.Fonts->AddFontFromMemoryTTF(idi_nahuj, sizeof(idi_nahuj), 36, NULL, io.Fonts->GetGlyphRangesCyrillic());
-		c_menu::get().g_cxmenufont = io.Fonts->AddFontFromMemoryTTF(MontserratRegular, sizeof(MontserratRegular), 14, NULL, io.Fonts->GetGlyphRangesCyrillic());
-		c_menu::get().g_cxm = io.Fonts->AddFontFromMemoryTTF(MontserratRegular, sizeof(MontserratRegular), 13, NULL, io.Fonts->GetGlyphRangesCyrillic());
-		c_menu::get().g_cxm_large = io.Fonts->AddFontFromMemoryTTF(MontserratRegular, sizeof(MontserratRegular), 30, NULL, io.Fonts->GetGlyphRangesCyrillic());
+		c_menu::get().g_cxmenufont = io.Fonts->AddFontFromMemoryTTF(MontserratRegular, sizeof(MontserratRegular), 15, &menu_font_config, io.Fonts->GetGlyphRangesCyrillic());
+		c_menu::get().g_cxm = io.Fonts->AddFontFromMemoryTTF(MontserratRegular, sizeof(MontserratRegular), 13, &menu_font_config, io.Fonts->GetGlyphRangesCyrillic());
+		c_menu::get().g_cxm_large = io.Fonts->AddFontFromMemoryTTF(MontserratRegular, sizeof(MontserratRegular), 28, &menu_font_config, io.Fonts->GetGlyphRangesCyrillic());
 		c_menu::get().g_widgets = io.Fonts->AddFontFromMemoryTTF(REFSAN, sizeof(REFSAN), 18, NULL, io.Fonts->GetGlyphRangesCyrillic());
 
 		ImGui_ImplDX9_CreateDeviceObjects();
@@ -183,7 +185,7 @@ namespace hooks
 
 	long __stdcall hooked_present(IDirect3DDevice9* device, RECT* src_rect, RECT* dest_rect, HWND dest_wnd_override, RGNDATA* dirty_region)
 	{
-		static auto original = directx_hook->get_func_address <PresentFn> (17);
+		static auto original = directx_hook->get_func_address <PresentFn>(17);
 		g_ctx.local((player_t*)m_entitylist()->GetClientEntity(m_engine()->GetLocalPlayer()), true);
 
 		if (!d3d_init)
@@ -273,7 +275,7 @@ namespace hooks
 
 void __fastcall hooks::hooked_setkeycodestate(void* thisptr, void* edx, ButtonCode_t code, bool bDown)
 {
-	static auto original_fn = inputinternal_hook->get_func_address <SetKeyCodeState_t> (91);
+	static auto original_fn = inputinternal_hook->get_func_address <SetKeyCodeState_t>(91);
 
 	if (input_shouldListen && bDown)
 	{
@@ -288,7 +290,7 @@ void __fastcall hooks::hooked_setkeycodestate(void* thisptr, void* edx, ButtonCo
 
 void __fastcall hooks::hooked_setmousecodestate(void* thisptr, void* edx, ButtonCode_t code, MouseCodeState_t state)
 {
-	static auto original_fn = inputinternal_hook->get_func_address <SetMouseCodeState_t> (92);
+	static auto original_fn = inputinternal_hook->get_func_address <SetMouseCodeState_t>(92);
 
 	if (input_shouldListen && state == BUTTON_PRESSED)
 	{

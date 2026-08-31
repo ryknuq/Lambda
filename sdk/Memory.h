@@ -12,12 +12,16 @@ class ItemSchema;
 class Memory {
 public:
 	void initialize() noexcept;
+	bool valid() const noexcept
+	{
+		return hud && findHudElement && clearHudWeapon && itemSchema;
+	}
 
-    uintptr_t hud;
-    int*(__thiscall* findHudElement)(uintptr_t, const char*);
-    int(__thiscall* clearHudWeapon)(int*, int);
-    std::add_pointer_t<ItemSchema* __cdecl()> itemSchema;
-	int(__thiscall* equipWearable)(void* wearable, void* player);
+    uintptr_t hud = 0;
+    int*(__thiscall* findHudElement)(uintptr_t, const char*) = nullptr;
+    int(__thiscall* clearHudWeapon)(int*, int) = nullptr;
+    std::add_pointer_t<ItemSchema* __cdecl()> itemSchema = nullptr;
+	int(__thiscall* equipWearable)(void* wearable, void* player) = nullptr;
 
 private:
     static std::uintptr_t findPattern(const char* module, const char* pattern, size_t offset = 0) noexcept
