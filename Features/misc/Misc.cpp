@@ -1045,53 +1045,44 @@ bool misc::createmove(CUserCmd* m_pcmd)
 	return true;
 }
 
-void misc::break_lc(CUserCmd* m_pcmd) // breaking lc with fakelags
+void misc::break_lc(CUserCmd* m_pcmd)
 {
 	auto choked = m_clientstate()->iChokedCommands;
-	static auto fluctuate_ticks = 0;
-	static auto switch_ticks = false;
-	static auto random_factor = min(rand() % 16 + 1, cfg.antiaim.triggers_fakelag_amount);
 
-	if (!g_ctx.globals.exploits && cfg.antiaim.fakelag && cfg.antiaim.fakelag_enablers[FAKELAG_PEEK] && started_peeking)
+	auto on_ground = engineprediction::get().backup_data.flags & FL_ONGROUND;
+	auto velocity = engineprediction::get().backup_data.velocity.Length2D();
+
+	auto active = false;
+
+	if (cfg.antiaim.fakelag_enablers[FAKELAG_SLOW_WALK] && key_binds::get().get_key_bind_state(21))
+		active = true;
+
+	if (cfg.antiaim.fakelag_enablers[FAKELAG_MOVE] && velocity > 0.1f)
+		active = true;
+
+	if (cfg.antiaim.fakelag_enablers[FAKELAG_AIR] && !on_ground)
+		active = true;
+
+	if (cfg.antiaim.fakelag_enablers[FAKELAG_PEEK] && g_ctx.globals.m_Peek.m_bIsPeeking)
+		active = true;
+
+	if (!active)
 	{
-		if (choked < max_choke)
-			g_ctx.send_packet = false;
-		else
-		{
-			started_peeking = false;
-
-			random_factor = min(rand() % 16 + 1, cfg.antiaim.triggers_fakelag_amount);
-			switch_ticks = !switch_ticks;
-			fluctuate_ticks = switch_ticks ? cfg.antiaim.triggers_fakelag_amount : max(cfg.antiaim.triggers_fakelag_amount - 2, 1);
-
-			g_ctx.send_packet = true;
-		}
+		g_ctx.send_packet = true;
+		return;
 	}
 
-	max_choke = min(max_choke, 5);
+	max_choke = cfg.antiaim.triggers_fakelag_amount;
+
+	if (m_gamerules()->m_bIsValveDS())
+		max_choke = min(max_choke, 6);
+	else
+		max_choke = min(max_choke, 14);
 
 	if (choked < max_choke)
 		g_ctx.send_packet = false;
 	else
-	{
-		started_peeking = false;
-		random_factor = min(rand() % 16 + 1, max_choke);
-		switch_ticks = !switch_ticks;
-		fluctuate_ticks = switch_ticks ? max_choke : max(max_choke - 2, 1);
 		g_ctx.send_packet = true;
-	}
-
-	if (g_ctx.send_packet)
-	{
-		started_peeking = true;
-		g_ctx.globals.next_tickbase_shift++;
-		started_peeking = false;
-	}
-	else
-	{
-		g_ctx.globals.ticks_allowed = 16;
-		g_ctx.globals.next_tickbase_shift++;
-	}
 }
 void misc::double_tap_defensive(CUserCmd* m_pcmd)
 {
@@ -1303,7 +1294,7 @@ bool misc::double_tap(CUserCmd* m_pcmd)
 	}
 	else if (!g_ctx.globals.weapon->is_grenade() && g_ctx.globals.weapon->m_iItemDefinitionIndex() != WEAPON_TASER && g_ctx.globals.weapon->m_iItemDefinitionIndex() != WEAPON_REVOLVER)
 	{
-		if (cfg.ragebot.defensive_doubletap && !g_ctx.globals.m_Peek.m_bIsPeeking)
+		if (cfg.ragebot.defensive_doubletap && g_ctx.globals.m_Peek.m_bIsPeeking)
 			g_ctx.globals.tickbase_shift = min(2, max_tickbase_shift);
 		else
 			g_ctx.globals.tickbase_shift = max_tickbase_shift;

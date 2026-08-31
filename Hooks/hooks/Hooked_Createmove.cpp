@@ -286,7 +286,8 @@ void __stdcall hooks::hooked_createmove(int sequence_number, float input_sample_
 		misc::get().hide_shots(m_pcmd, false);
 	else
 	{
-		g_ctx.globals.ticks_allowed = backup_ticks_allowed;
+		if (!misc::get().recharging_double_tap)
+			g_ctx.globals.ticks_allowed = backup_ticks_allowed;
 		misc::get().hide_shots(m_pcmd, true);
 	}
 
@@ -329,7 +330,7 @@ void __stdcall hooks::hooked_createmove(int sequence_number, float input_sample_
 	util::movement_fix(wish_yaw, m_pcmd);
 
 	if (g_ctx.globals.should_recharge)
-		g_ctx.send_packet = true;
+		g_ctx.send_packet = false;
 
 	if (g_ctx.globals.ticks_choke)
 	{

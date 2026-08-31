@@ -85,7 +85,22 @@ void fakelag::Createmove()
 	if (FakelagCondition(g_ctx.get_command()))
 		return;
 
-	Fakelag(g_ctx.get_command());
+	auto m_pcmd = g_ctx.get_command();
+
+	bool has_triggers = false;
+	for (size_t i = 0; i < cfg.antiaim.fakelag_enablers.size(); i++)
+	{
+		if (cfg.antiaim.fakelag_enablers[i])
+		{
+			has_triggers = true;
+			break;
+		}
+	}
+
+	if (has_triggers)
+		misc::get().break_lc(m_pcmd);
+	else
+		Fakelag(m_pcmd);
 }
 
 

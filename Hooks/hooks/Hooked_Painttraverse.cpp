@@ -249,6 +249,37 @@ void __fastcall hooks::hooked_painttraverse(void* ecx, void* edx, vgui::VPANEL p
 
 			g_ctx.globals.bomb_carrier = -1;
 
+			for (auto i = 1; i <= m_globals()->m_maxclients; i++)
+			{
+				auto player = static_cast<player_t*>(m_entitylist()->GetClientEntity(i));
+
+				if (!player || !player->is_alive() || player->IsDormant())
+					continue;
+
+				auto weapons = player->m_hMyWeapons();
+				auto found = false;
+
+				for (auto slot = 0; slot < 64; slot++)
+				{
+					if (!weapons[slot].IsValid())
+						continue;
+
+					auto weapon = (weapon_t*)m_entitylist()->GetClientEntityFromHandle(weapons[slot]);
+
+					if (weapon && weapon->m_iItemDefinitionIndex() == WEAPON_C4)
+					{
+						found = true;
+						break;
+					}
+				}
+
+				if (found)
+				{
+					g_ctx.globals.bomb_carrier = i;
+					break;
+				}
+			}
+
 			misc::get().desync_arrows();
 
 			auto weapon = g_ctx.local()->m_hActiveWeapon().Get();
