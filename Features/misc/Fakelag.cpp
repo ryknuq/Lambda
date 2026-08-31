@@ -97,10 +97,10 @@ void fakelag::Createmove()
 		}
 	}
 
-	if (has_triggers)
-		misc::get().break_lc(m_pcmd);
-	else
-		Fakelag(m_pcmd);
+	if (has_triggers && misc::get().break_lc(m_pcmd))
+		return;
+
+	Fakelag(m_pcmd);
 }
 
 

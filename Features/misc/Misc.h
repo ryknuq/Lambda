@@ -42,7 +42,7 @@ public:
 
 	bool createmove(CUserCmd* m_pcmd);
 
-	void break_lc(CUserCmd* m_pcmd);
+	bool break_lc(CUserCmd* m_pcmd);
 
 	bool double_tap_enabled = false;
 	bool double_tap_key = false;

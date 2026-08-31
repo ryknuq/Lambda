@@ -181,78 +181,19 @@ next_cmd:
 	to_cmd = from_cmd;
 
 	to_cmd.m_command_number++;
-
-
-	to_cmd.m_tickcount += ((int)(1.0f / m_globals()->m_intervalpertick) * 3);
+	to_cmd.m_tickcount = INT_MAX;
 
 	if (newcmds > choked_modifier)
 		return true;
 
-	for (auto i = choked_modifier - newcmds + 1; i > 0; --i)
+	for (auto i = choked_modifier - newcmds; i > 0; --i)
 	{
 		WriteUsercmd(buf, &to_cmd, &from_cmd);
 
 		from_cmd = to_cmd;
 		to_cmd.m_command_number++;
-		to_cmd.m_tickcount++;
 	}
-	uintptr_t stackbase;
-	__asm mov stackbase, ebp;
 
-	auto m_pnNewCmds = reinterpret_cast <int*> (stackbase + 0xFCC);
-
-	int m_nNewCmds = *m_pnNewCmds;
-
-	int m_nTickbase = g_ctx.globals.tickbase_shift;
-
-	int m_nTotalNewCmds = min(m_nNewCmds + abs(m_nTickbase), 62);
-
-	if (from != -1)
-		return true;
-
-	int m_nNewCommands = m_nTotalNewCmds;
-	int m_nBackupCommands = 0;
-	int m_nNextCmd = m_clientstate()->nLastOutgoingCommand + m_clientstate()->iChokedCommands + 1;
-
-	if (to > m_nNextCmd)
-	{
-	Run:
-		CUserCmd* m_pCmd = m_input()->GetUserCmd(from);
-		if (m_pCmd)
-		{
-			CUserCmd m_nToCmd = *m_pCmd, m_nFromCmd = *m_pCmd;
-			m_nToCmd.m_command_number++;
-			m_nToCmd.m_tickcount += m_globals()->m_tickcount + 2 * m_globals()->m_tickcount;
-			for (int i = m_nNewCmds; i <= m_nTotalNewCmds; i++)
-			{
-				int m_shift = m_nTotalNewCmds - m_nNewCmds + 1;
-
-				do
-				{
-					m_nFromCmd.m_buttons = m_nToCmd.m_buttons;
-					m_nFromCmd.m_viewangles.x = m_nToCmd.m_viewangles.x;
-					m_nFromCmd.m_impulse = m_nToCmd.m_impulse;
-					m_nFromCmd.m_weaponselect = m_nToCmd.m_weaponselect;
-					m_nFromCmd.m_aimdirection.y = m_nToCmd.m_aimdirection.y;
-					m_nFromCmd.m_weaponsubtype = m_nToCmd.m_weaponsubtype;
-					m_nFromCmd.m_upmove = m_nToCmd.m_upmove;
-					m_nFromCmd.m_random_seed = m_nToCmd.m_random_seed;
-					m_nFromCmd.m_mousedx = m_nToCmd.m_mousedx;
-					m_nFromCmd.pad_0x4C[3] = m_nToCmd.pad_0x4C[3];
-					m_nFromCmd.m_command_number = m_nToCmd.m_command_number;
-					m_nFromCmd.m_tickcount = m_nToCmd.m_tickcount;
-					m_nFromCmd.m_mousedy = m_nToCmd.m_mousedy;
-					m_nFromCmd.pad_0x4C[19] = m_nToCmd.pad_0x4C[19];
-					m_nFromCmd.m_predicted = m_nToCmd.m_predicted;
-					m_nFromCmd.pad_0x4C[23] = m_nToCmd.pad_0x4C[23];
-					m_nToCmd.m_command_number++;
-					m_nToCmd.m_tickcount++;
-					--m_shift;
-				} while (m_shift);
-			}
-			return true;
-		}
-	}
 	return true;
 }
 

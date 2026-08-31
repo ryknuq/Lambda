@@ -1045,7 +1045,7 @@ bool misc::createmove(CUserCmd* m_pcmd)
 	return true;
 }
 
-void misc::break_lc(CUserCmd* m_pcmd)
+bool misc::break_lc(CUserCmd* m_pcmd)
 {
 	auto choked = m_clientstate()->iChokedCommands;
 
@@ -1067,10 +1067,7 @@ void misc::break_lc(CUserCmd* m_pcmd)
 		active = true;
 
 	if (!active)
-	{
-		g_ctx.send_packet = true;
-		return;
-	}
+		return false;
 
 	max_choke = cfg.antiaim.triggers_fakelag_amount;
 
@@ -1083,6 +1080,8 @@ void misc::break_lc(CUserCmd* m_pcmd)
 		g_ctx.send_packet = false;
 	else
 		g_ctx.send_packet = true;
+
+	return true;
 }
 void misc::double_tap_defensive(CUserCmd* m_pcmd)
 {

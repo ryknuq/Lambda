@@ -379,13 +379,12 @@ namespace util
 
 			memcpy(command, cmd, sizeof(CUserCmd));
 
-			if (command->m_tickcount != INT_MAX && m_clientstate()->iDeltaTick > 0)
-				m_prediction()->Update(m_clientstate()->iDeltaTick, true, m_clientstate()->nLastCommandAck, m_clientstate()->nLastOutgoingCommand + m_clientstate()->iChokedCommands);
-
 			command->m_command_number = sequence_number;
-			command->m_predicted = command->m_tickcount != INT_MAX;
+			command->m_tickcount = INT_MAX;
+			command->m_predicted = true;
+			command->m_buttons &= ~(IN_ATTACK | IN_ATTACK2);
 
-			if (m_clientstate()->pNetChannel && (commands_to_add + 1) < tickbase_shift) {
+			if (m_clientstate()->pNetChannel) {
 				++m_clientstate()->pNetChannel->m_nChokedPackets;
 				++m_clientstate()->pNetChannel->m_nOutSequenceNr;
 				++m_clientstate()->iChokedCommands;
@@ -417,8 +416,8 @@ namespace util
 			++commands_to_add;
 		} while (commands_to_add != tickbase_shift);
 
-		//*(bool*)((uintptr_t)m_prediction() + 0x24) = true;
-		//*(int*)((uintptr_t)m_prediction() + 0x1C) = 0;
+		*(bool*)((uintptr_t)m_prediction() + 0x24) = true;
+		*(int*)((uintptr_t)m_prediction() + 0x1C) = 0;
 	}
 
 
