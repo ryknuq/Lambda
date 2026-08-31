@@ -302,11 +302,6 @@ namespace util
 		if (!cfg.ragebot.enable)
 			return false;
 
-		auto nci = m_engine()->GetNetChannelInfo();
-
-		if (!nci)
-			return false;
-
 		auto i = e->EntIndex();
 
 		if (i < 1 || i > 64)
@@ -314,7 +309,7 @@ namespace util
 
 		auto records = &player_records[i];
 
-		if (records->size() < 2)
+		if (records->empty())
 			return false;
 
 		for (auto record = records->rbegin(); record != records->rend(); ++record)
@@ -323,41 +318,9 @@ namespace util
 				continue;
 
 			if (record->origin.DistTo(e->GetAbsOrigin()) < 1.0f)
-				return false;
+				continue;
 
-			auto curtime = m_globals()->m_curtime;
-			static auto sv_maxunlag = m_cvar()->FindVar(crypt_str("sv_maxunlag"));
-			auto range = sv_maxunlag->GetFloat();
-
-			if (g_ctx.local()->is_alive())
-				curtime = TICKS_TO_TIME(g_ctx.globals.fixed_tickbase);
-
-			auto next_record = record + 1;
-			auto end = next_record == records->rend();
-
-			auto next = end ? e->GetAbsOrigin() : next_record->origin;
-			auto time_next = end ? e->m_flSimulationTime() : next_record->simulation_time;
-
-			auto correct = nci->GetLatency(FLOW_OUTGOING) + nci->GetLatency(FLOW_INCOMING) + util::get_interpolation();
-			auto time_delta = time_next - record->simulation_time;
-
-			auto add = end ? range : time_delta;
-			auto deadtime = record->simulation_time + correct + add;
-			auto delta = deadtime - curtime;
-
-			auto mul = 1.0f / add;
-			auto lerp = math::lerp(next, record->origin, math::clamp(delta * mul, 0.0f, 1.0f));
-
-			matrix3x4_t result[MAXSTUDIOBONES];
-			memcpy(result, record->matrixes_data.main, MAXSTUDIOBONES * sizeof(matrix3x4_t));
-
-			for (auto j = 0; j < MAXSTUDIOBONES; j++)
-			{
-				auto matrix_delta = math::matrix_get_origin(record->matrixes_data.main[j]) - record->origin;
-				math::matrix_set_origin(matrix_delta + lerp, result[j]);
-			}
-
-			memcpy(matrix, result, MAXSTUDIOBONES * sizeof(matrix3x4_t));
+			memcpy(matrix, record->matrixes_data.main, MAXSTUDIOBONES * sizeof(matrix3x4_t));
 			return true;
 		}
 
