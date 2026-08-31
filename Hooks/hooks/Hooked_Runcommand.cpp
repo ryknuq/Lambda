@@ -103,19 +103,6 @@ bool __stdcall hooks::hooked_inprediction()
 using CLMove_t = void(__vectorcall*)(float, bool);
 void __vectorcall hooks::hooked_clmove(float accumulated_extra_samples, bool bFinalTick)
 {
-	if (g_ctx.globals.should_recharge)
-	{
-		if (++g_ctx.globals.ticks_allowed >= 16)
-		{
-			g_ctx.globals.should_recharge = false;
-			g_ctx.send_packet = true;
-		}
-		else
-			g_ctx.send_packet = false;
-
-		return;
-	}
-
 	((CLMove_t)original_clmove)(accumulated_extra_samples, bFinalTick);
 	if (g_ctx.available() && g_ctx.local()->is_alive())
 	{

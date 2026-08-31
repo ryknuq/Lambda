@@ -1,22 +1,47 @@
 #include "setup_bones.h"
 
+struct bone_setup_data_t
+{
+	uintptr_t ik_construct;
+	uintptr_t ik_destructor;
+	uintptr_t ik_init;
+	uintptr_t ik_update_targets;
+	uintptr_t ik_solve_dependencies;
+	uintptr_t ik_add_dependencies;
+	uintptr_t init_pose;
+	uintptr_t accumulate_pose;
+	uintptr_t calc_autoplay_sequences;
+	uintptr_t calc_bone_adj;
+	uintptr_t pose_parameter;
+	uintptr_t update_cache;
+	uintptr_t copy_to_follow;
+	uintptr_t copy_from_follow;
+	uintptr_t attachment;
+	uintptr_t bone_merge_offset;
+	uintptr_t ik_offset;
+	uintptr_t model_bone_counter;
+	int custom_player;
+	int sequence;
+	int cycle;
+	int controllers;
+	int poses;
+};
+
+static bone_setup_data_t bone_data = {};
+
 class CIKContext
 {
 public:
 	void Construct()
 	{
 		using IKConstruct = void(__thiscall*)(void*);
-		static auto ik_ctor = (IKConstruct)util::FindSignature(crypt_str("client.dll"), crypt_str("53 8B D9 F6 C3 03 74 0B FF 15 ?? ?? ?? ?? 84 C0 74 01 CC C7 83 ?? ?? ?? ?? ?? ?? ?? ?? 8B CB"));
-
-		ik_ctor(this);
+		((IKConstruct)bone_data.ik_construct)(this);
 	}
 
 	void Destructor()
 	{
 		using IKDestructor = void(__thiscall*)(CIKContext*);
-		static auto ik_dector = (IKDestructor)util::FindSignature(crypt_str("client.dll"), crypt_str("56 8B F1 57 8D 8E ?? ?? ?? ?? E8 ?? ?? ?? ?? 8D 8E ?? ?? ?? ?? E8 ?? ?? ?? ?? 83 BE ?? ?? ?? ?? ??"));
-
-		ik_dector(this);
+		((IKDestructor)bone_data.ik_destructor)(this);
 	}
 
 	void ClearTargets()
@@ -40,25 +65,19 @@ public:
 	void Init(CStudioHdr* hdr, Vector* angles, Vector* origin, float currentTime, int frames, int boneMask)
 	{
 		using Init_t = void(__thiscall*)(void*, CStudioHdr*, QAngle*, Vector*, float, int, int);
-
-		static auto ik_init = util::FindSignature(crypt_str("client.dll"), crypt_str("55 8B EC 83 EC 08 8B 45 08 56 57 8B F9 8D 8F"));
-		((Init_t)ik_init)(this, hdr, (QAngle*)angles, origin, currentTime, frames, boneMask);
+		((Init_t)bone_data.ik_init)(this, hdr, (QAngle*)angles, origin, currentTime, frames, boneMask);
 	}
 
 	void UpdateTargets(Vector* pos, Quaternion* qua, matrix3x4_t* matrix, uint8_t* boneComputed)
 	{
 		using UpdateTargets_t = void(__thiscall*)(void*, Vector*, Quaternion*, matrix3x4_t*, uint8_t*);
-
-		static auto ik_update_targets = util::FindSignature(crypt_str("client.dll"), crypt_str("55 8B EC 83 E4 F0 81 EC ?? ?? ?? ?? 33 D2"));
-		((UpdateTargets_t)ik_update_targets)(this, pos, qua, matrix, boneComputed);
+		((UpdateTargets_t)bone_data.ik_update_targets)(this, pos, qua, matrix, boneComputed);
 	}
 
 	void SolveDependencies(Vector* pos, Quaternion* qua, matrix3x4_t* matrix, uint8_t* boneComputed)
 	{
 		using SolveDependencies_t = void(__thiscall*)(void*, Vector*, Quaternion*, matrix3x4_t*, uint8_t*);
-
-		static auto ik_solve_dependencies = util::FindSignature(crypt_str("client.dll"), crypt_str("55 8B EC 83 E4 F0 81 EC ?? ?? ?? ?? 8B 81"));
-		((SolveDependencies_t)ik_solve_dependencies)(this, pos, qua, matrix, boneComputed);
+		((SolveDependencies_t)bone_data.ik_solve_dependencies)(this, pos, qua, matrix, boneComputed);
 	}
 };
 
@@ -71,7 +90,7 @@ struct CBoneSetup
 
 	void InitPose(Vector pos[], Quaternion q[], CStudioHdr* hdr)
 	{
-		static auto init_pose = util::FindSignature("client.dll", "55 8B EC 83 EC 10 53 8B D9 89 55 F8 56 57 89 5D F4 8B 0B 89 4D F0");
+		auto init_pose = bone_data.init_pose;
 
 		__asm
 		{
@@ -89,14 +108,12 @@ struct CBoneSetup
 	void AccumulatePose(Vector pos[], Quaternion q[], int sequence, float cycle, float flWeight, float flTime, CIKContext* pIKContext)
 	{
 		using AccumulatePoseFn = void(__thiscall*)(CBoneSetup*, Vector* a2, Quaternion* a3, int a4, float a5, float a6, float a7, CIKContext* a8);
-		static auto accumulate_pose = (AccumulatePoseFn)util::FindSignature(crypt_str("client.dll"), crypt_str("55 8B EC 83 E4 F0 B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? A1 ?? ?? ?? ??"));
-
-		return accumulate_pose(this, pos, q, sequence, cycle, flWeight, flTime, pIKContext);
+		return ((AccumulatePoseFn)bone_data.accumulate_pose)(this, pos, q, sequence, cycle, flWeight, flTime, pIKContext);
 	}
 
 	void CalcAutoplaySequences(Vector pos[], Quaternion q[], float flRealTime, CIKContext* pIKContext)
 	{
-		static auto calc_autoplay_sequences = util::FindSignature(crypt_str("client.dll"), crypt_str("55 8B EC 83 EC 10 53 56 57 8B 7D 10 8B D9 F3 0F 11 5D ??"));
+		auto calc_autoplay_sequences = bone_data.calc_autoplay_sequences;
 
 		__asm
 		{
@@ -112,7 +129,7 @@ struct CBoneSetup
 
 	void CalcBoneAdj(Vector pos[], Quaternion q[], float* controllers, int boneMask)
 	{
-		static auto calc_bone_adj = util::FindSignature(crypt_str("client.dll"), crypt_str("55 8B EC 83 E4 F8 81 EC ?? ?? ?? ?? 8B C1 89 54 24 04 89 44 24 2C 56 57 8B 00"));
+		auto calc_bone_adj = bone_data.calc_bone_adj;
 
 		__asm
 		{
@@ -131,8 +148,7 @@ struct CBoneSetup
 
 uintptr_t& GetBoneMerge(player_t* player)
 {
-	static auto bone_merge = util::FindSignature(crypt_str("client.dll"), crypt_str("89 86 ?? ?? ?? ?? E8 ?? ?? ?? ?? FF 75 08"));
-	return *(uintptr_t*)((uintptr_t)player + *(uintptr_t*)(bone_merge + 0x2));
+	return *(uintptr_t*)((uintptr_t)player + bone_data.bone_merge_offset);
 }
 
 struct mstudioposeparamdesc_t
@@ -153,9 +169,7 @@ struct mstudioposeparamdesc_t
 mstudioposeparamdesc_t* pPoseParameter(CStudioHdr* hdr, int index)
 {
 	using poseParametorFN = mstudioposeparamdesc_t * (__thiscall*)(CStudioHdr*, int);
-	static poseParametorFN pose_parameter = (poseParametorFN)util::FindSignature(crypt_str("client.dll"), crypt_str("55 8B EC 8B 45 08 57 8B F9 8B 4F 04 85 C9 75 15 8B"));
-
-	return pose_parameter(hdr, index);
+	return ((poseParametorFN)bone_data.pose_parameter)(hdr, index);
 }
 
 __forceinline uintptr_t rel32_fix(uintptr_t ptr)
@@ -166,8 +180,7 @@ __forceinline uintptr_t rel32_fix(uintptr_t ptr)
 
 void UpdateCache(uintptr_t bonemerge)
 {
-	static auto bone_merge_update_cache = (void(__thiscall*)(uintptr_t))rel32_fix(util::FindSignature(crypt_str("client.dll"), crypt_str("E8 ?? ?? ?? ?? 83 7E 10 00 74 64")));
-	bone_merge_update_cache(bonemerge);
+	((void(__thiscall*)(uintptr_t))bone_data.update_cache)(bonemerge);
 }
 
 float GetPoseParamValue(CStudioHdr* hdr, int index, float flValue)
@@ -230,13 +243,82 @@ void MergeMatchingPoseParams(uintptr_t bonemerge, float* poses, float* target_po
 	}
 }
 
+static uintptr_t resolve_signature(const char* pattern, bool& valid)
+{
+	auto address = (uintptr_t)util::FindSignature(crypt_str("client.dll"), pattern);
+
+	if (!address)
+		valid = false;
+
+	return address;
+}
+
+static bool resolve_bone_setup()
+{
+	auto valid = true;
+
+	bone_data.ik_construct = resolve_signature(crypt_str("53 8B D9 F6 C3 03 74 0B FF 15 ?? ?? ?? ?? 84 C0 74 01 CC C7 83 ?? ?? ?? ?? ?? ?? ?? ?? 8B CB"), valid);
+	bone_data.ik_destructor = resolve_signature(crypt_str("56 8B F1 57 8D 8E ?? ?? ?? ?? E8 ?? ?? ?? ?? 8D 8E ?? ?? ?? ?? E8 ?? ?? ?? ?? 83 BE ?? ?? ?? ?? ??"), valid);
+	bone_data.ik_init = resolve_signature(crypt_str("55 8B EC 83 EC 08 8B 45 08 56 57 8B F9 8D 8F"), valid);
+	bone_data.ik_update_targets = resolve_signature(crypt_str("55 8B EC 83 E4 F0 81 EC ?? ?? ?? ?? 33 D2"), valid);
+	bone_data.ik_solve_dependencies = resolve_signature(crypt_str("55 8B EC 83 E4 F0 81 EC ?? ?? ?? ?? 8B 81"), valid);
+	bone_data.ik_add_dependencies = resolve_signature(crypt_str("55 8B EC 81 EC BC 00 00 00 53 56 57"), valid);
+	bone_data.init_pose = resolve_signature(crypt_str("55 8B EC 83 EC 10 53 8B D9 89 55 F8 56 57 89 5D F4 8B 0B 89 4D F0"), valid);
+	bone_data.accumulate_pose = resolve_signature(crypt_str("55 8B EC 83 E4 F0 B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? A1 ?? ?? ?? ??"), valid);
+	bone_data.calc_autoplay_sequences = resolve_signature(crypt_str("55 8B EC 83 EC 10 53 56 57 8B 7D 10 8B D9 F3 0F 11 5D ??"), valid);
+	bone_data.calc_bone_adj = resolve_signature(crypt_str("55 8B EC 83 E4 F8 81 EC ?? ?? ?? ?? 8B C1 89 54 24 04 89 44 24 2C 56 57 8B 00"), valid);
+	bone_data.pose_parameter = resolve_signature(crypt_str("55 8B EC 8B 45 08 57 8B F9 8B 4F 04 85 C9 75 15 8B"), valid);
+	bone_data.attachment = resolve_signature(crypt_str("55 8B EC 83 EC 48 53 8B 5D 08 89 4D F4"), valid);
+
+	auto update_cache = resolve_signature(crypt_str("E8 ?? ?? ?? ?? 83 7E 10 00 74 64"), valid);
+	auto copy_to_follow = resolve_signature(crypt_str("E8 ?? ?? ?? ?? 8B 87 ?? ?? ?? ?? 8D 8C 24 ?? ?? ?? ?? 8B 7C 24 18"), valid);
+	auto copy_from_follow = resolve_signature(crypt_str("E8 ?? ?? ?? ?? F3 0F 10 45 ?? 8D 84 24 ?? ?? ?? ??"), valid);
+
+	auto ik_reference = resolve_signature(crypt_str("8B 8F ?? ?? ?? ?? 89 4C 24 1C"), valid);
+	auto bone_merge_reference = resolve_signature(crypt_str("89 86 ?? ?? ?? ?? E8 ?? ?? ?? ?? FF 75 08"), valid);
+	auto bone_cache_reference = resolve_signature(crypt_str("80 3D ?? ?? ?? ?? ?? 74 16 A1 ?? ?? ?? ?? 48 C7 81"), valid);
+	auto custom_player_reference = resolve_signature(crypt_str("80 BF ?? ?? ?? ?? ?? 0F 84 ?? ?? ?? ?? 83 BF ?? ?? ?? ?? ?? 74 7C"), valid);
+
+	if (!valid)
+		return false;
+
+	bone_data.update_cache = rel32_fix(update_cache);
+	bone_data.copy_to_follow = rel32_fix(copy_to_follow);
+	bone_data.copy_from_follow = rel32_fix(copy_from_follow);
+
+	bone_data.ik_offset = *(uintptr_t*)(ik_reference + 0x2) + 0x4;
+	bone_data.bone_merge_offset = *(uintptr_t*)(bone_merge_reference + 0x2);
+	bone_data.model_bone_counter = *(uintptr_t*)(bone_cache_reference + 0xA);
+	bone_data.custom_player = *(int*)(custom_player_reference + 0x2);
+
+	return bone_data.ik_offset && bone_data.bone_merge_offset && bone_data.model_bone_counter && bone_data.custom_player;
+}
+
+bool setup_bones_available()
+{
+	static auto resolved = resolve_bone_setup();
+
+	if (!resolved)
+		return false;
+
+	if (!bone_data.sequence)
+		bone_data.sequence = netvars::get().get_offset(crypt_str("CCSPlayer"), crypt_str("m_nSequence"));
+
+	if (!bone_data.cycle)
+		bone_data.cycle = netvars::get().get_offset(crypt_str("CCSPlayer"), crypt_str("m_flCycle"));
+
+	if (!bone_data.controllers)
+		bone_data.controllers = netvars::get().get_offset(crypt_str("CCSPlayer"), crypt_str("m_flEncodedController"));
+
+	if (!bone_data.poses)
+		bone_data.poses = netvars::get().get_offset(crypt_str("CCSPlayer"), crypt_str("m_flPoseParameter"));
+
+	return bone_data.sequence && bone_data.cycle && bone_data.controllers && bone_data.poses;
+}
+
 void CSetupBones::setup()
 {
-	static auto ik = util::FindSignature(crypt_str("client.dll"), crypt_str("8B 8F ?? ?? ?? ?? 89 4C 24 1C"));
-	static auto m_pIk = *(CIKContext**)((uintptr_t)m_animating + 0x99C);
-
-	if (!m_bShouldDoIK)
-		m_pIk = nullptr;
+	auto m_pIk = m_bShouldDoIK ? *(CIKContext**)((uintptr_t)m_animating + bone_data.ik_offset) : nullptr;
 
 	m_pHdr = m_animating->m_pStudioHdr();
 
@@ -270,22 +352,20 @@ void CSetupBones::setup()
 	if (m_boneMask & BONE_USED_BY_ATTACHMENT && m_bShouldAttachment)
 		attachment_helper();
 
+	if (!m_bShouldWriteCache)
+		return;
+
 	m_animating->m_flLastBoneSetupTime() = m_flCurtime;
 
 	m_animating->m_BoneAccessor().m_ReadableBones |= m_boneMask;
 	m_animating->m_BoneAccessor().m_WritableBones |= m_boneMask;
 
-	static auto invalidate_bone_cache = util::FindSignature(crypt_str("client.dll"), crypt_str("80 3D ?? ?? ?? ?? ?? 74 16 A1 ?? ?? ?? ?? 48 C7 81"));
-	static auto model_bone_counter = *(uintptr_t*)(invalidate_bone_cache + 0xA);
-
-	m_animating->m_iMostRecentModelBoneCounter() = *(uint32_t*)model_bone_counter;
+	m_animating->m_iMostRecentModelBoneCounter() = *(uint32_t*)bone_data.model_bone_counter;
 }
 
 bool CanBeAnimated(player_t* player)
 {
-	static auto custom_player = *(int*)(util::FindSignature(crypt_str("client.dll"), crypt_str("80 BF ?? ?? ?? ?? ?? 0F 84 ?? ?? ?? ?? 83 BF ?? ?? ?? ?? ?? 74 7C")) + 2);
-
-	if (!*(bool*)((uintptr_t)player + custom_player) || !player->get_animation_state())
+	if (!*(bool*)((uintptr_t)player + bone_data.custom_player) || !player->get_animation_state())
 		return false;
 
 	auto weapon = player->m_hActiveWeapon().Get();
@@ -306,11 +386,7 @@ void CSetupBones::get_skeleton()
 	alignas(16) Vector position[256];
 	alignas(16) Quaternion rotation[256];
 
-	static auto ik = util::FindSignature(crypt_str("client.dll"), crypt_str("8B 8F ?? ?? ?? ?? 89 4C 24 1C"));
-	static auto m_pIk = *(CIKContext**)((uintptr_t)m_animating + *(uintptr_t*)(ik + 0x2) + 0x4);
-
-	if (!m_bShouldDoIK)
-		m_pIk = nullptr;
+	auto m_pIk = m_bShouldDoIK ? *(CIKContext**)((uintptr_t)m_animating + bone_data.ik_offset) : nullptr;
 
 	alignas(16) char buffer[32];
 	alignas(16) auto bone_setup = (CBoneSetup*)&buffer;
@@ -320,106 +396,116 @@ void CSetupBones::get_skeleton()
 	bone_setup->m_flPoseParameter = m_flPoseParameters;
 	bone_setup->m_pPoseDebugger = nullptr;
 
+	auto studio_hdr = *(studiohdr_t**)m_pHdr;
+
+	auto sequence = *(int*)((uintptr_t)m_animating + bone_data.sequence);
+	auto cycle = *(float*)((uintptr_t)m_animating + bone_data.cycle);
+
 	bone_setup->InitPose(m_vecBones, m_quatBones, m_pHdr);
-	bone_setup->AccumulatePose(m_vecBones, m_quatBones, *(int*)((uintptr_t)m_animating + 0x28BC), *(float*)((uintptr_t)m_animating + 0xA14), 1.0f, m_flCurtime, m_pIk);
 
-	int layer[13] =
-	{
-		m_nAnimOverlayCount
-	};
+	if (sequence >= 0 && sequence < studio_hdr->numlocalseq)
+		bone_setup->AccumulatePose(m_vecBones, m_quatBones, sequence, cycle, 1.0f, m_flCurtime, m_pIk);
 
-	for (auto i = 0; i < m_nAnimOverlayCount; ++i)
+	auto overlay_count = min(m_nAnimOverlayCount, 13);
+
+	int layer[13];
+
+	for (auto i = 0; i < 13; ++i)
+		layer[i] = -1;
+
+	for (auto i = 0; i < overlay_count; ++i)
 	{
 		auto& final_layer = m_animLayers[i];
 
-		if (final_layer.m_flWeight > 0.0f && final_layer.m_nOrder != 13 && final_layer.m_nOrder >= 0 && final_layer.m_nOrder < m_nAnimOverlayCount)
+		if (final_layer.m_flWeight > 0.0f && final_layer.m_nOrder < (uint32_t)overlay_count)
 			layer[final_layer.m_nOrder] = i;
 	}
 
-	static auto copy_to_follow = rel32_fix(util::FindSignature(crypt_str("client.dll"), crypt_str("E8 ?? ?? ?? ?? 8B 87 ?? ?? ?? ?? 8D 8C 24 ?? ?? ?? ?? 8B 7C 24 18")));
-	static auto bone_merge_copy_to_follow = (void(__thiscall*)(uintptr_t, Vector*, Quaternion*, int, Vector*, Quaternion*))copy_to_follow;
-
-	static auto copy_from_follow = rel32_fix(util::FindSignature(crypt_str("client.dll"), crypt_str("E8 ?? ?? ?? ?? F3 0F 10 45 ?? 8D 84 24 ?? ?? ?? ??")));
-	static auto bone_merge_copy_from_follow = (void(__thiscall*)(uintptr_t, Vector*, Quaternion*, int, Vector*, Quaternion*))copy_from_follow;
+	auto bone_merge_copy_to_follow = (void(__thiscall*)(uintptr_t, Vector*, Quaternion*, int, Vector*, Quaternion*))bone_data.copy_to_follow;
+	auto bone_merge_copy_from_follow = (void(__thiscall*)(uintptr_t, Vector*, Quaternion*, int, Vector*, Quaternion*))bone_data.copy_from_follow;
 
 	char tmp_buffer[4208];
 	auto world_ik = (CIKContext*)tmp_buffer;
 
+	alignas(16) char buffer2[32];
+	alignas(16) auto world_setup = (CBoneSetup*)&buffer2;
+
+	uintptr_t bone_merge = 0;
+	CStudioHdr* world_hdr = nullptr;
+	studiohdr_t* world_studio_hdr = nullptr;
+
 	auto weapon = m_animating->m_hActiveWeapon().Get();
 
-	if (CanBeAnimated(m_animating) && weapon)
+	if (weapon && CanBeAnimated(m_animating))
 	{
 		auto weaponWorldModel = (player_t*)weapon->m_hWeaponWorldModel().Get();
 
 		if (weaponWorldModel)
 		{
-			auto bone_merge = GetBoneMerge(weaponWorldModel);
+			auto merge = GetBoneMerge(weaponWorldModel);
 
-			if (bone_merge)
+			if (merge)
 			{
-				MergeMatchingPoseParams(bone_merge, m_flWorldPoses, m_flPoseParameters);
-				auto world_hdr = weaponWorldModel->m_pStudioHdr();
+				world_hdr = weaponWorldModel->m_pStudioHdr();
+				world_studio_hdr = world_hdr ? *(studiohdr_t**)world_hdr : nullptr;
 
-				world_ik->Construct();
-				world_ik->Init(world_hdr, &m_angAngles, &m_vecOrigin, m_flCurtime, 0, BONE_USED_BY_BONE_MERGE);
-
-				alignas(16) char buffer2[32];
-				alignas(16) auto world_setup = (CBoneSetup*)&buffer2;
-
-				world_setup->m_pStudioHdr = world_hdr;
-				world_setup->m_boneMask = BONE_USED_BY_BONE_MERGE;
-				world_setup->m_flPoseParameter = m_flWorldPoses;
-				world_setup->m_pPoseDebugger = nullptr;
-
-				world_setup->InitPose(position, rotation, world_hdr);
-
-				for (auto i = 0; i < m_nAnimOverlayCount; ++i)
+				if (world_studio_hdr)
 				{
-					auto layer = &m_animLayers[i];
+					bone_merge = merge;
 
-					if (layer && layer->m_nSequence > 1 && layer->m_flWeight > 0.0f)
-					{
-						if (m_bShouldDispatch && m_animating == g_ctx.local())
-						{
-							using UpdateDispatchLayer = void(__thiscall*)(void*, AnimationLayer*, CStudioHdr*, int);
-							call_virtual <UpdateDispatchLayer>(m_animating, 246)(m_animating, layer, world_hdr, layer->m_nSequence);
-						}
+					MergeMatchingPoseParams(bone_merge, m_flWorldPoses, m_flPoseParameters);
 
-						if (!m_bShouldDispatch || layer->m_nDispatchSequence_2 <= 0 || layer->m_nDispatchSequence_2 >= (*(studiohdr_t**)world_hdr)->numlocalseq)
-							bone_setup->AccumulatePose(m_vecBones, m_quatBones, layer->m_nSequence, layer->m_flCycle, layer->m_flWeight, m_flCurtime, m_pIk);
-						else if (m_bShouldDispatch)
-						{
-							bone_merge_copy_from_follow(bone_merge, m_vecBones, m_quatBones, BONE_USED_BY_BONE_MERGE, position, rotation);
+					world_ik->Construct();
+					world_ik->Init(world_hdr, &m_angAngles, &m_vecOrigin, m_flCurtime, 0, BONE_USED_BY_BONE_MERGE);
 
-							using oIKAddDependencies = void(__thiscall*)(CIKContext*, float, int, int, float, float);
-							static auto add_dependencies = util::FindSignature(crypt_str("client.dll"), crypt_str("55 8B EC 81 EC BC 00 00 00 53 56 57"));
+					world_setup->m_pStudioHdr = world_hdr;
+					world_setup->m_boneMask = BONE_USED_BY_BONE_MERGE;
+					world_setup->m_flPoseParameter = m_flWorldPoses;
+					world_setup->m_pPoseDebugger = nullptr;
 
-							if (m_pIk)
-								(oIKAddDependencies(add_dependencies) (m_pIk, *(float*)((uintptr_t)m_animating + 0xA14), layer->m_nSequence, layer->m_flCycle, bone_setup->m_flPoseParameter[2], layer->m_flWeight));
-
-							world_setup->AccumulatePose(position, rotation, layer->m_nDispatchSequence_2, layer->m_flCycle, layer->m_flWeight, m_flCurtime, world_ik);
-							bone_merge_copy_to_follow(bone_merge, position, rotation, BONE_USED_BY_BONE_MERGE, m_vecBones, m_quatBones);
-						}
-					}
+					world_setup->InitPose(position, rotation, world_hdr);
 				}
-
-				world_ik->Destructor();
 			}
 		}
 	}
-	else
+
+	for (auto i = 0; i < overlay_count; ++i)
 	{
-		for (auto i = 0; i < m_nAnimOverlayCount; ++i)
-		{
-			auto layer_count = layer[i];
+		auto index = layer[i];
 
-			if (layer_count >= 0 && layer_count < m_nAnimOverlayCount)
+		if (index < 0)
+			continue;
+
+		auto final_layer = &m_animLayers[index];
+
+		if (final_layer->m_flWeight <= 0.0f || !final_layer->m_nSequence || final_layer->m_nSequence >= (uint32_t)studio_hdr->numlocalseq)
+			continue;
+
+		if (bone_merge && m_bShouldDispatch && m_animating == g_ctx.local())
+		{
+			using UpdateDispatchLayer = void(__thiscall*)(void*, AnimationLayer*, CStudioHdr*, int);
+			call_virtual <UpdateDispatchLayer>(m_animating, 246)(m_animating, final_layer, world_hdr, final_layer->m_nSequence);
+		}
+
+		if (!bone_merge || !m_bShouldDispatch || final_layer->m_nDispatchSequence_2 <= 0 || final_layer->m_nDispatchSequence_2 >= world_studio_hdr->numlocalseq)
+			bone_setup->AccumulatePose(m_vecBones, m_quatBones, final_layer->m_nSequence, final_layer->m_flCycle, final_layer->m_flWeight, m_flCurtime, m_pIk);
+		else
+		{
+			bone_merge_copy_from_follow(bone_merge, m_vecBones, m_quatBones, BONE_USED_BY_BONE_MERGE, position, rotation);
+
+			if (m_pIk)
 			{
-				auto final_layer = &m_animLayers[i];
-				bone_setup->AccumulatePose(position, rotation, final_layer->m_nSequence, final_layer->m_flCycle, final_layer->m_flWeight, m_flCurtime, m_pIk);
+				using oIKAddDependencies = void(__thiscall*)(CIKContext*, float, int, int, float, float);
+				(oIKAddDependencies(bone_data.ik_add_dependencies) (m_pIk, cycle, final_layer->m_nSequence, final_layer->m_flCycle, bone_setup->m_flPoseParameter[2], final_layer->m_flWeight));
 			}
+
+			world_setup->AccumulatePose(position, rotation, final_layer->m_nDispatchSequence_2, final_layer->m_flCycle, final_layer->m_flWeight, m_flCurtime, world_ik);
+			bone_merge_copy_to_follow(bone_merge, position, rotation, BONE_USED_BY_BONE_MERGE, m_vecBones, m_quatBones);
 		}
 	}
+
+	if (bone_merge)
+		world_ik->Destructor();
 
 	if (m_pIk)
 	{
@@ -431,7 +517,7 @@ void CSetupBones::get_skeleton()
 	else
 		bone_setup->CalcAutoplaySequences(m_vecBones, m_quatBones, m_flCurtime, nullptr);
 
-	bone_setup->CalcBoneAdj(m_vecBones, m_quatBones, (float*)((uintptr_t)m_animating + 0xA54), m_boneMask);
+	bone_setup->CalcBoneAdj(m_vecBones, m_quatBones, (float*)((uintptr_t)m_animating + bone_data.controllers), m_boneMask);
 }
 
 void CSetupBones::studio_build_matrices(CStudioHdr* hdr, const matrix3x4_t& rotationmatrix, Vector* pos, Quaternion* q, int boneMask, matrix3x4_t* bonetoworld, uint32_t* boneComputed)
@@ -494,10 +580,7 @@ void CSetupBones::studio_build_matrices(CStudioHdr* hdr, const matrix3x4_t& rota
 void CSetupBones::attachment_helper()
 {
 	using AttachmentHelperFn = void(__thiscall*)(player_t*, CStudioHdr*);
-	static auto m_AttachmentHelper = util::FindSignature(crypt_str("client.dll"), crypt_str("55 8B EC 83 EC 48 53 8B 5D 08 89 4D F4"));
-
-	static auto attachment = (AttachmentHelperFn)m_AttachmentHelper;
-	attachment(m_animating, m_pHdr);
+	((AttachmentHelperFn)bone_data.attachment)(m_animating, m_pHdr);
 }
 
 void CSetupBones::fix_bones_rotations()
@@ -526,4 +609,53 @@ void CSetupBones::fix_bones_rotations()
 			}
 		}
 	}
+}
+
+bool setup_bones_riptide(player_t* player, matrix3x4_t* matrix, int mask, float curtime)
+{
+	if (!player || !matrix || !setup_bones_available())
+		return false;
+
+	auto hdr = player->m_pStudioHdr();
+
+	if (!hdr || !*(studiohdr_t**)hdr)
+		return false;
+
+	auto layers = player->get_animlayers();
+
+	if (!layers)
+		return false;
+
+	alignas(16) Vector position[256];
+	alignas(16) Quaternion rotation[256];
+
+	CSetupBones bones;
+
+	bones.m_animating = player;
+	bones.m_boneMatrix = matrix;
+	bones.m_pHdr = hdr;
+	bones.m_vecBones = position;
+	bones.m_quatBones = rotation;
+	bones.m_vecOrigin = player->GetRenderOrigin();
+	bones.m_angAngles = player->GetRenderAngles();
+	bones.m_bShouldDoIK = false;
+	bones.m_bShouldAttachment = (mask & BONE_USED_BY_ATTACHMENT) != 0;
+	bones.m_bShouldDispatch = true;
+	bones.m_bShouldWriteCache = false;
+	bones.m_boneMask = mask;
+	bones.m_nAnimOverlayCount = player->animlayer_count();
+	bones.m_animLayers = layers;
+	bones.m_flCurtime = curtime;
+
+	auto poses = (float*)((uintptr_t)player + bone_data.poses);
+
+	for (auto i = 0; i < 24; ++i)
+	{
+		bones.m_flPoseParameters[i] = poses[i];
+		bones.m_flWorldPoses[i] = 0.0f;
+	}
+
+	bones.setup();
+
+	return true;
 }

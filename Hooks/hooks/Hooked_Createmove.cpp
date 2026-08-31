@@ -78,9 +78,14 @@ void __stdcall hooks::hooked_createmove(int sequence_number, float input_sample_
 	{
 		m_pcmd->m_buttons &= ~IN_ATTACK;
 		m_pcmd->m_buttons &= ~IN_ATTACK2;
-	}
 
-	if (g_ctx.globals.ticks_allowed < 16 && (misc::get().double_tap_enabled && misc::get().double_tap_key || misc::get().hide_shots_enabled && misc::get().hide_shots_key))
+		if (++g_ctx.globals.ticks_allowed >= 16)
+		{
+			g_ctx.globals.ticks_allowed = 16;
+			g_ctx.globals.should_recharge = false;
+		}
+	}
+	else if (g_ctx.globals.ticks_allowed < 16 && (misc::get().double_tap_enabled && misc::get().double_tap_key || misc::get().hide_shots_enabled && misc::get().hide_shots_key))
 		g_ctx.globals.should_recharge = true;
 
 	g_ctx.globals.backup_tickbase = g_ctx.local()->m_nTickBase();
@@ -382,21 +387,18 @@ void __stdcall hooks::hooked_createmove(int sequence_number, float input_sample_
 			const float spawn_time = g_ctx.local()->m_flSpawnTime();
 			const float cur_time = m_globals()->m_curtime;
 
-			// wait at least ~0.25s after spawn before attempting to buy
 			if (cur_time - spawn_time >= 0.25f)
 			{
 				--g_ctx.globals.should_buy;
 
 				if (!g_ctx.globals.should_buy)
 				{
-					// extra safety: ensure weapon system appears responsive before issuing buys
 					auto active = g_ctx.local()->m_hActiveWeapon().Get();
 					if (active)
 					{
 						auto info = active->get_csweapon_info();
 						if (!info)
 						{
-							// postpone by a few ticks if weapon scripts are not ready yet
 							g_ctx.globals.should_buy = 2;
 							return;
 						}
@@ -407,7 +409,6 @@ void __stdcall hooks::hooked_createmove(int sequence_number, float input_sample_
 					switch (cfg.misc.buybot1)
 					{
 					case 1:
-						// team-correct auto sniper
 						if (g_ctx.local()->m_iTeamNum() == 3)
 							buy += crypt_str("buy scar20; ");
 						else

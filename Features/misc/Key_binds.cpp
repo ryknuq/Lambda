@@ -105,7 +105,12 @@ void key_binds::update_key_binds()
 
 bool key_binds::get_key_bind_state(int key_bind_id)
 {
-	return keys[key_bind_id];
+	auto key = keys.find(key_bind_id);
+
+	if (key == keys.end())
+		return false;
+
+	return key->second;
 }
 
 bool key_binds::get_key_bind_state_lua(int key_bind_id)
@@ -121,7 +126,7 @@ bool key_binds::get_key_bind_state_lua(int key_bind_id)
 		if (g_ctx.globals.current_weapon < 0)
 			return false;
 
-		return keys[4 + g_ctx.globals.current_weapon];
+		return get_key_bind_state(4 + g_ctx.globals.current_weapon);
 	case 12:
 		return misc::get().hide_shots_key;
 	case 13:
@@ -131,11 +136,16 @@ bool key_binds::get_key_bind_state_lua(int key_bind_id)
 	case 15:
 		return antiaim::get().manual_side == SIDE_RIGHT;
 	default:
-		return keys[key_bind_id];
+		return get_key_bind_state(key_bind_id);
 	}
 }
 
 bool key_binds::get_key_bind_mode(int key_bind_id)
 {
-	return mode[key_bind_id];
+	auto found = mode.find(key_bind_id);
+
+	if (found == mode.end())
+		return HOLD_ON;
+
+	return found->second;
 }

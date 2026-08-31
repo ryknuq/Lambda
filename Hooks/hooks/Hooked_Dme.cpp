@@ -30,9 +30,17 @@ IMaterial* CreateMaterial(bool lit, const std::string& material_data)
 
 using DrawModelExecute_t = void(__thiscall*)(IVModelRender*, IMatRenderContext*, const DrawModelState_t&, const ModelRenderInfo_t&, matrix3x4_t*);
 
-void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t& state, const ModelRenderInfo_t& info, matrix3x4_t* bone_to_world)
+static bool render_state_dirty = false;
+
+static void set_blend(float blend)
 {
-	static auto original_fn = modelrender_hook->get_func_address <DrawModelExecute_t>(21);
+	render_state_dirty = true;
+	m_renderview()->SetBlend(blend);
+}
+
+static void draw_model_chams(IMatRenderContext* ctx, const DrawModelState_t& state, const ModelRenderInfo_t& info, matrix3x4_t* bone_to_world)
+{
+	static auto original_fn = hooks::modelrender_hook->get_func_address <DrawModelExecute_t>(21);
 
 	if (!cfg.player.enable || !info.pModel || !info.pRenderable)
 		return original_fn(m_modelrender(), ctx, state, info, bone_to_world);
@@ -40,11 +48,9 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 	auto model_entity = static_cast<player_t*>(m_entitylist()->GetClientEntity(info.entity_index));
 	auto name = m_modelinfo()->GetModelName(info.pModel);
 
-	// Bugfix: Exclude shadows from Chams
 	if (strstr(name, "shadow"))
 		return original_fn(m_modelrender(), ctx, state, info, bone_to_world);
 
-	// Optimization: Faster model identification
 	bool is_player = false;
 	if (info.entity_index >= 1 && info.entity_index <= m_globals()->m_maxclients) {
 		if (model_entity && model_entity->is_alive() && (cfg.player.type[ENEMY].chams[PLAYER_CHAMS_VISIBLE] || cfg.player.type[TEAM].chams[PLAYER_CHAMS_VISIBLE] || cfg.player.type[LOCAL].chams[PLAYER_CHAMS_VISIBLE] || cfg.player.fake_chams_enable || cfg.player.backtrack_chams))
@@ -56,16 +62,15 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 	bool weapon_enemy_hands = false;
 	bool defuse_kit = false;
 
-	// Only do string searches if it's NOT a player
 	if (!is_player) {
-		if (name[7] == 'w' && name[8] == 'e') { // weapons/
+		if (name[7] == 'w' && name[8] == 'e') {
 			if (name[15] == 'v' && name[16] == '_' && cfg.esp.weapon_chams) is_weapon = true;
 			else if (strstr(name, "models/weapons/w") && cfg.esp.attachment_chams) {
 				if (strstr(name, "_dropped.mdl")) weapon_on_back = true;
 				else weapon_enemy_hands = true;
 			}
 		}
-		else if (name[7] == 'd' && name[8] == 'e' && cfg.esp.attachment_chams) { // defuser
+		else if (name[7] == 'd' && name[8] == 'e' && cfg.esp.attachment_chams) {
 			if (strstr(name, "defuser")) defuse_kit = true;
 		}
 	}
@@ -219,7 +224,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 									cfg.player.backtrack_chams_color[2] / 255.0f
 								};
 
-								m_renderview()->SetBlend(alpha * alpha_modifier);
+								set_blend(alpha * alpha_modifier);
 								util::color_modulate(backtrack_color, backtrack_material);
 
 								backtrack_material->IncrementReferenceCount(); 
@@ -241,7 +246,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 						cfg.player.type[ENEMY].xqz_color[2] / 255.0f
 					};
 
-					m_renderview()->SetBlend(alpha * alpha_modifier); 
+					set_blend(alpha * alpha_modifier); 
 					util::color_modulate(xqz_color, material);
 
 					material->IncrementReferenceCount();
@@ -260,7 +265,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 						cfg.player.type[ENEMY].chams_color[2] / 255.0f
 					};
 
-					m_renderview()->SetBlend(alpha * alpha_modifier);
+					set_blend(alpha * alpha_modifier);
 					util::color_modulate(normal_color, material);
 
 					material->IncrementReferenceCount();
@@ -285,7 +290,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 								cfg.player.type[ENEMY].animated_material_color[2] / 255.0f
 							};
 
-							m_renderview()->SetBlend(alpha * alpha_modifier);
+							set_blend(alpha * alpha_modifier);
 							util::color_modulate(animated_color, animated_material);
 
 							animated_material->IncrementReferenceCount();
@@ -308,7 +313,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 							cfg.player.type[ENEMY].double_material_color[2] / 255.0f
 						};
 
-						m_renderview()->SetBlend(alpha * alpha_modifier);
+						set_blend(alpha * alpha_modifier);
 						util::color_modulate(double_color, double_material);
 
 						double_material->IncrementReferenceCount();
@@ -342,7 +347,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 									cfg.player.backtrack_chams_color[2] / 255.0f
 								};
 
-								m_renderview()->SetBlend(alpha * alpha_modifier);
+								set_blend(alpha * alpha_modifier);
 								util::color_modulate(backtrack_color, backtrack_material);
 
 								backtrack_material->IncrementReferenceCount();
@@ -364,7 +369,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 						cfg.player.type[ENEMY].chams_color[2] / 255.0f
 					};
 
-					m_renderview()->SetBlend(alpha * alpha_modifier);
+					set_blend(alpha * alpha_modifier);
 					util::color_modulate(normal_color, material);
 
 					material->IncrementReferenceCount();
@@ -389,7 +394,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 								cfg.player.type[ENEMY].animated_material_color[2] / 255.0f
 							};
 
-							m_renderview()->SetBlend(alpha * alpha_modifier);
+							set_blend(alpha * alpha_modifier);
 							util::color_modulate(animated_color, animated_material);
 
 							animated_material->IncrementReferenceCount();
@@ -412,7 +417,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 							cfg.player.type[ENEMY].double_material_color[2] / 255.0f
 						};
 
-						m_renderview()->SetBlend(alpha * alpha_modifier);
+						set_blend(alpha * alpha_modifier);
 						util::color_modulate(double_color, double_material);
 
 						double_material->IncrementReferenceCount();
@@ -448,7 +453,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 						cfg.player.type[TEAM].xqz_color[2] / 255.0f
 					};
 
-					m_renderview()->SetBlend(alpha);
+					set_blend(alpha);
 					util::color_modulate(xqz_color, material);
 
 					material->IncrementReferenceCount();
@@ -467,7 +472,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 						cfg.player.type[TEAM].chams_color[2] / 255.0f
 					};
 
-					m_renderview()->SetBlend(alpha);
+					set_blend(alpha);
 					util::color_modulate(normal_color, material);
 
 					material->IncrementReferenceCount();
@@ -492,7 +497,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 								cfg.player.type[TEAM].animated_material_color[2] / 255.0f
 							};
 
-							m_renderview()->SetBlend(alpha);
+							set_blend(alpha);
 							util::color_modulate(animated_color, animated_material);
 
 							animated_material->IncrementReferenceCount();
@@ -515,7 +520,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 							cfg.player.type[TEAM].double_material_color[2] / 255.0f
 						};
 
-						m_renderview()->SetBlend(alpha);
+						set_blend(alpha);
 						util::color_modulate(double_color, double_material);
 
 						double_material->IncrementReferenceCount();
@@ -539,7 +544,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 						cfg.player.type[TEAM].chams_color[2] / 255.0f
 					};
 
-					m_renderview()->SetBlend(alpha);
+					set_blend(alpha);
 					util::color_modulate(normal_color, material);
 
 					material->IncrementReferenceCount();
@@ -564,7 +569,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 								cfg.player.type[TEAM].animated_material_color[2] / 255.0f
 							};
 
-							m_renderview()->SetBlend(alpha);
+							set_blend(alpha);
 							util::color_modulate(animated_color, animated_material);
 
 							animated_material->IncrementReferenceCount();
@@ -587,7 +592,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 							cfg.player.type[TEAM].double_material_color[2] / 255.0f
 						};
 
-						m_renderview()->SetBlend(alpha);
+						set_blend(alpha);
 						util::color_modulate(double_color, double_material);
 
 						double_material->IncrementReferenceCount();
@@ -628,7 +633,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 						cfg.player.type[LOCAL].xqz_color[2] / 255.0f
 					};
 
-					m_renderview()->SetBlend(alpha);
+					set_blend(alpha);
 					util::color_modulate(xqz_color, material);
 
 					material->IncrementReferenceCount();
@@ -647,7 +652,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 						cfg.player.type[LOCAL].chams_color[2] / 255.0f
 					};
 
-					m_renderview()->SetBlend(alpha);
+					set_blend(alpha);
 					util::color_modulate(normal_color, material);
 
 					material->IncrementReferenceCount();
@@ -672,7 +677,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 								cfg.player.type[LOCAL].animated_material_color[2] / 255.0f
 							};
 
-							m_renderview()->SetBlend(alpha);
+							set_blend(alpha);
 							util::color_modulate(animated_color, animated_material);
 
 							animated_material->IncrementReferenceCount();
@@ -695,7 +700,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 							cfg.player.type[LOCAL].double_material_color[2] / 255.0f
 						};
 
-						m_renderview()->SetBlend(alpha);
+						set_blend(alpha);
 						util::color_modulate(double_color, double_material);
 
 						double_material->IncrementReferenceCount();
@@ -719,7 +724,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 						cfg.player.type[LOCAL].chams_color[2] / 255.0f
 					};
 
-					m_renderview()->SetBlend(alpha);
+					set_blend(alpha);
 					util::color_modulate(normal_color, material);
 
 					material->IncrementReferenceCount();
@@ -744,7 +749,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 								cfg.player.type[LOCAL].animated_material_color[2] / 255.0f
 							};
 
-							m_renderview()->SetBlend(alpha);
+							set_blend(alpha);
 							util::color_modulate(animated_color, animated_material);
 
 							animated_material->IncrementReferenceCount();
@@ -767,7 +772,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 							cfg.player.type[LOCAL].double_material_color[2] / 255.0f
 						};
 
-						m_renderview()->SetBlend(alpha);
+						set_blend(alpha);
 						util::color_modulate(double_color, double_material);
 
 						double_material->IncrementReferenceCount();
@@ -784,7 +789,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 
 			if (!called_original && cfg.player.layered)
 			{
-				m_renderview()->SetBlend(alpha_modifier);
+				set_blend(alpha_modifier);
 				m_renderview()->SetColorModulation(1.0f, 1.0f, 1.0f);
 
 				original_fn(m_modelrender(), ctx, state, info, bone_to_world);
@@ -812,7 +817,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 					cfg.player.fake_chams_color[2] / 255.0f
 				};
 
-				m_renderview()->SetBlend(alpha);
+				set_blend(alpha);
 				util::color_modulate(fake_color, material);
 
 				material->IncrementReferenceCount();
@@ -837,7 +842,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 							cfg.player.fake_animated_material_color[2] / 255.0f
 						};
 
-						m_renderview()->SetBlend(alpha);
+						set_blend(alpha);
 						util::color_modulate(animated_color, animated_material);
 
 						animated_material->IncrementReferenceCount();
@@ -860,7 +865,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 						cfg.player.fake_double_material_color[2] / 255.0f
 					};
 
-					m_renderview()->SetBlend(alpha);
+					set_blend(alpha);
 					util::color_modulate(double_color, double_material);
 
 					double_material->IncrementReferenceCount();
@@ -884,7 +889,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 
 			if (!called_original && !cfg.player.layered)
 			{
-				m_renderview()->SetBlend(alpha_modifier);
+				set_blend(alpha_modifier);
 				m_renderview()->SetColorModulation(1.0f, 1.0f, 1.0f);
 
 				original_fn(m_modelrender(), ctx, state, info, bone_to_world);
@@ -907,7 +912,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 				cfg.esp.weapon_chams_color[2] / 255.0f
 			};
 
-			m_renderview()->SetBlend(alpha);
+			set_blend(alpha);
 			util::color_modulate(weapon_color, material);
 
 			material->IncrementReferenceCount();
@@ -932,7 +937,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 						cfg.esp.weapon_animated_material_color[2] / 255.0f
 					};
 
-					m_renderview()->SetBlend(alpha);
+					set_blend(alpha);
 					util::color_modulate(animated_color, animated_material);
 
 					animated_material->IncrementReferenceCount();
@@ -955,7 +960,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 					cfg.esp.weapon_double_material_color[2] / 255.0f
 				};
 
-				m_renderview()->SetBlend(alpha);
+				set_blend(alpha);
 				util::color_modulate(double_color, double_material);
 
 				double_material->IncrementReferenceCount();
@@ -988,7 +993,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 				cfg.esp.attachment_chams_color[2] / 255.0f
 			};
 
-			m_renderview()->SetBlend(alpha);
+			set_blend(alpha);
 			util::color_modulate(attachment_color, material);
 
 			material->IncrementReferenceCount();
@@ -1009,7 +1014,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 					cfg.esp.attachment_double_material_color[2] / 255.0f
 				};
 
-				m_renderview()->SetBlend(alpha);
+				set_blend(alpha);
 				util::color_modulate(double_color, double_material);
 
 				double_material->IncrementReferenceCount();
@@ -1042,7 +1047,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 				cfg.esp.attachment_chams_color[2] / 255.0f
 			};
 
-			m_renderview()->SetBlend(alpha);
+			set_blend(alpha);
 			util::color_modulate(attachment_color, material);
 
 			material->IncrementReferenceCount();
@@ -1063,7 +1068,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 					cfg.esp.attachment_double_material_color[2] / 255.0f
 				};
 
-				m_renderview()->SetBlend(alpha);
+				set_blend(alpha);
 				util::color_modulate(double_color, double_material);
 
 				double_material->IncrementReferenceCount();
@@ -1096,7 +1101,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 				cfg.esp.attachment_chams_color[2] / 255.0f
 			};
 
-			m_renderview()->SetBlend(alpha);
+			set_blend(alpha);
 			util::color_modulate(attachment_color, material);
 
 			material->IncrementReferenceCount();
@@ -1117,7 +1122,7 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 					cfg.esp.attachment_double_material_color[2] / 255.0f
 				};
 
-				m_renderview()->SetBlend(alpha);
+				set_blend(alpha);
 				util::color_modulate(double_color, double_material);
 
 				double_material->IncrementReferenceCount();
@@ -1134,4 +1139,18 @@ void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t&
 		if (!called_original)
 			return original_fn(m_modelrender(), ctx, state, info, bone_to_world);
 	}
+}
+
+void __stdcall hooks::hooked_dme(IMatRenderContext* ctx, const DrawModelState_t& state, const ModelRenderInfo_t& info, matrix3x4_t* bone_to_world)
+{
+	draw_model_chams(ctx, state, info, bone_to_world);
+
+	if (!render_state_dirty)
+		return;
+
+	render_state_dirty = false;
+
+	m_modelrender()->ForcedMaterialOverride(nullptr);
+	m_renderview()->SetColorModulation(1.0f, 1.0f, 1.0f);
+	m_renderview()->SetBlend(1.0f);
 }

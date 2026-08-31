@@ -957,13 +957,10 @@ c_baseplayeranimationstate* player_t::get_animation_state()
 
 CStudioHdr* player_t::m_pStudioHdr()
 {
-	//0x2950
-	//fixed
+	static auto studio_hdr = (uintptr_t)util::FindSignature(crypt_str("client.dll"), crypt_str("8B B7 ?? ?? ?? ?? 89 74 24 20"));
+	static auto offset = studio_hdr ? *(uintptr_t*)(studio_hdr + 0x2) + 0x4 : 0x2950;
 
-	return *(CStudioHdr**)((uintptr_t)this + *(uintptr_t*)0x2950);
-
-	//static auto studio_hdr = util::FindSignature(crypt_str("client.dll"), crypt_str("8B B7 ?? ?? ?? ?? 89 74 24 20"));
-	//return *(CStudioHdr**)((uintptr_t)this + *(uintptr_t*)(studio_hdr + 0x2) + 0x4);
+	return *(CStudioHdr**)((uintptr_t)this + offset);
 }
 
 bool player_t::setup_bones_fixed(matrix3x4_t* matrix, int mask) // semxxz lox
@@ -1002,7 +999,10 @@ bool player_t::setup_bones_fixed(matrix3x4_t* matrix, int mask) // semxxz lox
 	g_ctx.globals.setuping_bones = true;
 	invalidate_bone_cache();
 
-	SetupBones(matrix, matrix ? MAXSTUDIOBONES : -4, mask, m_flSimulationTime());
+	done = setup_bones_riptide(this, matrix, mask, m_flSimulationTime());
+
+	if (!done)
+		SetupBones(matrix, matrix ? MAXSTUDIOBONES : -4, mask, m_flSimulationTime());
 
 	g_ctx.globals.setuping_bones = false;
 

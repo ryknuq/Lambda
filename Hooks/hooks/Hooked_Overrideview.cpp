@@ -98,7 +98,6 @@ void __stdcall hooks::hooked_overrideview(CViewSetup* viewsetup)
 }
 void Thirdperson_Init(bool fakeducking, float progress)
 {
-
     static float current_fraction = 0.0f;
 
     auto distance = ((float)cfg.misc.thirdperson_distance) * progress;
@@ -126,14 +125,14 @@ void Thirdperson_Init(bool fakeducking, float progress)
     m_trace()->TraceRay(Ray_t(eye_pos, offset, Vector(-16.0f, -16.0f, -16.0f), Vector(16.0f, 16.0f, 16.0f)), 131083, &filter, &tr);
 
     if (current_fraction > tr.fraction)
-
         current_fraction = tr.fraction;
 
-    else if (current_fraction > 0.9999f)
+    if (m_globals()->m_frametime > 0.0f)
+        current_fraction = math::interpolate(current_fraction, tr.fraction, m_globals()->m_frametime * 10.0f);
+    else
+        current_fraction = tr.fraction;
 
-        current_fraction = 1.0f;
-
-    current_fraction = math::interpolate(current_fraction, tr.fraction, m_globals()->m_frametime * 10.0f);
+    current_fraction = std::clamp(current_fraction, 0.0f, 1.0f);
 
     angles.z = distance * current_fraction;
 
@@ -143,61 +142,24 @@ void Thirdperson_Init(bool fakeducking, float progress)
 void thirdperson(bool fakeducking)
 {
     {
-        static float progress;
+        static auto progress = 0.0f;
 
-        static bool in_transition;
+        auto active = g_ctx.local()->is_alive() && g_ctx.globals.in_thirdperson;
 
-        static auto in_thirdperson = false;
-
-        if (!in_thirdperson && g_ctx.globals.in_thirdperson)
-        {
-            in_thirdperson = true;
-        }
-
-        else if (in_thirdperson && !g_ctx.globals.in_thirdperson)
-            in_thirdperson = false;
-
-        if (g_ctx.local()->is_alive() && in_thirdperson)
-        {
-            in_transition = false;
-
-            if (!m_input()->m_fCameraInThirdPerson)
-            {
-
-                m_input()->m_fCameraInThirdPerson = true;
-
-            }
-
-        }
+        if (active)
+            progress += m_globals()->m_frametime * 8.0f + (progress / 100.0f);
         else
-        {
-            progress -= m_globals()->m_frametime * 8.f + (progress / 100);
-            progress = std::clamp(progress, 0.f, 1.f);
+            progress -= m_globals()->m_frametime * 8.0f + (progress / 100.0f);
 
-            if (!progress)
-                m_input()->m_fCameraInThirdPerson = false;
+        progress = std::clamp(progress, 0.0f, 1.0f);
 
-            else
-            {
+        if (active && progress < 0.05f)
+            progress = 0.05f;
 
-                in_transition = true;
+        m_input()->m_fCameraInThirdPerson = progress > 0.0f;
 
-                m_input()->m_fCameraInThirdPerson = true;
-
-            }
-
-        }
-
-        if (m_input()->m_fCameraInThirdPerson && !in_transition)
-        {
-
-            progress += m_globals()->m_frametime * 8.f + (progress / 100);
-
-            progress = std::clamp(progress, 0.f, 1.f);
-
-        }
-
-        Thirdperson_Init(fakeducking, progress);
+        if (m_input()->m_fCameraInThirdPerson)
+            Thirdperson_Init(fakeducking, progress);
     }
 
     {

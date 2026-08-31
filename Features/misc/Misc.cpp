@@ -1095,94 +1095,68 @@ void misc::break_lc(CUserCmd* m_pcmd) // breaking lc with fakelags
 }
 void misc::double_tap_defensive(CUserCmd* m_pcmd)
 {
-	if (!cfg.ragebot.defensive_doubletap)
-		return;
-
-	// Ensure player velocity is less than max speed before proceeding
-	if (g_ctx.local()->m_vecVelocity().Length2D() < g_ctx.local()->GetMaxPlayerSpeed())
+	if (!cfg.ragebot.defensive_doubletap || !cfg.ragebot.enable || !cfg.ragebot.double_tap)
 	{
+		g_ctx.globals.m_Peek.m_bIsPrevPeek = false;
 		g_ctx.globals.m_Peek.m_bIsPeeking = false;
-		g_ctx.globals.tickbase_shift = 2;  // Break LC (Lag Compensation)
 		return;
 	}
 
-	// Get the active combat weapon, skip if no weapon or revolver is equipped
-	const auto pCombatWeapon = g_ctx.local()->m_hActiveWeapon().Get();
-	if (!pCombatWeapon || pCombatWeapon->m_iItemDefinitionIndex() == WEAPON_REVOLVER || (m_pcmd->m_buttons & IN_ATTACK))
+	auto weapon = g_ctx.local()->m_hActiveWeapon().Get();
+
+	if (!weapon || weapon->is_non_aim() || weapon->is_grenade() || weapon->m_iItemDefinitionIndex() == WEAPON_TASER || weapon->m_iItemDefinitionIndex() == WEAPON_REVOLVER)
+	{
+		g_ctx.globals.m_Peek.m_bIsPrevPeek = false;
+		g_ctx.globals.m_Peek.m_bIsPeeking = false;
 		return;
+	}
 
-	// Predict eye position based on player velocity and interval
-	Vector predicted_eye_pos = g_ctx.globals.eye_pos + (engineprediction::get().backup_data.velocity * m_globals()->m_intervalpertick);
+	g_ctx.globals.m_Peek.m_bIsPrevPeek = g_ctx.globals.m_Peek.m_bIsPeeking;
+	g_ctx.globals.m_Peek.m_bIsPeeking = false;
 
-	// Iterate over all players
+	if (m_pcmd->m_buttons & IN_ATTACK)
+	{
+		g_ctx.globals.m_Peek.m_bIsPeeking = true;
+		return;
+	}
+
+	auto ticks = max(m_clientstate()->iChokedCommands, 1);
+	auto velocity = engineprediction::get().backup_data.velocity;
+
 	for (auto i = 1; i <= m_globals()->m_maxclients; i++)
 	{
 		auto e = static_cast<player_t*>(m_entitylist()->GetClientEntity(i));
-		if (!e || !e->valid(true))
+
+		if (!e || e == g_ctx.local() || !e->valid(true))
 			continue;
 
-		// Get player records
 		auto records = &player_records[i];
+
 		if (records->empty())
 			continue;
 
-		// Get the most recent valid record for this player
 		auto record = &records->front();
+
 		if (!record->valid())
 			continue;
 
-		// Adjust player animation data
-		record->adjust_player();
+		auto head = e->hitbox_position_matrix(HITBOX_HEAD, record->matrixes_data.first);
 
-		// Check prediction for each choked command tick
-		for (int next_chock = 1; next_chock <= m_clientstate()->iChokedCommands; ++next_chock)
+		for (auto tick = 1; tick <= ticks; ++tick)
 		{
-			predicted_eye_pos += (engineprediction::get().backup_data.velocity * m_globals()->m_intervalpertick) * next_chock;  // Update the predicted position
+			auto predicted_eye_pos = g_ctx.globals.eye_pos + velocity * (m_globals()->m_intervalpertick * tick);
+			auto fire_data = autowall::get().wall_penetration(predicted_eye_pos, head, e);
 
-			// Perform wall penetration check
-			auto fire_data = autowall::get().wall_penetration(predicted_eye_pos, e->hitbox_position_matrix(HITBOX_HEAD, record->matrixes_data.first), e);
 			if (fire_data.valid && fire_data.damage >= 1)
 			{
 				g_ctx.globals.m_Peek.m_bIsPeeking = true;
-				break;  // Exit once a valid hit is found
+				break;
 			}
 		}
+
+		if (g_ctx.globals.m_Peek.m_bIsPeeking)
+			break;
 	}
-
-	// Shift time handling for teleport behavior
-	if (++g_ctx.globals.shift_time > 15)
-		g_ctx.globals.shift_time = 0;
-
-	if (g_ctx.local()->m_vecVelocity().Length2D() > g_ctx.local()->GetMaxPlayerSpeed())
-		g_ctx.globals.shift_time = (g_ctx.local()->m_fFlags() & FL_ONGROUND) ? 1 : 4;
-
-	// Clamp shift time for tickbase manipulation
-	g_ctx.globals.shift_time = std::clamp(g_ctx.globals.shift_time, 1, 2);
-
-	// Apply tickbase shift based on shift time
-	if (g_ctx.globals.shift_time > 0)
-		g_ctx.globals.tickbase_shift = 14;  // Maximum tickbase shift
-
-	// Handle peek state and tickbase shift adjustments
-	if (m_gamerules()->m_bIsValveDS() || g_ctx.globals.m_Peek.m_bIsPeeking)
-	{
-		if (!g_ctx.globals.m_Peek.m_bIsPrevPeek)
-		{
-			g_ctx.globals.m_Peek.m_bIsPrevPeek = true;
-			g_ctx.globals.tickbase_shift = 15;  // High tickbase shift during peek
-			return;
-		}
-	}
-	else
-	{
-		g_ctx.globals.m_Peek.m_bIsPrevPeek = false;
-	}
-
-	// Default shift to 2 if no specific condition is met
-	g_ctx.globals.tickbase_shift = 2;
-
-	// Reset shift time to 14 if needed
-	g_ctx.globals.shift_time = 14;
 }
 
 
@@ -1328,7 +1302,12 @@ bool misc::double_tap(CUserCmd* m_pcmd)
 		firing_dt = true;
 	}
 	else if (!g_ctx.globals.weapon->is_grenade() && g_ctx.globals.weapon->m_iItemDefinitionIndex() != WEAPON_TASER && g_ctx.globals.weapon->m_iItemDefinitionIndex() != WEAPON_REVOLVER)
-		g_ctx.globals.tickbase_shift = max_tickbase_shift;
+	{
+		if (cfg.ragebot.defensive_doubletap && !g_ctx.globals.m_Peek.m_bIsPeeking)
+			g_ctx.globals.tickbase_shift = min(2, max_tickbase_shift);
+		else
+			g_ctx.globals.tickbase_shift = max_tickbase_shift;
+	}
 
 	return true;
 }

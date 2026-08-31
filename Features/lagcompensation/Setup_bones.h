@@ -19,6 +19,7 @@ public:
 	bool m_bShouldDoIK = false;
 	bool m_bShouldAttachment = true;
 	bool m_bShouldDispatch = true;
+	bool m_bShouldWriteCache = true;
 	int m_boneMask = 0;
 	float m_flPoseParameters[24];
 	float m_flWorldPoses[24];
@@ -27,3 +28,6 @@ public:
 	float m_flCurtime = 0.0f;
 	player_t* m_animating = nullptr;
 };
+
+bool setup_bones_available();
+bool setup_bones_riptide(player_t* player, matrix3x4_t* matrix, int mask, float curtime);
