@@ -104,17 +104,6 @@ using CLMove_t = void(__vectorcall*)(float, bool);
 void __vectorcall hooks::hooked_clmove(float accumulated_extra_samples, bool bFinalTick)
 {
 	((CLMove_t)original_clmove)(accumulated_extra_samples, bFinalTick);
-	if (g_ctx.available() && g_ctx.local()->is_alive())
-	{
-		if (g_ctx.globals.trigger_teleport)
-		{
-			for (int i = 0; i < g_ctx.globals.teleport_amount; i++)
-				((CLMove_t)original_clmove)(accumulated_extra_samples, bFinalTick);
-
-			g_ctx.globals.teleport_amount = 0;
-			g_ctx.globals.trigger_teleport = false;
-		}
-	}
 }
 
 

@@ -177,8 +177,6 @@ public:
 
 		//dt
 		bool should_recharge = false;
-		int trigger_teleport;
-		int teleport_amount;
 		int tickrt = 0;
 		//dt
 

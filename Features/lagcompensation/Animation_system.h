@@ -227,6 +227,7 @@ public:
 	float left_side = 0.f, right_side = 0.f;
 	bool moving_resolver_active;
 	bool high_desync_resolver_active;
+	bool resolver_confident;
 
 	bool invalid;
 	bool immune;
@@ -273,6 +274,10 @@ public:
 		type = ORIGINAL;
 		side = RESOLVER_ORIGINAL;
 
+		moving_resolver_active = false;
+		high_desync_resolver_active = false;
+		resolver_confident = false;
+
 		invalid = false;
 		immune = false;
 		dormant = false;
@@ -310,6 +315,10 @@ public:
 	{
 		type = ORIGINAL;
 		side = RESOLVER_ORIGINAL;
+
+		moving_resolver_active = false;
+		high_desync_resolver_active = false;
+		resolver_confident = false;
 
 		invalid = false;
 		store_data(e, store);

@@ -138,6 +138,7 @@ void C_ConfigManager::setup()
 		setup_item(&cfg.ragebot.weapon[i].max_misses_amount, 0, std::to_string(i) + crypt_str("Ragebot.max_misses_amount"));
 		setup_item(&cfg.ragebot.weapon[i].prefer_safe_points, false, std::to_string(i) + crypt_str("Ragebot.prefer_safe_points"));
 		setup_item(&cfg.ragebot.weapon[i].prefer_body_aim, false, std::to_string(i) + crypt_str("Ragebot.prefer_body_aim"));
+		setup_item(&cfg.ragebot.weapon[i].body_aim_modifiers, 6, std::to_string(i) + crypt_str("Ragebot.body_aim_modifiers"));
 	}
 
 	setup_item(&cfg.antiaim.enable, false, crypt_str("Antiaim.enable"));

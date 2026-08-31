@@ -685,6 +685,8 @@ void c_menu::rage_tab() // rage tab
 				draw_keybind(crypt_str("Force body aim"), &cfg.ragebot.body_aim_key, crypt_str("##HOKEY_FORCE_BODY_AIM"));
 			}
 
+			draw_multicombo(crypt_str("Body Aim Conditions"), cfg.ragebot.weapon[hooks::rage_weapon].body_aim_modifiers, bodyaim, ARRAYSIZE(bodyaim), preview);
+
 			ImGui::Checkbox(crypt_str("Static point scale"), &cfg.ragebot.weapon[hooks::rage_weapon].static_point_scale);
 			if (cfg.ragebot.weapon[hooks::rage_weapon].static_point_scale)
 			{

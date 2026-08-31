@@ -302,6 +302,7 @@ struct Config
 			int max_misses_amount;
 			bool prefer_safe_points;
 			bool prefer_body_aim;
+			std::vector <int> body_aim_modifiers;
 			bool autostop;
 			std::vector <int> autostop_modifiers;
 			int selection_type;

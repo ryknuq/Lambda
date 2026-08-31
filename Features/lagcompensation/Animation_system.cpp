@@ -392,6 +392,18 @@ void lagcompensation::update_player_animations(player_t* e)
 
 	c_baseplayeranimationstate state;
 	memcpy(&state, animstate, sizeof(c_baseplayeranimationstate));
+
+	c_baseplayeranimationstate final_state;
+	AnimationLayer final_layers[15];
+	float final_poses[24];
+
+	auto final_time = e->m_flSimulationTime();
+	auto final_ticks = TIME_TO_TICKS(final_time);
+	auto final_flags = e->m_fFlags();
+	auto final_duck = e->m_flDuckAmount();
+	auto final_lby = e->m_flLowerBodyYawTarget();
+	auto have_final = false;
+
 	auto ticks_chocked = 1;
 	if (previous_record)
 	{
@@ -467,6 +479,20 @@ void lagcompensation::update_player_animations(player_t* e)
 				m_globals()->m_tickcount = simulated_ticks;
 				m_globals()->m_interpolation_amount = 0.0f;
 
+				if (i == ticks_chocked)
+				{
+					memcpy(&final_state, animstate, sizeof(c_baseplayeranimationstate));
+					memcpy(final_layers, e->get_animlayers(), e->animlayer_count() * sizeof(AnimationLayer));
+					memcpy(final_poses, &e->m_flPoseParameter(), 24 * sizeof(float));
+
+					final_time = simulated_time;
+					final_ticks = simulated_ticks;
+					final_flags = e->m_fFlags();
+					final_duck = e->m_flDuckAmount();
+					final_lby = e->m_flLowerBodyYawTarget();
+					have_final = true;
+				}
+
 				g_ctx.globals.updating_animation = true;
 				e->update_clientside_animation();
 				g_ctx.globals.updating_animation = false;
@@ -484,6 +510,15 @@ void lagcompensation::update_player_animations(player_t* e)
 
 	if (!updated_animations)
 	{
+		memcpy(&final_state, animstate, sizeof(c_baseplayeranimationstate));
+		memcpy(final_layers, e->get_animlayers(), e->animlayer_count() * sizeof(AnimationLayer));
+		memcpy(final_poses, &e->m_flPoseParameter(), 24 * sizeof(float));
+
+		final_flags = e->m_fFlags();
+		final_duck = e->m_flDuckAmount();
+		final_lby = e->m_flLowerBodyYawTarget();
+		have_final = true;
+
 		g_ctx.globals.updating_animation = true;
 		e->update_clientside_animation();
 		g_ctx.globals.updating_animation = false;
@@ -543,16 +578,44 @@ void lagcompensation::update_player_animations(player_t* e)
 
 		auto simulate_side = [&](float yaw, int matrix, int slot)
 		{
-			memcpy(animstate, &state, sizeof(c_baseplayeranimationstate));
-			memcpy(&e->m_flPoseParameter(), pose_parametrs, 24 * sizeof(float));
-			memcpy(e->get_animlayers(), baseline_layers, e->animlayer_count() * sizeof(AnimationLayer));
+			memcpy(animstate, have_final ? &final_state : &state, sizeof(c_baseplayeranimationstate));
+			memcpy(&e->m_flPoseParameter(), have_final ? final_poses : pose_parametrs, 24 * sizeof(float));
+			memcpy(e->get_animlayers(), have_final ? final_layers : baseline_layers, e->animlayer_count() * sizeof(AnimationLayer));
+
+			if (have_final)
+			{
+				e->m_fFlags() = final_flags;
+				e->m_flDuckAmount() = final_duck;
+				e->m_flLowerBodyYawTarget() = final_lby;
+			}
 
 			animstate->m_flGoalFeetYaw = math::normalize_yaw(yaw);
 			animstate->m_flCurrentFeetYaw = animstate->m_flGoalFeetYaw;
 
+			const auto entry_realtime = m_globals()->m_realtime;
+			const auto entry_curtime = m_globals()->m_curtime;
+			const auto entry_framecount = m_globals()->m_framecount;
+			const auto entry_tickcount = m_globals()->m_tickcount;
+			const auto entry_interpolation = m_globals()->m_interpolation_amount;
+
+			if (have_final)
+			{
+				m_globals()->m_realtime = final_time;
+				m_globals()->m_curtime = final_time;
+				m_globals()->m_framecount = final_ticks;
+				m_globals()->m_tickcount = final_ticks;
+				m_globals()->m_interpolation_amount = 0.0f;
+			}
+
 			g_ctx.globals.updating_animation = true;
 			e->update_clientside_animation();
 			g_ctx.globals.updating_animation = false;
+
+			m_globals()->m_realtime = entry_realtime;
+			m_globals()->m_curtime = entry_curtime;
+			m_globals()->m_framecount = entry_framecount;
+			m_globals()->m_tickcount = entry_tickcount;
+			m_globals()->m_interpolation_amount = entry_interpolation;
 
 			memcpy(record->resolver_poses[slot], &e->m_flPoseParameter(), 24 * sizeof(float));
 			memcpy(record->resolver_layers[slot], e->get_animlayers(), sizeof(AnimationLayer) * 13);

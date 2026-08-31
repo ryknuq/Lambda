@@ -1240,12 +1240,7 @@ bool misc::double_tap(CUserCmd* m_pcmd)
 		double_tap_enabled = false;
 
 		if (!firing_dt && was_in_dt)
-		{
-			g_ctx.globals.trigger_teleport = true;
-			g_ctx.globals.teleport_amount = max_tickbase_shift;
-
 			was_in_dt = false;
-		}
 
 		g_ctx.globals.ticks_allowed = 0;
 		g_ctx.globals.tickbase_shift = 0;
@@ -1293,10 +1288,22 @@ bool misc::double_tap(CUserCmd* m_pcmd)
 	}
 	else if (!g_ctx.globals.weapon->is_grenade() && g_ctx.globals.weapon->m_iItemDefinitionIndex() != WEAPON_TASER && g_ctx.globals.weapon->m_iItemDefinitionIndex() != WEAPON_REVOLVER)
 	{
+		auto target_shift = max_tickbase_shift;
+
 		if (cfg.ragebot.defensive_doubletap && g_ctx.globals.m_Peek.m_bIsPeeking)
-			g_ctx.globals.tickbase_shift = min(2, max_tickbase_shift);
-		else
-			g_ctx.globals.tickbase_shift = max_tickbase_shift;
+			target_shift = min(2, max_tickbase_shift);
+
+		if (g_ctx.send_packet && g_ctx.globals.ticks_allowed < target_shift)
+		{
+			auto room = 62 - (m_clientstate()->iChokedCommands + 1);
+			auto shift = min(target_shift - g_ctx.globals.ticks_allowed, room);
+
+			if (shift > 0)
+			{
+				g_ctx.globals.tickbase_shift = shift;
+				g_ctx.globals.ticks_allowed += shift;
+			}
+		}
 	}
 
 	return true;

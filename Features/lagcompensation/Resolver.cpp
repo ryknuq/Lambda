@@ -54,6 +54,7 @@ void resolver::resolve()
 	player_record->side = RESOLVER_ORIGINAL;
 	player_record->moving_resolver_active = false;
 	player_record->high_desync_resolver_active = false;
+	player_record->resolver_confident = false;
 
 	goal_feet_yaw = original_goal_feet_yaw;
 	state->m_flGoalFeetYaw = original_goal_feet_yaw;
@@ -70,9 +71,11 @@ void resolver::resolve()
 	for (auto i = 0; i < resolver_candidate_count; ++i)
 		candidate_yaw[i] = math::normalize_yaw(eye_yaw + max_delta * resolver_candidate_scale[i]);
 
-	auto commit = [&](resolver_side selected, float yaw)
+	auto commit = [&](resolver_side selected, float yaw, bool confident = false)
 	{
 		player_record->side = selected;
+		player_record->resolver_confident = confident;
+
 		goal_feet_yaw = math::normalize_yaw(yaw);
 
 		state->m_flGoalFeetYaw = goal_feet_yaw;
@@ -107,14 +110,14 @@ void resolver::resolve()
 
 	if (player_record->shot)
 	{
-		commit(RESOLVER_ZERO, eye_yaw);
+		commit(RESOLVER_ZERO, eye_yaw, true);
 		return;
 	}
 
 	const auto fresh_update = !previous_player_record ||
 		player_record->simulation_time > previous_player_record->simulation_time;
 
-	const auto lby_fresh = fresh_update && previous_player_record && previous_player_record->valid(false) &&
+	const auto lby_fresh = standing && fresh_update && previous_player_record && previous_player_record->valid(false) &&
 		std::fabs(math::normalize_yaw(player_record->lby - previous_player_record->lby)) > 0.25f;
 
 	float error[resolver_candidate_count] = { };
@@ -205,6 +208,91 @@ void resolver::resolve()
 		accumulate(gathered, player_record->network_poses[pose], false, 0.005f);
 	}
 
+	float pose_estimates[24];
+	auto pose_estimate_count = 0;
+
+	for (auto pose = 0; pose < 24; ++pose)
+	{
+		float sorted[resolver_candidate_count];
+		float sorted_delta[resolver_candidate_count];
+
+		for (auto i = 0; i < resolver_candidate_count; ++i)
+		{
+			const auto candidate = resolver_candidate_order[i];
+
+			sorted[i] = player_record->resolver_poses[candidate][pose];
+			sorted_delta[i] = max_delta * resolver_candidate_scale[candidate];
+		}
+
+		auto rising = 0;
+		auto falling = 0;
+
+		for (auto i = 1; i < resolver_candidate_count; ++i)
+		{
+			if (sorted[i] > sorted[i - 1])
+				++rising;
+			else if (sorted[i] < sorted[i - 1])
+				++falling;
+		}
+
+		if (rising && falling)
+			continue;
+
+		if (std::fabs(sorted[resolver_candidate_count - 1] - sorted[0]) < 0.02f)
+			continue;
+
+		const auto network = player_record->network_poses[pose];
+		auto estimate = FLT_MAX;
+
+		for (auto i = 1; i < resolver_candidate_count; ++i)
+		{
+			const auto low = min(sorted[i - 1], sorted[i]);
+			const auto high = max(sorted[i - 1], sorted[i]);
+
+			if (high - low < 0.0001f || network < low || network > high)
+				continue;
+
+			const auto fraction = (network - sorted[i - 1]) / (sorted[i] - sorted[i - 1]);
+
+			estimate = sorted_delta[i - 1] + (sorted_delta[i] - sorted_delta[i - 1]) * fraction;
+			break;
+		}
+
+		if (estimate == FLT_MAX)
+			continue;
+
+		pose_estimates[pose_estimate_count++] = estimate;
+	}
+
+	auto pose_delta = 0.0f;
+	auto pose_solved = false;
+	auto pose_confident = false;
+
+	if (pose_estimate_count)
+	{
+		auto sum = 0.0f;
+		auto lowest = FLT_MAX;
+		auto highest = -FLT_MAX;
+
+		for (auto i = 0; i < pose_estimate_count; ++i)
+		{
+			sum += pose_estimates[i];
+			lowest = min(lowest, pose_estimates[i]);
+			highest = max(highest, pose_estimates[i]);
+		}
+
+		pose_delta = std::clamp(sum / (float)pose_estimate_count, -max_delta, max_delta);
+		pose_solved = true;
+		pose_confident = pose_estimate_count >= 2 && highest - lowest <= max_delta * 0.2f;
+
+		const auto pose_yaw = math::normalize_yaw(eye_yaw + pose_delta);
+
+		for (auto i = 0; i < resolver_candidate_count; ++i)
+			error[i] += 1.5f * min(std::fabs(math::normalize_yaw(candidate_yaw[i] - pose_yaw)) / max_delta, 1.0f);
+
+		terms += 1.5f;
+	}
+
 	if (lby_fresh)
 	{
 		for (auto i = 0; i < resolver_candidate_count; ++i)
@@ -213,12 +301,19 @@ void resolver::resolve()
 		terms += 2.0f;
 	}
 
-	if (last_resolved_time > 0.0f && player_record->simulation_time - last_resolved_time <= TICKS_TO_TIME(2))
+	if (last_resolved_time > 0.0f)
 	{
-		for (auto i = 0; i < resolver_candidate_count; ++i)
-			error[i] += 0.5f * min(std::fabs(math::normalize_yaw(candidate_yaw[i] - last_resolved_yaw)) / max_delta, 1.0f);
+		const auto elapsed = TIME_TO_TICKS(player_record->simulation_time - last_resolved_time);
 
-		terms += 0.5f;
+		if (elapsed >= 0 && elapsed <= 6)
+		{
+			const auto weight = 0.5f * (1.0f - (float)elapsed / 7.0f);
+
+			for (auto i = 0; i < resolver_candidate_count; ++i)
+				error[i] += weight * min(std::fabs(math::normalize_yaw(candidate_yaw[i] - last_resolved_yaw)) / max_delta, 1.0f);
+
+			terms += weight;
+		}
 	}
 
 	auto has_fallback = false;
@@ -270,8 +365,20 @@ void resolver::resolve()
 
 		if (runner_up >= 0 && (error[runner_up] - error[best]) / terms > 0.035f)
 		{
+			auto resolved = refined;
+
+			if (pose_solved)
+			{
+				const auto pose_yaw = math::normalize_yaw(eye_yaw + pose_delta);
+
+				if (std::fabs(math::normalize_yaw(pose_yaw - refined)) <= max_delta * 0.35f)
+					resolved = pose_yaw;
+			}
+
 			player_record->moving_resolver_active = !standing;
-			commit(resolver_candidate_sides[best], refined);
+			player_record->high_desync_resolver_active = std::fabs(math::normalize_yaw(resolved - eye_yaw)) > max_delta * 0.7f;
+
+			commit(resolver_candidate_sides[best], resolved, true);
 			return;
 		}
 
@@ -280,9 +387,20 @@ void resolver::resolve()
 		fallback_yaw = refined;
 	}
 
+	if (pose_confident)
+	{
+		const auto resolved = math::normalize_yaw(eye_yaw + pose_delta);
+
+		player_record->moving_resolver_active = !standing;
+		player_record->high_desync_resolver_active = std::fabs(pose_delta) > max_delta * 0.7f;
+
+		commit(nearest_side(resolved), resolved, true);
+		return;
+	}
+
 	if (lby_fresh)
 	{
-		commit(nearest_side(player_record->lby), player_record->lby);
+		commit(nearest_side(player_record->lby), player_record->lby, true);
 		return;
 	}
 
@@ -294,9 +412,28 @@ void resolver::resolve()
 		{
 			const auto resolved = std::clamp(lby_delta, -max_delta, max_delta);
 
-			commit(nearest_side(eye_yaw + resolved), eye_yaw + resolved);
+			commit(nearest_side(eye_yaw + resolved), eye_yaw + resolved, true);
 			return;
 		}
+	}
+
+	if (has_fallback)
+	{
+		auto resolved = fallback_yaw;
+
+		if (pose_solved)
+		{
+			const auto pose_yaw = math::normalize_yaw(eye_yaw + pose_delta);
+
+			if (std::fabs(math::normalize_yaw(pose_yaw - fallback_yaw)) <= max_delta * 0.35f)
+				resolved = pose_yaw;
+		}
+
+		player_record->moving_resolver_active = !standing;
+		player_record->high_desync_resolver_active = std::fabs(math::normalize_yaw(resolved - eye_yaw)) > max_delta * 0.7f;
+
+		commit(fallback_side, resolved);
+		return;
 	}
 
 	const auto first_visible = util::visible(g_ctx.globals.eye_pos,
@@ -309,13 +446,6 @@ void resolver::resolve()
 		const auto hidden = first_visible ? 2 : 1;
 
 		commit(resolver_candidate_sides[hidden], candidate_yaw[hidden]);
-		return;
-	}
-
-	if (has_fallback)
-	{
-		player_record->moving_resolver_active = !standing;
-		commit(fallback_side, fallback_yaw);
 		return;
 	}
 

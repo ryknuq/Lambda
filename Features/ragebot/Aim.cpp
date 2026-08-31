@@ -436,13 +436,23 @@ void aim::scan_targets()
 
 bool aim::automatic_stop(CUserCmd* cmd)
 {
-    if (!should_stop)
-        return true;
+    static auto last_stop_tick = INT_MIN;
 
     if (!cfg.ragebot.weapon[g_ctx.globals.current_weapon].autostop)
         return true;
 
-    if (g_ctx.globals.slowwalking || misc::get().recharging_double_tap)
+    if (should_stop)
+        last_stop_tick = m_globals()->m_tickcount;
+
+    if (!should_stop)
+    {
+        auto ticks_since_stop = m_globals()->m_tickcount - last_stop_tick;
+
+        if (targets.empty() || ticks_since_stop < 0 || ticks_since_stop > 5)
+            return true;
+    }
+
+    if (g_ctx.globals.slowwalking || g_ctx.globals.fakeducking || misc::get().recharging_double_tap)
         return true;
 
     if (!(g_ctx.local()->m_fFlags() & FL_ONGROUND && engineprediction::get().backup_data.flags & FL_ONGROUND))
@@ -469,7 +479,7 @@ bool aim::automatic_stop(CUserCmd* cmd)
     if (!weapon_info)
         return true;
 
-    auto max_speed = 0.26f * (g_ctx.globals.scoped ? weapon_info->flMaxPlayerSpeedAlt : weapon_info->flMaxPlayerSpeed);
+    auto max_speed = 0.33f * (g_ctx.globals.scoped ? weapon_info->flMaxPlayerSpeedAlt : weapon_info->flMaxPlayerSpeed);
 
     if (engineprediction::get().backup_data.velocity.Length2D() < max_speed)
         slowwalk::get().create_move(cmd);
@@ -481,6 +491,7 @@ bool aim::automatic_stop(CUserCmd* cmd)
         math::vector_angles(engineprediction::get().backup_data.velocity, direction);
         m_engine()->GetViewAngles(real_view);
 
+        direction.x = 0.0f;
         direction.y = real_view.y - direction.y;
 
         Vector forward;
@@ -581,9 +592,28 @@ void aim::scan(adjust_data* record, scan_data& data, const Vector& shoot_positio
 	auto body_hitboxes = true;
 	float best_score = -1.0f;
 
+	auto& body_aim_modifiers = weapon_cfg.body_aim_modifiers;
+
+	auto force_body_aim = body_aim_modifiers[BAIM_PREFER]
+		|| body_aim_modifiers[BAIM_AIR] && !(record->flags & FL_ONGROUND)
+		|| body_aim_modifiers[BAIM_HIGH_VELOCITY] && record->velocity.Length2D() > 85.0f
+		|| body_aim_modifiers[BAIM_DOUBLE_TAP] && g_ctx.globals.double_tap_aim
+		|| body_aim_modifiers[BAIM_UNRESOLVED] && !record->bot && !record->resolver_confident;
+
+	auto lethal_body = body_aim_modifiers[BAIM_LETHAL];
+
+	scan_point lethal_body_point;
+
+	auto lethal_body_damage = 0;
+	auto lethal_body_hitbox = -1;
+	auto lethal_body_visible = false;
+	float lethal_body_score = -1.0f;
+
 	for (auto& point : points)
 	{
-		if (body_hitboxes && (point.hitbox < HITBOX_PELVIS || point.hitbox > HITBOX_UPPER_CHEST))
+		auto is_body = point.hitbox >= HITBOX_PELVIS && point.hitbox <= HITBOX_UPPER_CHEST;
+
+		if (body_hitboxes && !is_body)
 		{
 			body_hitboxes = false;
 
@@ -593,7 +623,7 @@ void aim::scan(adjust_data* record, scan_data& data, const Vector& shoot_positio
 			if (best_damage >= health)
 				break;
 
-			if (weapon_cfg.prefer_body_aim && best_damage >= 1)
+			if ((force_body_aim || weapon_cfg.prefer_body_aim) && best_damage >= 1)
 				break;
 		}
 
@@ -610,9 +640,21 @@ void aim::scan(adjust_data* record, scan_data& data, const Vector& shoot_positio
 
 		auto current_minimum_damage = fire_data.visible ? visible_minimum_damage : occluded_minimum_damage;
 
-		float current_score = static_cast<float>(fire_data.damage);
+		auto effective_damage = min(fire_data.damage, health);
+
+		float current_score = static_cast<float>(effective_damage);
+
+		if (effective_damage >= health)
+			current_score += 40.0f;
+
+		if (fire_data.visible)
+			current_score += 12.0f;
+
 		current_score += point.center ? 2.0f : 0.0f;
 		current_score += point.safe ? 1.0f : 0.0f;
+
+		if (lethal_body && is_body && effective_damage >= health)
+			current_score += 8.0f;
 
 		if (current_score >= best_score && fire_data.damage >= current_minimum_damage)
 		{
@@ -631,6 +673,15 @@ void aim::scan(adjust_data* record, scan_data& data, const Vector& shoot_positio
 			if (force_safe_points && !point.safe)
 				continue;
 
+			if (lethal_body && is_body && fire_data.damage >= health && current_score > lethal_body_score)
+			{
+				lethal_body_score = current_score;
+				lethal_body_damage = fire_data.damage;
+				lethal_body_hitbox = fire_data.hitbox;
+				lethal_body_visible = fire_data.visible;
+				lethal_body_point = point;
+			}
+
 			best_damage = fire_data.damage;
 			best_score = current_score;
 
@@ -642,6 +693,14 @@ void aim::scan(adjust_data* record, scan_data& data, const Vector& shoot_positio
 			if (fire_data.visible && point.center && point.safe && fire_data.damage >= health)
 				break;
 		}
+	}
+
+	if (lethal_body_hitbox >= 0 && lethal_body_damage >= data.damage)
+	{
+		data.point = lethal_body_point;
+		data.visible = lethal_body_visible;
+		data.damage = lethal_body_damage;
+		data.hitbox = lethal_body_hitbox;
 	}
 }
 
@@ -1233,7 +1292,7 @@ void aim::fire(CUserCmd* cmd)
     shot->shot_info.target_name = player_info.szName;
     shot->shot_info.client_hitbox = get_hitbox_name(final_target.data.hitbox, true);
     shot->shot_info.client_damage = final_target.data.damage;
-    shot->shot_info.hitchance = hitchance(aim_angle);
+    shot->shot_info.hitchance = final_hitchance;
     shot->shot_info.backtrack_ticks = backtrack_ticks;
     shot->shot_info.aim_point = final_target.data.point.point;
     shot->shot_info.distance_to_target = final_target.distance;
@@ -1362,6 +1421,66 @@ int aim::hitchance(const Vector& aim_angle)
     else if (is_special_weapon)
         base_inaccuracy = weapon_info->flInaccuracyStandAlt;
 
+    auto is_head = final_target.data.hitbox == HITBOX_HEAD;
+    auto high_accuracy_weapon = g_ctx.globals.weapon->m_iItemDefinitionIndex() == WEAPON_AWP || g_ctx.globals.weapon->m_iItemDefinitionIndex() == WEAPON_SSG08;
+
+    auto ring_spread = g_ctx.globals.spread + g_ctx.globals.inaccuracy;
+
+    auto ring_intersections = 0;
+    auto ring_reaching = 0;
+    auto damage = 0;
+
+    for (auto i = 1; i <= 6; ++i)
+    {
+        for (auto j = 0; j < 8; ++j)
+        {
+            auto current_spread = ring_spread * ((float)i / 6.0f);
+
+            auto direction_cos = 0.0f;
+            auto direction_sin = 0.0f;
+
+            DirectX::XMScalarSinCos(&direction_cos, &direction_sin, (float)j / 8.0f * DirectX::XM_2PI);
+
+            auto spread_x = direction_cos * current_spread;
+            auto spread_y = direction_sin * current_spread;
+
+            auto direction = ZERO;
+
+            direction.x = forward.x + spread_x * right.x + spread_y * up.x;
+            direction.y = forward.y + spread_x * right.y + spread_y * up.y;
+            direction.z = forward.z + spread_x * right.z + spread_y * up.z;
+
+            auto end = g_ctx.globals.eye_pos + direction * weapon_info->flRange;
+
+            if (!hitbox_intersection(final_target.record->player, final_target.record->matrixes_data.main, final_target.data.hitbox, g_ctx.globals.eye_pos, end))
+                continue;
+
+            ++ring_intersections;
+
+            auto fire_data = autowall::get().wall_penetration(g_ctx.globals.eye_pos, end, final_target.record->player);
+
+            if (!fire_data.valid || fire_data.damage < 1)
+                continue;
+
+            ++ring_reaching;
+
+            if (is_head && fire_data.hitbox != HITBOX_HEAD)
+                continue;
+
+            damage += high_accuracy_weapon ? fire_data.damage : 1;
+        }
+    }
+
+    auto occlusion_scale = 1.0f;
+
+    if (ring_intersections)
+    {
+        if (!ring_reaching)
+            return final_hitchance;
+
+        occlusion_scale = (float)ring_reaching / (float)ring_intersections;
+    }
+
     if (real_inaccuracy - 0.000001f < base_inaccuracy)
         final_hitchance = 101;
     else
@@ -1423,54 +1542,15 @@ int aim::hitchance(const Vector& aim_angle)
         final_hitchance = (int)((float)hits / 2.56f);
     }
 
+    final_hitchance = (int)((float)final_hitchance * occlusion_scale);
+
     if (g_ctx.globals.double_tap_aim)
         return final_hitchance;
-
-    auto damage = 0;
-    auto high_accuracy_weapon = g_ctx.globals.weapon->m_iItemDefinitionIndex() == WEAPON_AWP || g_ctx.globals.weapon->m_iItemDefinitionIndex() == WEAPON_SSG08;
-
-    auto spread = g_ctx.globals.spread + g_ctx.globals.inaccuracy;
-
-    for (auto i = 1; i <= 6; ++i)
-    {
-        for (auto j = 0; j < 8; ++j)
-        {
-            auto current_spread = spread * ((float)i / 6.0f);
-
-            auto direction_cos = 0.0f;
-            auto direction_sin = 0.0f;
-
-            DirectX::XMScalarSinCos(&direction_cos, &direction_sin, (float)j / 8.0f * DirectX::XM_2PI);
-
-            auto spread_x = direction_cos * current_spread;
-            auto spread_y = direction_sin * current_spread;
-
-            auto direction = ZERO;
-
-            direction.x = forward.x + spread_x * right.x + spread_y * up.x;
-            direction.y = forward.y + spread_x * right.y + spread_y * up.y;
-            direction.z = forward.z + spread_x * right.z + spread_y * up.z;
-
-            auto end = g_ctx.globals.eye_pos + direction * weapon_info->flRange;
-
-            if (hitbox_intersection(final_target.record->player, final_target.record->matrixes_data.main, final_target.data.hitbox, g_ctx.globals.eye_pos, end))
-            {
-                auto fire_data = autowall::get().wall_penetration(g_ctx.globals.eye_pos, end, final_target.record->player);
-                auto valid_hitbox = true;
-
-                if (final_target.data.hitbox == HITBOX_HEAD && fire_data.hitbox != HITBOX_HEAD)
-                    valid_hitbox = false;
-
-                if (fire_data.valid && fire_data.damage >= 1 && valid_hitbox)
-                    damage += high_accuracy_weapon ? fire_data.damage : 1;
-            }
-        }
-    }
 
     if (high_accuracy_weapon)
         return (float)damage / 48.0f >= get_minimum_damage(final_target.data.visible, final_target.health) ? final_hitchance : 0;
 
-    return (float)damage / 48.0f >= (float)cfg.ragebot.weapon[g_ctx.globals.current_weapon].hitchance_amount * 0.01f ? final_hitchance : 0;
+    return final_hitchance;
 }
 
 static int clip_ray_to_hitbox(const Ray_t& ray, mstudiobbox_t* hitbox, matrix3x4_t& matrix, trace_t& trace)
