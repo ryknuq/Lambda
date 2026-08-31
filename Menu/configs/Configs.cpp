@@ -3,11 +3,90 @@
 #include "..\..\includes.hpp"
 #include "..\..\utils\util.hpp"
 #include <shlobj.h>
+#include <cctype>
 
 std::unordered_map <std::string, float[4]> colors;
 
-C_ConfigManager* cfg_manager = new C_ConfigManager();
 Config cfg;
+
+C_ConfigManager* cfg_manager = new C_ConfigManager();
+
+static bool create_directory_recursive(const std::string& path)
+{
+	if (path.empty())
+		return false;
+
+	std::string current;
+	current.reserve(path.size() + 1);
+
+	for (size_t i = 0; i < path.size(); ++i)
+	{
+		current.push_back(path[i]);
+
+		const auto separator = path[i] == '\\' || path[i] == '/';
+
+		if (!separator && i + 1 != path.size())
+			continue;
+
+		if (current.size() <= 3 && separator)
+			continue;
+
+		if (CreateDirectory(current.c_str(), nullptr))
+			continue;
+
+		if (GetLastError() == ERROR_ALREADY_EXISTS)
+			continue;
+
+		const auto attributes = GetFileAttributes(current.c_str());
+
+		if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY))
+			continue;
+
+		return false;
+	}
+
+	return true;
+}
+
+const std::string& get_config_directory()
+{
+	static const std::string directory = []() -> std::string
+	{
+		const char* variables[] =
+		{
+			crypt_str("LOCALAPPDATA"),
+			crypt_str("APPDATA"),
+			crypt_str("USERPROFILE")
+		};
+
+		char buffer[MAX_PATH];
+
+		for (auto variable : variables)
+		{
+			const auto length = GetEnvironmentVariable(variable, buffer, MAX_PATH);
+
+			if (length == 0 || length >= MAX_PATH)
+				continue;
+
+			std::string candidate(buffer, length);
+
+			if (candidate.back() != '\\' && candidate.back() != '/')
+				candidate.push_back('\\');
+
+			candidate += crypt_str("Lambda\\configs\\");
+
+			if (create_directory_recursive(candidate))
+				return candidate;
+		}
+
+		std::string fallback = crypt_str("C:\\Lambda\\configs\\");
+		create_directory_recursive(fallback);
+
+		return fallback;
+	}();
+
+	return directory;
+}
 
 item_setting* get_by_definition_index(const int definition_index)
 {
@@ -21,6 +100,9 @@ item_setting* get_by_definition_index(const int definition_index)
 
 void C_ConfigManager::setup()
 {
+	clear_items();
+	colors.clear();
+
 	setup_item(&cfg.ragebot.enable, false, crypt_str("Ragebot.enable"));
 	setup_item(&cfg.ragebot.zeus_bot, false, crypt_str("Ragebot.zeus_bot"));
 	setup_item(&cfg.ragebot.knife_bot, false, crypt_str("Ragebot.knife_bot"));
@@ -397,9 +479,12 @@ void C_ConfigManager::setup_item(std::string* pointer, const std::string& value,
 	*pointer = value;
 }
 
-void C_ConfigManager::save(std::string config)
+bool C_ConfigManager::save(std::string config)
 {
-	std::string file = crypt_str("C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive\\Lambda\\configs\\") + config;
+	if (config.empty())
+		return false;
+
+	std::string file = get_config_directory() + config;
 	json allJson;
 
 	for (auto it : items)
@@ -465,35 +550,23 @@ void C_ConfigManager::save(std::string config)
 		allJson.push_back(j);
 	}
 
-	auto get_type = [](menu_item_type type)
-		{
-			switch (type)
-			{
-			case CHECK_BOX:
-				return "bool";
-			case COMBO_BOX:
-			case SLIDER_INT:
-				return "int";
-			case SLIDER_FLOAT:
-				return "float";
-			case COLOR_PICKER:
-				return "Color";
-			}
-		};
-
 	std::string data;
+	Base64::encode(allJson.dump(), &data);
 
-	Base64 base64;
-	base64.encode(allJson.dump(), &data);
+	create_directory_recursive(get_config_directory());
 
-	std::ofstream ofs;
-	ofs.open(file + '\0', std::ios::out | std::ios::trunc);
+	std::ofstream ofs(file, std::ios::out | std::ios::trunc | std::ios::binary);
 
-	ofs << std::setw(4) << data << std::endl;
+	if (!ofs.is_open())
+		return false;
+
+	ofs << data;
 	ofs.close();
+
+	return !ofs.fail();
 }
 
-void C_ConfigManager::load(std::string config, bool load_script_items)
+bool C_ConfigManager::load(std::string config, bool load_script_items)
 {
 	static auto find_item = [](std::vector< C_ConfigItem* > items, std::string name) -> C_ConfigItem*
 		{
@@ -504,23 +577,29 @@ void C_ConfigManager::load(std::string config, bool load_script_items)
 			return nullptr;
 		};
 
-	std::string file = crypt_str("C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive\\Lambda\\configs\\") + config;
+	if (config.empty())
+		return false;
+
+	std::string file = get_config_directory() + config;
+
+	std::ifstream ifs(file, std::ios::in | std::ios::binary);
+
+	if (!ifs.is_open())
+		return false;
 
 	std::string data;
-
-	std::ifstream ifs;
-	ifs.open(file + '\0');
 
 	ifs >> data;
 	ifs.close();
 
 	if (data.empty())
-		return;
-
-	Base64 base64;
+		return false;
 
 	std::string decoded_data;
-	base64.decode(data, &decoded_data);
+	Base64::decode(data, &decoded_data);
+
+	while (!decoded_data.empty() && (decoded_data.back() == '\0' || isspace((unsigned char)decoded_data.back())))
+		decoded_data.pop_back();
 
 	json allJson;
 
@@ -530,12 +609,18 @@ void C_ConfigManager::load(std::string config, bool load_script_items)
 	}
 	catch (...)
 	{
-		return;
+		return false;
 	}
 
 	for (auto it = allJson.begin(); it != allJson.end(); ++it)
 	{
 		json j = *it;
+
+		if (!j.is_object()
+			|| j.find(crypt_str("name")) == j.end() || !j[crypt_str("name")].is_string()
+			|| j.find(crypt_str("type")) == j.end() || !j[crypt_str("type")].is_string()
+			|| j.find(crypt_str("value")) == j.end())
+			continue;
 
 		std::string name = j[crypt_str("name")];
 		std::string type = j[crypt_str("type")];
@@ -571,6 +656,8 @@ void C_ConfigManager::load(std::string config, bool load_script_items)
 
 			if (item)
 			{
+				try
+				{
 				if (!type.compare(crypt_str("int")))
 					*(int*)item->pointer = j[crypt_str("value")].get<int>();
 				else if (!type.compare(crypt_str("float")))
@@ -582,31 +669,36 @@ void C_ConfigManager::load(std::string config, bool load_script_items)
 					std::vector<int> a;
 					json ja = json::parse(j[crypt_str("value")].get<std::string>().c_str());
 
-					for (json::iterator it = ja.begin(); it != ja.end(); ++it)
-					a.push_back(*it);
+					for (json::iterator value = ja.begin(); value != ja.end(); ++value)
+						a.push_back(*value);
 
-					*(key_bind*)item->pointer = key_bind((ButtonCode_t)a[0], (key_bind_mode)a[1]);
+					if (a.size() >= 2)
+						*(key_bind*)item->pointer = key_bind((ButtonCode_t)a[0], (key_bind_mode)a[1]);
 				}
 				else if (!type.compare(crypt_str("Color")))
 				{
 					std::vector<int> a;
 					json ja = json::parse(j[crypt_str("value")].get<std::string>().c_str());
 
-					for (json::iterator it = ja.begin(); it != ja.end(); ++it)
-						a.push_back(*it);
+					for (json::iterator value = ja.begin(); value != ja.end(); ++value)
+						a.push_back(*value);
 
-					colors.erase(item->name);
-					*(Color*)item->pointer = Color(a[0], a[1], a[2], a[3]);
+					if (a.size() >= 4)
+					{
+						colors.erase(item->name);
+						*(Color*)item->pointer = Color(a[0], a[1], a[2], a[3]);
+					}
 				}
 				else if (!type.compare(crypt_str("vector<int>")))
 				{
 					auto ptr = static_cast<std::vector <int>*> (item->pointer);
-					ptr->clear();
 
 					json ja = json::parse(j[crypt_str("value")].get<std::string>().c_str());
 
-					for (json::iterator it = ja.begin(); it != ja.end(); ++it)
-						ptr->push_back(*it);
+					size_t index = 0;
+
+					for (json::iterator value = ja.begin(); value != ja.end() && index < ptr->size(); ++value, ++index)
+						(*ptr)[index] = value->get<int>();
 				}
 				else if (!type.compare(crypt_str("vector<string>")))
 				{
@@ -615,22 +707,30 @@ void C_ConfigManager::load(std::string config, bool load_script_items)
 
 					json ja = json::parse(j[crypt_str("value")].get<std::string>().c_str());
 
-					for (json::iterator it = ja.begin(); it != ja.end(); ++it)
-						ptr->push_back(*it);
+					for (json::iterator value = ja.begin(); value != ja.end(); ++value)
+						ptr->push_back(*value);
 				}
 				else if (!type.compare(crypt_str("string")))
 					*(std::string*)item->pointer = j[crypt_str("value")].get<std::string>();
+				}
+				catch (...)
+				{
+				}
 			}
 		}
 	}
+
+	return true;
 }
 
-void C_ConfigManager::remove(std::string config)
+bool C_ConfigManager::remove(std::string config)
 {
-	std::string file = crypt_str("C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive\\Lambda\\configs\\") + config;
+	if (config.empty())
+		return false;
 
-	std::string path = file + '\0';
-	std::remove(path.c_str());
+	std::string path = get_config_directory() + config;
+
+	return std::remove(path.c_str()) == 0;
 }
 
 void C_ConfigManager::clear_items()
@@ -642,14 +742,13 @@ void C_ConfigManager::clear_items()
 
 void C_ConfigManager::config_files()
 {
-	std::string file = crypt_str("C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive\\Lambda\\configs\\");
+	const std::string& directory = get_config_directory();
 
-	// Create directory if it doesn't exist
-	CreateDirectory(file.c_str(), NULL);
+	create_directory_recursive(directory);
 
 	files.clear();
 
-	std::string path = file + crypt_str("*.cfg");
+	std::string path = directory + crypt_str("*.cfg");
 	WIN32_FIND_DATA fd;
 
 	HANDLE hFind = FindFirstFile(path.c_str(), &fd);

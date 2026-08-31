@@ -34,8 +34,7 @@ __forceinline void setup_steam()
 
 __forceinline void dirs()
 {
-	CreateDirectory(crypt_str("C:\\Lambda\\"), NULL);
-	CreateDirectory(crypt_str("C:\\Lambda\\Configs\\"), NULL);
+	get_config_directory();
 }
 
 void immortalehay() {

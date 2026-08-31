@@ -11,16 +11,16 @@ const char Base64Alphabet[] =
 class Base64 
 {
 public:
-	static void encode(std::string &in, std::string *out) 
+	static void encode(const std::string &in, std::string *out)
 	{
 		int i = 0, j = 0;
 		size_t enc_len = 0;
 		unsigned char a3[3];
 		unsigned char a4[4];
 
-		out->resize(EncodedLength(in));  
+		out->resize(EncodedLength(in));
 
-		int input_len = in.size();  
+		size_t input_len = in.size();
 		std::string::const_iterator input = in.begin();
 
 		while (input_len--) {
@@ -52,24 +52,28 @@ public:
 			}
 		}
 
+		out->resize(enc_len);
+
 		for (auto& symbol : *out)
 			++symbol;
 	}
 
-	static void decode(std::string &in, std::string *out) 
+	static void decode(const std::string &in_shifted, std::string *out)
 	{
+		std::string in = in_shifted;
+
+		for (auto& symbol : in)
+			--symbol;
+
 		int i = 0, j = 0;
 		size_t dec_len = 0;
 		unsigned char a3[3];
 		unsigned char a4[4];
 
-		int input_len = in.size();  
+		size_t input_len = in.size();
 		std::string::const_iterator input = in.begin();
 
-		out->resize(DecodedLength(in));  
-
-		for (auto& symbol : in)
-			--symbol;
+		out->resize((in.size() / 4 + 1) * 3);
 
 		while (input_len--) {
 			if (*input == '=') {
@@ -107,22 +111,12 @@ public:
 				(*out)[dec_len++] = a3[j];
 			}
 		}
+
+		out->resize(dec_len);
 	}
 
 private:
-	static int DecodedLength(const std::string &in) 
-	{
-		int numEq = 0;
-		int n = in.size();  
-
-		for (std::string::const_reverse_iterator it = in.rbegin(); *it == '='; ++it) {
-			++numEq;
-		}
-
-		return ((6 * n) / 8) - numEq;
-	}
-
-	inline static int EncodedLength(size_t length) 
+	inline static int EncodedLength(size_t length)
 	{
 		return (length + 2 - ((length + 2) % 3)) / 3 * 4;
 	}

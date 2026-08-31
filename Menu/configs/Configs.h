@@ -119,13 +119,15 @@ public:
 	}
 
 	void setup();
-	void save(std::string config);
-	void load(std::string config, bool load_script_items);
-	void remove(std::string config);
+	bool save(std::string config);
+	bool load(std::string config, bool load_script_items);
+	bool remove(std::string config);
 	void clear_items();
 	std::vector<std::string> files;
 	void config_files();
 };
+
+const std::string& get_config_directory();
 
 extern C_ConfigManager* cfg_manager;
 

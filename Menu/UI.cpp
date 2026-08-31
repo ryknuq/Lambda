@@ -247,25 +247,19 @@ void draw_combo(const char* name, int& variable, bool (*items_getter)(void*, int
 
 std::string get_config_dir()
 {
-	// Get the executable directory and construct the full path
-	char exePath[MAX_PATH];
-	GetModuleFileNameA(NULL, exePath, MAX_PATH);
-	std::string exeDir(exePath);
-	exeDir = exeDir.substr(0, exeDir.find_last_of("\\/"));
-	
-	std::string folder = crypt_str("C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive\\Lambda\\");
-
-	CreateDirectory(folder.c_str(), NULL);
-
-	return folder;
+	return get_config_directory();
 }
 
 void load_config(std::string selected_config)
 {
-	if (cfg_manager->files.empty())
+	if (selected_config.empty())
 		return;
 
-	cfg_manager->load(selected_config, false);
+	if (!cfg_manager->load(selected_config, false))
+	{
+		eventlogs::get().add(crypt_str("Failed to load ") + selected_config);
+		return;
+	}
 	//c_lua::get().unload_all_scripts();
 
 	//for (auto& script : cfg.scripts.scripts)
@@ -299,15 +293,17 @@ void load_config(std::string selected_config)
 
 void save_config(std::string selected_config)
 {
-	if (selected_config == "")
-		return;
-
-	if (cfg_manager->files.empty())
+	if (selected_config.empty())
 		return;
 
 	cfg.scripts.scripts.clear();
 
-	cfg_manager->save(selected_config);
+	if (!cfg_manager->save(selected_config))
+	{
+		eventlogs::get().add(crypt_str("Failed to save ") + selected_config + crypt_str(" to ") + get_config_directory());
+		return;
+	}
+
 	cfg_manager->config_files();
 
 	eventlogs::get().add(crypt_str("Saved ") + selected_config);
@@ -315,32 +311,60 @@ void save_config(std::string selected_config)
 
 void remove_config(std::string selected_config)
 {
+	if (selected_config.empty())
+		return;
+
+	if (!cfg_manager->remove(selected_config))
+	{
+		eventlogs::get().add(crypt_str("Failed to delete ") + selected_config);
+		return;
+	}
+
 	eventlogs::get().add(crypt_str("Deleted ") + selected_config);
 
-	cfg_manager->remove(selected_config);
 	cfg_manager->config_files();
 
 	files = cfg_manager->files;
 
-	if (cfg.selected_config >= files.size())
-		cfg.selected_config = files.size() - 1;
-
-	for (auto& current : files)
-		if (current.size() > 2)
-			current.erase(current.size() - 3, 3);
+	if (files.empty())
+		cfg.selected_config = 0;
+	else if (cfg.selected_config >= (int)files.size())
+		cfg.selected_config = (int)files.size() - 1;
 }
 
 void add_config(std::string name)
 {
+	const std::string invalid = crypt_str("\\/:*?\"<>|");
+
+	for (auto& c : name)
+		if (invalid.find(c) != std::string::npos || (unsigned char)c < ' ')
+			c = '_';
+
+	while (!name.empty() && (name.front() == ' ' || name.front() == '.'))
+		name.erase(name.begin());
+
+	while (!name.empty() && (name.back() == ' ' || name.back() == '.'))
+		name.pop_back();
+
 	if (name.empty())
 		name = crypt_str("config");
 
-	if (name.find(crypt_str(".cfg")) == std::string::npos)
-		name += crypt_str(".cfg");
+	const std::string extension = crypt_str(".cfg");
+
+	if (name.size() < extension.size() || name.compare(name.size() - extension.size(), extension.size(), extension) != 0)
+		name += extension;
+
+	if (!cfg_manager->save(name))
+	{
+		eventlogs::get().add(crypt_str("Failed to create ") + name + crypt_str(" in ") + get_config_directory());
+		return;
+	}
+
+	cfg_manager->config_files();
+
+	files = cfg_manager->files;
 
 	eventlogs::get().add(crypt_str("Added ") + name + crypt_str(" config"));
-
-	cfg_manager->save(name);
 }
 
 bool LabelClick2(const char* label, bool* v, const char* unique_id)
@@ -1379,8 +1403,7 @@ void c_menu::settings_tab() // cfg + lua
 
 			if ((ImGui::CustomButton(crypt_str("Open Config Directory"), crypt_str("##OpenConfigDirectory"), ImVec2(390, 30), true, c_menu::get().settingicons, "2")))
 			{
-				std::string folder = crypt_str("C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive\\Lambda\\configs\\");
-				CreateDirectory(folder.c_str(), NULL);
+				const std::string& folder = get_config_directory();
 
 				ShellExecute(NULL, crypt_str("open"), folder.c_str(), NULL, NULL, SW_SHOWNORMAL);
 			}
