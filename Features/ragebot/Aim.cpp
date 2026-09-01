@@ -1,12 +1,3 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: http://www.viva64.com
-
-/*
-
-        By Semmxz
-
-*/
-
 #include "aim.h"
 #include "..\misc\misc.h"
 #include "..\misc\logs.h"
@@ -14,7 +5,6 @@
 #include "..\misc\prediction_system.h"
 #include "..\fakewalk\slowwalk.h"
 #include "..\lagcompensation\local_animations.h"
-#include "RageBackTracking.h"
 
 void aim::run(CUserCmd* cmd)
 {
@@ -36,15 +26,6 @@ void aim::run(CUserCmd* cmd)
         }
 
         return;
-    }
-
-    for (auto i = 1; i <= m_globals()->m_maxclients; i++)
-    {
-        if (player_records[i].size() > 64)
-        {
-            while (player_records[i].size() > 32)
-                player_records[i].pop_back();
-        }
     }
 
     automatic_revolver(cmd);
@@ -119,88 +100,6 @@ void aim::run(CUserCmd* cmd)
 
 }
 
-float m_flMatVal[3][4];
-
-inline void SetOrigin(Vector const& p)
-{
-    m_flMatVal[0][3] = p.x;
-    m_flMatVal[1][3] = p.y;
-    m_flMatVal[2][3] = p.z;
-}
-inline Vector GetOrigin()
-{
-    return Vector(m_flMatVal[0][3], m_flMatVal[1][3], m_flMatVal[2][3]);
-}
-
-/*void aim::automatic_revolver(CUserCmd* cmd)
-{
-    if (!cfg.ragebot.enable)
-        return;
-
-    if (g_ctx.globals.weapon->m_iItemDefinitionIndex() != WEAPON_REVOLVER)
-        return;
-
-    if (!m_engine()->IsActiveApp())
-        return;
-
-    if (g_ctx.local()->m_flNextAttack() > TICKS_TO_TIME(g_ctx.globals.backup_tickbase))
-        return;
-
-    static auto last_checked = 0;
-    static auto last_spawn_time = 0.f;
-    static auto tick_cocked = 0;
-    static auto tick_strip = 0;
-    auto time = TICKS_TO_TIME(g_ctx.globals.backup_tickbase);
-
-    const auto max_ticks = TIME_TO_TICKS(.25f) - 1;
-    const auto tick_base = TIME_TO_TICKS(time);
-
-    if (g_ctx.local()->m_flSpawnTime() != last_spawn_time) {
-        tick_cocked = tick_base;
-        tick_strip = tick_base - max_ticks - 1;
-        last_spawn_time = g_ctx.local()->m_flSpawnTime();
-    }
-
-    if (g_ctx.globals.weapon->m_flNextPrimaryAttack() > time) {
-        cmd->m_buttons &= ~IN_ATTACK;
-        r8_fire = false;
-        return;
-    }
-
-    if (last_checked == tick_base)
-        return;
-
-    last_checked = tick_base;
-    r8_fire = false;
-
-    if (tick_base - tick_strip > 2 && tick_base - tick_strip < 14)
-        r8_fire = true;
-
-    if (cmd->m_buttons & IN_ATTACK && r8_fire)
-        return;
-
-    cmd->m_buttons |= IN_ATTACK;
-
-    if (g_ctx.globals.weapon->m_flNextSecondaryAttack() >= time)
-        cmd->m_buttons |= IN_ATTACK2;
-
-    if (tick_base - tick_cocked > max_ticks * 2 + 1) {
-        tick_cocked = tick_base;
-        tick_strip = tick_base - max_ticks - 1;
-    }
-
-    const auto cock_limit = tick_base - tick_cocked >= max_ticks;
-    const auto after_strip = tick_base - tick_strip <= max_ticks;
-
-    if (cock_limit || after_strip) {
-        tick_cocked = tick_base;
-        cmd->m_buttons &= ~IN_ATTACK;
-
-        if (cock_limit)
-            tick_strip = tick_base;
-    }
-}*/
-
 void aim::automatic_revolver(CUserCmd* cmd)
 {
     if (!cfg.ragebot.enable)
@@ -213,7 +112,7 @@ void aim::automatic_revolver(CUserCmd* cmd)
 
     static auto tick = 0.2f;
 
-    if (cmd->m_buttons &= ~IN_ATTACK)
+    if (!(cmd->m_buttons & IN_ATTACK))
         return;
 
     cmd->m_buttons &= ~IN_ATTACK2;
@@ -240,28 +139,6 @@ void aim::automatic_revolver(CUserCmd* cmd)
 
     g_ctx.globals.revolver_working = true;
 }
-
-void aim::AdjustRevolverData(CUserCmd* cmd, int32_t nCommand, int32_t nButtons)
-{
-    if (g_ctx.local()->m_fFlags() & FL_FROZEN || antiaim::get().freeze_check)
-        return;
-
-    int nn;
-
-    auto pCombatWeapon = g_ctx.local()->m_hActiveWeapon().Get();
-}
-
-float aim::LerpTime() {
-    static auto cl_interp = m_cvar()->FindVar(crypt_str("cl_interp"));
-    static auto cl_updaterate = m_cvar()->FindVar(crypt_str("cl_updaterate"));
-    static auto cl_interp_ratio = m_cvar()->FindVar(crypt_str("cl_interp_ratio"));
-
-    const auto a2 = cl_updaterate->GetFloat();
-    const auto a1 = cl_interp->GetFloat();
-    const auto v2 = cl_interp_ratio->GetFloat() / a2;
-
-    return fmaxf(a1, v2);
-};
 
 int aim::backtrack_window()
 {
@@ -332,11 +209,51 @@ void aim::collect_records(target& current)
     }
 }
 
+static float target_threat(player_t* e, const Vector& viewangles, const Vector& eye_pos)
+{
+    auto head = e->hitbox_position(HITBOX_HEAD);
+
+    if (head.IsZero())
+        head = e->GetAbsOrigin() + e->m_vecViewOffset();
+
+    const auto distance = eye_pos.DistTo(head);
+    const auto fov = math::get_fov(viewangles, math::calculate_angle(eye_pos, head));
+
+    auto score = 1024.0f;
+
+    score -= math::clamp(fov, 0.0f, 180.0f) * 4.0f;
+    score -= math::clamp(distance, 0.0f, 4096.0f) * 0.06f;
+    score -= (float)math::clamp(e->m_iHealth(), 0, 100) * 1.2f;
+
+    auto weapon = e->m_hActiveWeapon().Get();
+
+    if (weapon)
+    {
+        if (weapon->is_non_aim())
+            score -= 160.0f;
+        else
+        {
+            const auto reverse = math::get_fov(e->m_angEyeAngles(), math::calculate_angle(head, eye_pos));
+
+            if (reverse < 30.0f)
+                score += (30.0f - reverse) * 3.5f;
+        }
+    }
+
+    return score;
+}
+
 void aim::prepare_targets()
 {
+    Vector engine_angles;
+    m_engine()->GetViewAngles(engine_angles);
+
     for (auto i = 1; i <= m_globals()->m_maxclients; i++)
     {
         auto e = (player_t*)m_entitylist()->GetClientEntity(i);
+
+        if (!e)
+            continue;
 
         if (!e->valid(true, false))
             continue;
@@ -360,13 +277,8 @@ void aim::prepare_targets()
 
     if (targets.size() > 5)
     {
-        Vector engine_angles;
-        m_engine()->GetViewAngles(engine_angles);
-
         std::sort(targets.begin(), targets.end(), [&engine_angles](const target& a, const target& b) {
-            auto dist_a = a.e->GetAbsOrigin().DistTo(g_ctx.local()->GetAbsOrigin());
-            auto dist_b = b.e->GetAbsOrigin().DistTo(g_ctx.local()->GetAbsOrigin());
-            return dist_a < dist_b;
+            return target_threat(a.e, engine_angles, g_ctx.globals.eye_pos) > target_threat(b.e, engine_angles, g_ctx.globals.eye_pos);
             });
 
         targets.resize(5);
@@ -377,21 +289,6 @@ void aim::prepare_targets()
         collect_records(target);
         backup.emplace_back(adjust_data(target.e));
     }
-}
-
-static bool compare_records(const optimized_adjust_data& first, const optimized_adjust_data& second)
-{
-    auto first_pitch = math::normalize_pitch(first.angles.x);
-    auto second_pitch = math::normalize_pitch(second.angles.x);
-
-    if (fabs(first_pitch - second_pitch) > 15.0f)
-        return fabs(first_pitch) < fabs(second_pitch);
-    else if (first.duck_amount != second.duck_amount) //-V550
-        return first.duck_amount < second.duck_amount;
-    else if (first.origin != second.origin)
-        return first.origin.DistTo(g_ctx.local()->GetAbsOrigin()) < second.origin.DistTo(g_ctx.local()->GetAbsOrigin());
-
-    return first.simulation_time > second.simulation_time;
 }
 
 adjust_data* aim::get_record(std::deque <adjust_data>* records, bool history)
@@ -452,14 +349,9 @@ int aim::get_minimum_damage(bool visible, int health)
     return minimum_damage;
 }
 
-int aim::get_adaptive_minimum_damage(bool visible, int health, int hitbox)
-{
-    return get_minimum_damage(visible, health);
-}
-
 float aim::probe_record(adjust_data* record)
 {
-    static const int probe_hitboxes[] = { HITBOX_HEAD, HITBOX_CHEST, HITBOX_PELVIS };
+    static const int probe_hitboxes[] = { HITBOX_HEAD, HITBOX_UPPER_CHEST, HITBOX_CHEST, HITBOX_STOMACH, HITBOX_PELVIS };
 
     auto health = record->player->m_iHealth();
     auto best = -1.0f;
@@ -490,8 +382,7 @@ float aim::probe_record(adjust_data* record)
         if (record->shot)
             rating += 22.0f;
 
-        if (record->resolver_confident)
-            rating += 14.0f;
+        rating += record->resolver_confidence * 16.0f;
 
         if (fire_data.damage > record->hittable_damage)
         {
@@ -512,7 +403,8 @@ float aim::rate_record(adjust_data* record, scan_data& data, float newest_time)
     auto health = record->player->m_iHealth();
     auto rating = (float)min(data.damage, health);
 
-    auto unresolved = !record->bot && !record->resolver_confident;
+    auto trust = record->bot ? 1.0f : math::clamp(record->resolver_confidence, 0.0f, 1.0f);
+    auto unresolved = trust < 0.55f;
 
     if (data.damage >= health)
         rating += 60.0f;
@@ -529,8 +421,7 @@ float aim::rate_record(adjust_data* record, scan_data& data, float newest_time)
     if (record->shot)
         rating += 22.0f;
 
-    if (record->resolver_confident)
-        rating += 14.0f;
+    rating += trust * 18.0f;
 
     auto age = TIME_TO_TICKS(newest_time - record->simulation_time);
 
@@ -854,35 +745,46 @@ bool aim::automatic_stop(CUserCmd* cmd)
     return true;
 }
 
-static bool compare_points(const scan_point& first, const scan_point& second)
-{
-    return !first.center && first.hitbox == second.hitbox;
-}
-
 float aim::safe_point_margin(adjust_data* record, int hitbox, const Vector& shoot_position, const Vector& point)
 {
-    matrix3x4_t* candidates[3] =
+    matrix3x4_t* candidates[5] =
     {
         record->matrixes_data.zero,
         record->matrixes_data.first,
-        record->matrixes_data.second
+        record->matrixes_data.second,
+        record->matrixes_data.positive,
+        record->matrixes_data.negative
     };
 
-    Vector origin[3];
+    Vector origin[5];
+    auto count = 0;
 
-    for (auto i = 0; i < 3; ++i)
+    for (auto i = 0; i < 5; ++i)
     {
-        origin[i] = record->player->hitbox_position_matrix(hitbox, candidates[i]);
+        auto position = record->player->hitbox_position_matrix(hitbox, candidates[i]);
 
-        if (origin[i].IsZero())
-            return 0.0f;
+        if (position.IsZero())
+        {
+            if (i < 3)
+                return 0.0f;
+
+            continue;
+        }
+
+        candidates[count] = candidates[i];
+        origin[count] = position;
+
+        ++count;
     }
+
+    if (count < 3)
+        return 0.0f;
 
     auto distinct = false;
 
-    for (auto i = 0; i < 3 && !distinct; ++i)
+    for (auto i = 0; i < count && !distinct; ++i)
     {
-        for (auto j = i + 1; j < 3; ++j)
+        for (auto j = i + 1; j < count; ++j)
         {
             if (origin[i].DistTo(origin[j]) > 0.05f)
             {
@@ -897,7 +799,7 @@ float aim::safe_point_margin(adjust_data* record, int hitbox, const Vector& shoo
 
     auto margin = 0.0f;
 
-    for (auto i = 0; i < 3; ++i)
+    for (auto i = 0; i < count; ++i)
     {
         auto distance = 0.0f;
 
@@ -931,12 +833,18 @@ float aim::point_clearance(adjust_data* record, const scan_point& point, const V
     math::fast_vec_normalize(right);
     math::fast_vec_normalize(up);
 
-    const Vector shift[4] =
+    const auto diagonal = radius * 0.70710678f;
+
+    const Vector shift[8] =
     {
         right * radius,
         right * -radius,
         up * radius,
-        up * -radius
+        up * -radius,
+        right * diagonal + up * diagonal,
+        right * diagonal + up * -diagonal,
+        right * -diagonal + up * diagonal,
+        right * -diagonal + up * -diagonal
     };
 
     auto extension = 1.0f + 24.0f / distance;
@@ -957,7 +865,7 @@ float aim::point_clearance(adjust_data* record, const scan_point& point, const V
         ++passing;
     }
 
-    return (float)passing * 0.25f;
+    return (float)passing * 0.125f;
 }
 
 void aim::scan(adjust_data* record, scan_data& data, const Vector& shoot_position)
@@ -979,14 +887,17 @@ void aim::scan(adjust_data* record, scan_data& data, const Vector& shoot_positio
 
     auto& weapon_cfg = cfg.ragebot.weapon[g_ctx.globals.current_weapon];
 
+    auto trust = record->bot ? 1.0f : math::clamp(record->resolver_confidence, 0.0f, 1.0f);
+    auto unresolved = trust < 0.55f;
+
     auto safe_points_key = key_binds::get().get_key_bind_state(3);
     auto force_safe_points = safe_points_key || weapon_cfg.max_misses && g_ctx.globals.missed_shots[record->i] >= weapon_cfg.max_misses_amount;
     auto best_damage = 0;
 
     auto health = record->player->m_iHealth();
 
-    auto visible_minimum_damage = get_adaptive_minimum_damage(true, health, HITBOX_HEAD);
-    auto occluded_minimum_damage = get_adaptive_minimum_damage(false, health, HITBOX_HEAD);
+    auto visible_minimum_damage = get_minimum_damage(true, health);
+    auto occluded_minimum_damage = get_minimum_damage(false, health);
     auto damage_floor = (float)min(visible_minimum_damage, occluded_minimum_damage);
     auto cone_spread = fmaxf(g_ctx.globals.spread + g_ctx.globals.inaccuracy, 0.0f);
 
@@ -1014,7 +925,10 @@ void aim::scan(adjust_data* record, scan_data& data, const Vector& shoot_positio
 	if (points.empty())
 		return;
 
-	auto unresolved = !record->bot && !record->resolver_confident;
+	std::stable_partition(points.begin(), points.end(), [](const scan_point& point)
+		{
+			return point.hitbox >= HITBOX_PELVIS && point.hitbox <= HITBOX_UPPER_CHEST;
+		});
 
 	if (unresolved || weapon_cfg.prefer_safe_points)
 	{
@@ -1045,7 +959,7 @@ void aim::scan(adjust_data* record, scan_data& data, const Vector& shoot_positio
 		|| body_aim_modifiers[BAIM_AIR] && !(record->flags & FL_ONGROUND)
 		|| body_aim_modifiers[BAIM_HIGH_VELOCITY] && record->velocity.Length2D() > 85.0f
 		|| body_aim_modifiers[BAIM_DOUBLE_TAP] && g_ctx.globals.double_tap_aim
-		|| body_aim_modifiers[BAIM_UNRESOLVED] && !record->bot && !record->resolver_confident;
+		|| body_aim_modifiers[BAIM_UNRESOLVED] && unresolved;
 
 	auto lethal_body = body_aim_modifiers[BAIM_LETHAL];
 
@@ -1067,7 +981,7 @@ void aim::scan(adjust_data* record, scan_data& data, const Vector& shoot_positio
 			if (key_binds::get().get_key_bind_state(22))
 				break;
 
-			if (best_damage >= health)
+			if (lethal_body && best_damage >= health)
 				break;
 
 			if ((force_body_aim || weapon_cfg.prefer_body_aim) && best_damage >= 1)
@@ -1080,9 +994,6 @@ void aim::scan(adjust_data* record, scan_data& data, const Vector& shoot_positio
 			continue;
 
 		if (fire_data.damage < 1)
-			continue;
-
-		if (!fire_data.visible && !cfg.ragebot.enable)
 			continue;
 
 		auto current_minimum_damage = fire_data.visible ? visible_minimum_damage : occluded_minimum_damage;
@@ -1106,7 +1017,7 @@ void aim::scan(adjust_data* record, scan_data& data, const Vector& shoot_positio
 			current_score += 25.0f;
 
 		current_score += point.center ? 2.0f : 0.0f;
-		current_score += point.safe ? (unresolved ? 22.0f : 1.0f) : 0.0f;
+		current_score += point.safe ? (1.0f + (1.0f - trust) * 26.0f) : 0.0f;
 
 		if (lethal_body && is_body && effective_damage >= health)
 			current_score += 8.0f;
@@ -1118,7 +1029,7 @@ void aim::scan(adjust_data* record, scan_data& data, const Vector& shoot_positio
 			if (clearance <= 0.0f)
 				continue;
 
-			current_score -= (1.0f - clearance) * 30.0f;
+			current_score -= (1.0f - clearance) * 45.0f;
 		}
 
 		if (current_score >= best_score && fire_data.damage >= current_minimum_damage)
@@ -1219,48 +1130,62 @@ std::vector <int> aim::get_hitboxes(adjust_data* record)
 void aim::update_peek_state()
 {
     g_ctx.globals.m_Peek.m_bIsPeeking = false;
-    if (!cfg.ragebot.enable && (!cfg.antiaim.fakelag || !cfg.antiaim.triggers_fakelag_amount > 2))
+
+    if (!cfg.ragebot.enable && (!cfg.antiaim.fakelag || cfg.antiaim.triggers_fakelag_amount <= 2))
+        return;
+
+    if (!g_ctx.local() || g_ctx.globals.current_weapon == -1)
         return;
 
     if (g_ctx.local()->m_vecVelocity().Length2D() > 5.0f)
         return;
 
-    // predpos
-    Vector predicted_eye_pos = g_ctx.globals.eye_pos + (engineprediction::get().backup_data.velocity * m_globals()->m_intervalpertick);
+    const auto velocity = engineprediction::get().backup_data.velocity;
+    const auto chokes = max(m_clientstate()->iChokedCommands, 1);
 
     for (auto i = 1; i <= m_globals()->m_maxclients; i++)
     {
         auto e = static_cast<player_t*>(m_entitylist()->GetClientEntity(i));
-        if (!e->valid(true))
+
+        if (!e || !e->valid(true))
             continue;
 
         auto records = &player_records[i];
+
         if (records->empty())
             continue;
 
         auto record = &records->front();
+
         if (!record->valid())
             continue;
 
-        // apply player animated data
         record->adjust_player();
 
-        // look all ticks for get first hitable
-        for (int next_chock = 1; next_chock <= m_clientstate()->iChokedCommands; ++next_chock)
-        {
-            predicted_eye_pos *= next_chock;
+        auto head = e->hitbox_position_matrix(HITBOX_HEAD, record->matrixes_data.main);
 
-            auto fire_data = autowall::get().wall_penetration(predicted_eye_pos, e->hitbox_position_matrix(HITBOX_HEAD, record->matrixes_data.first), e);
+        if (head.IsZero())
+            continue;
+
+        for (auto next_choke = 1; next_choke <= chokes; ++next_choke)
+        {
+            const auto predicted_eye_pos = g_ctx.globals.eye_pos + velocity * (m_globals()->m_intervalpertick * (float)next_choke);
+
+            auto fire_data = autowall::get().wall_penetration(predicted_eye_pos, head, e);
+
             if (!fire_data.valid || fire_data.damage < 1)
                 continue;
 
             g_ctx.globals.m_Peek.m_bIsPeeking = true;
-            m_debugoverlay()->AddBoxOverlay(predicted_eye_pos, Vector(-0.7f, -0.7f, -0.7f), Vector(0.7f, 0.7f, 0.7f), Vector(0.f, 0.f, 0.f), 0, 255, 0, 100, m_globals()->m_intervalpertick * 2);
+            break;
         }
+
+        if (g_ctx.globals.m_Peek.m_bIsPeeking)
+            break;
     }
 }
 
-float aim::bodyscale(player_t* e) // 
+float aim::bodyscale(player_t* e)
 {
     if (!(e->m_fFlags() & FL_ONGROUND))
         return 0.f;
@@ -1273,14 +1198,12 @@ float aim::bodyscale(player_t* e) //
         return std::clamp(scale, 0.0f, 0.75f);
     }
 
-    // Calculate dynamic body scale based on distance
     auto distance = e->m_vecOrigin().DistTo(g_ctx.globals.eye_pos);
     auto max_distance = weapon_range / 4.f;
-    
+
     float factor = 0.f;
     if (distance < max_distance)
     {
-        // Sigmoid curve for smooth scale transition
         float normalized = (distance / max_distance);
         factor = 1.f - 1.f / (1.f + pow(2.f, -(normalized * 2.f - 1.f) / 0.115f));
     }
@@ -1352,21 +1275,26 @@ std::vector <scan_point> aim::get_points(adjust_data* record, int hitbox, bool f
         matrix3x4_t matrix;
         math::concat_transforms(record->matrixes_data.main[bbox->bone], rotation_matrix, matrix);
 
+        const auto local_center = (bbox->bbmin + bbox->bbmax) * 0.5f;
+
+        Vector world_center;
+        math::vector_transform(local_center, matrix, world_center);
+
+        points.emplace_back(scan_point(world_center, hitbox, true));
+
         if (hitbox == HITBOX_RIGHT_FOOT || hitbox == HITBOX_LEFT_FOOT)
         {
-            const auto local_center = (bbox->bbmin + bbox->bbmax) * 0.5f;
-            Vector local_points[3] =
+            Vector local_points[2] =
             {
-                local_center,
                 Vector(local_center.x + (bbox->bbmin.x - local_center.x) * 0.75f, local_center.y, local_center.z),
                 Vector(local_center.x + (bbox->bbmax.x - local_center.x) * 0.75f, local_center.y, local_center.z)
             };
 
-            for (int i = 0; i < 3; ++i)
+            for (auto& local : local_points)
             {
                 Vector world;
-                math::vector_transform(local_points[i], matrix, world);
-                points.emplace_back(scan_point(world, hitbox, i == 0));
+                math::vector_transform(local, matrix, world);
+                points.emplace_back(scan_point(world, hitbox, false));
             }
         }
 
@@ -1374,12 +1302,15 @@ std::vector <scan_point> aim::get_points(adjust_data* record, int hitbox, bool f
     }
 
     auto scale = hitbox == HITBOX_HEAD ? GetHeadScale(record->player) : bodyscale(record->player);
+
     if (!cfg.ragebot.weapon[g_ctx.globals.current_weapon].static_point_scale)
     {
         const auto spread = fmaxf(g_ctx.globals.spread + g_ctx.globals.inaccuracy, 0.0f);
         const auto spread_radius = center.DistTo(g_ctx.globals.eye_pos) * std::tan(spread);
-        scale = std::clamp((bbox->radius - spread_radius) / bbox->radius, 0.0f,
+        const auto spread_scale = std::clamp((bbox->radius - spread_radius) / bbox->radius, 0.0f,
             hitbox == HITBOX_HEAD ? 0.80f : 0.75f);
+
+        scale = min(scale, spread_scale);
     }
 
     points.emplace_back(scan_point(center, hitbox, true));
@@ -1418,146 +1349,34 @@ static bool compare_targets(const scanned_target& first, const scanned_target& s
     if (cfg.player_list.high_priority[first.record->i] != cfg.player_list.high_priority[second.record->i])
         return cfg.player_list.high_priority[first.record->i];
 
-    return first.data.damage > second.data.damage;
+    const auto lethal_first = first.data.damage >= first.health;
+    const auto lethal_second = second.data.damage >= second.health;
 
+    if (lethal_first != lethal_second)
+        return lethal_first;
+
+    switch (cfg.ragebot.weapon[g_ctx.globals.current_weapon].selection_type)
+    {
+    case 1:
+        return first.fov < second.fov;
+    case 2:
+        return first.distance < second.distance;
+    case 3:
+        return first.health < second.health;
+    }
+
+    return first.data.damage > second.data.damage;
 }
 
 void aim::find_best_target()
 {
-    if (cfg.ragebot.weapon[g_ctx.globals.current_weapon].selection_type)
-        std::sort(scanned_targets.begin(), scanned_targets.end(), compare_targets);
+    if (scanned_targets.empty())
+        return;
 
-    for (auto& target : scanned_targets)
-    {
-        final_target = target;
-        final_target.record->adjust_player();
-        break;
-    }
-}
+    std::sort(scanned_targets.begin(), scanned_targets.end(), compare_targets);
 
-bool IsTickValid(float simTime)
-{
-    static auto cl_interp_ratio = m_cvar()->FindVar(crypt_str("cl_interp_ratio"));
-    static auto sv_client_min_interp_ratio = m_cvar()->FindVar(crypt_str("sv_client_min_interp_ratio"));
-    static auto sv_client_max_interp_ratio = m_cvar()->FindVar(crypt_str("sv_client_max_interp_ratio"));
-    static auto sv_maxunlag = m_cvar()->FindVar(crypt_str("sv_maxunlag"));
-    auto lerp_ratio = math::clamp(cl_interp_ratio->GetFloat(), sv_client_min_interp_ratio->GetFloat(), sv_client_max_interp_ratio->GetFloat());
-    INetChannelInfo* nci = m_engine()->GetNetChannelInfo();
-
-    if (!nci)
-        return false;
-
-    auto lerpTicks = TIME_TO_TICKS(lerp_ratio);
-
-    int predCmdArrivTick = m_globals()->m_tickcount + 1 + 
-        TIME_TO_TICKS(nci->GetAvgLatency(FLOW_INCOMING) + 
-                      nci->GetAvgLatency(FLOW_OUTGOING));
-
-    float outgoingLatency = nci->GetLatency(FLOW_OUTGOING);
-    float clampedLatency = math::clamp(lerp_ratio + outgoingLatency, 0.f, sv_maxunlag->GetFloat());
-
-    int timeDelta = TIME_TO_TICKS(simTime) + TIME_TO_TICKS(lerp_ratio);
-    float correction = clampedLatency - TICKS_TO_TIME(predCmdArrivTick + lerpTicks - timeDelta);
-
-    return abs(correction) < sv_maxunlag->GetFloat();
-}
-
-bool aim::calculate_hitchance(const Vector& aim_angle, player_t* ent, int& final_hitchance)
-{
-    build_seed_table();
-
-    static int iTotalSeeds;
-
-    auto weapon = g_ctx.local()->m_hActiveWeapon();
-    if (!weapon)
-        return false;
-
-    auto weapon_info = weapon->get_csweapon_info();
-    if (!weapon_info)
-        return false;
-
-    Vector angles;
-
-    float flChance = cfg.ragebot.weapon[g_ctx.globals.current_weapon].hitchance ? cfg.ragebot.weapon[g_ctx.globals.current_weapon].hitchance_amount : 0;
-
-    Vector fw, rw, uw;
-    math::aim::AngleVectors(angles, fw, rw, uw);
-
-    int hits = 0;
-    int needed_hits = static_cast<int>(iTotalSeeds * (flChance / 100.f));
-
-    float weapon_spread = weapon->get_spread();
-    float weapon_inaccuracy = weapon->get_inaccuracy();
-
-    Vector src = g_ctx.local()->get_eye_pos();
-
-    for (int i = 0; i < iTotalSeeds; i++) {
-
-        float a = math::random_float(0.f, 1.f);
-        float b = math::random_float(0.f, M_PI * 2.f);
-        float c = math::random_float(0.f, 1.f);
-        float d = math::random_float(0.f, M_PI * 2.f);
-        float inaccuracy = a * weapon_inaccuracy;
-        float spread = c * weapon_spread;
-
-        if (weapon->m_iItemDefinitionIndex() == 64) {
-            if (g_ctx.get_command()->m_buttons & IN_ATTACK2) {
-                a = 1.f - a * a;
-                c = 1.f - c * c;
-            }
-        }
-
-        Vector spread_view((cos(b) * inaccuracy) + (cos(d) * spread), (sin(b) * inaccuracy) + (sin(d) * spread), 0);
-        Vector direction;
-
-        direction.x = fw.x + (spread_view.x * rw.x) + (spread_view.y * uw.x);
-        direction.y = fw.y + (spread_view.x * rw.y) + (spread_view.y * uw.y);
-        direction.z = fw.z + (spread_view.x * rw.z) + (spread_view.y * uw.z);
-        direction.Normalized();
-
-        Vector viewangles_spread;
-        Vector view_forward;
-
-        math::aim::Vector_Angles(direction, uw, viewangles_spread);
-        viewangles_spread.Normalize();
-        math::aim::AngleVectors2(viewangles_spread, view_forward);
-
-        view_forward.NormalizeInPlace();
-        view_forward = src + (view_forward * weapon_info->flRange);
-
-        trace_t tr;
-        Ray_t ray;
-
-        ray.Init(src, view_forward);
-        m_trace()->ClipRayToEntity(ray, MASK_SHOT, ent, &tr);
-
-        if (tr.hit_entity == ent)
-            hits++;
-
-        if (static_cast<int>((static_cast<float>(hits) / iTotalSeeds) * 100.f) >= flChance)
-            return true;
-
-        if ((iTotalSeeds - i + hits) < needed_hits)
-            return false;
-    }
-    final_hitchance = ((float)hits / (float)iTotalSeeds);
-    return false;
-}
-
-int aim::calc_bt_ticks()
-{
-    if (!final_target.record || !final_target.record->player)
-        return 0;
-
-    auto records = &player_records[final_target.record->player->EntIndex()];
-
-    for (size_t i = 0; i < records->size(); i++)
-    {
-        if (records->at(i).simulation_time == final_target.record->simulation_time) //-V550
-            return (int)i;
-    }
-
-    return 0;
+    final_target = scanned_targets.front();
+    final_target.record->adjust_player();
 }
 
 void aim::automatic_scope(CUserCmd* cmd)
@@ -1729,7 +1548,7 @@ void aim::fire(CUserCmd* cmd)
         if (!candidate.data.valid() || !candidate.record || !candidate.record->player)
             continue;
 
-        for (auto pass = 0; pass < 2 && attempts < 3; ++pass)
+        for (auto pass = 0; pass < 2 && attempts < 6; ++pass)
         {
             if (pass && !fallback_point(candidate))
                 break;
@@ -1755,7 +1574,7 @@ void aim::fire(CUserCmd* cmd)
             }
         }
 
-        if (solved || attempts >= 3)
+        if (solved || attempts >= 6)
             break;
     }
 
@@ -1811,6 +1630,8 @@ void aim::fire(CUserCmd* cmd)
             case HITBOX_LEFT_FOOT:
                 return shot_info ? crypt_str("Right foot") : crypt_str("right foot");
             }
+
+            return shot_info ? crypt_str("Generic") : crypt_str("generic");
         };
 
     player_info_t player_info;
@@ -1827,12 +1648,8 @@ void aim::fire(CUserCmd* cmd)
         *final_target.record, final_target.data, final_target.distance
     };
 
-    // Limit shots array to prevent unbounded memory growth
-    const int MAX_SHOTS = 256;
-    if (g_ctx.shots.size() >= MAX_SHOTS)
-    {
+    if (g_ctx.shots.size() >= 256)
         g_ctx.shots.erase(g_ctx.shots.begin());
-    }
 
     auto shot = &g_ctx.shots.emplace_back();
     shot->last_target = last_target_index;
@@ -1849,14 +1666,11 @@ void aim::fire(CUserCmd* cmd)
     shot->shot_info.was_visible_when_fired = final_target.data.visible;
     shot->shot_info.point_was_safe = final_target.data.point.safe > 0.0f;
 
-    // Capture weapon name from weapon index
     shot->shot_info.weapon_name = g_ctx.globals.weapon->get_name();
 
-    // Capture target position at fire time for prediction error detection
     shot->target_position_at_fire = final_target.record->origin;
 	shot->shoot_position = g_ctx.globals.eye_pos;
 
-    // Get network latency
     auto net_channel = m_engine()->GetNetChannelInfo();
     if (net_channel && !net_channel->IsLoopback() && !m_engine()->IsPlayingDemo())
     {
@@ -1866,7 +1680,6 @@ void aim::fire(CUserCmd* cmd)
 	else
 		shot->shot_info.network_latency_ms = 0;
 
-    // Capture target animation data
     auto target_player = final_target.record->player;
     if (target_player)
     {
@@ -1878,14 +1691,12 @@ void aim::fire(CUserCmd* cmd)
         }
     }
 
-    // Capture current map
     if (g_ctx.globals.current_map == crypt_str("unknown"))
     {
         const char* map_name = m_engine()->GetLevelName();
         if (map_name)
         {
             std::string map_str(map_name);
-            // Extract just the map name from path (e.g., "maps/de_dust2" -> "de_dust2")
             size_t pos = map_str.find_last_of("/\\");
             if (pos != std::string::npos)
                 map_str = map_str.substr(pos + 1);
@@ -1898,42 +1709,52 @@ void aim::fire(CUserCmd* cmd)
     g_ctx.globals.last_aimbot_shot = m_globals()->m_tickcount;
 }
 
-static std::vector<std::tuple<float, float, float>> precomputed_seeds = {};
-
-__forceinline void aim::build_seed_table()
+struct spread_sample_t
 {
-    if (!precomputed_seeds.empty())
+    float inaccuracy_scale;
+    float spread_scale;
+    float inaccuracy_sin;
+    float inaccuracy_cos;
+    float spread_sin;
+    float spread_cos;
+};
+
+static spread_sample_t spread_samples[256];
+static auto spread_samples_ready = false;
+
+void aim::build_seed_table()
+{
+    if (spread_samples_ready)
         return;
 
-    for (auto i = 0; i < 255; i++)
+    spread_samples_ready = true;
+
+    for (auto i = 0; i < 256; ++i)
     {
         math::random_seed(i + 1);
 
-        const auto pi_seed = math::random_float(0.f, twopi);
+        const auto inaccuracy_scale = math::random_float(0.0f, 1.0f);
+        const auto inaccuracy_angle = math::random_float(0.0f, DirectX::XM_2PI);
+        const auto spread_scale = math::random_float(0.0f, 1.0f);
+        const auto spread_angle = math::random_float(0.0f, DirectX::XM_2PI);
 
-        precomputed_seeds.emplace_back(math::random_float(0.f, 1.f),
-            sin(pi_seed), cos(pi_seed));
-    }
-}
+        auto inaccuracy_sin = 0.0f, inaccuracy_cos = 0.0f;
+        DirectX::XMScalarSinCos(&inaccuracy_sin, &inaccuracy_cos, inaccuracy_angle);
 
-static const int iTotalSeeds = 255;
-static std::vector<std::tuple<float, float, float>> PreComputedSeeds = {};
-void BulidSeedTable() {
+        auto spread_sin = 0.0f, spread_cos = 0.0f;
+        DirectX::XMScalarSinCos(&spread_sin, &spread_cos, spread_angle);
 
-    if (!PreComputedSeeds.empty()) return;
-
-    for (auto i = 0; i < iTotalSeeds; i++) {
-        math::random_seed(i + 1);
-
-        const auto pi_seed = math::random_float(0.f, M_PI * 2);
-
-        PreComputedSeeds.emplace_back(math::random_float(0.f, 1.f), sin(pi_seed), cos(pi_seed));
+        spread_samples[i].inaccuracy_scale = inaccuracy_scale;
+        spread_samples[i].spread_scale = spread_scale;
+        spread_samples[i].inaccuracy_sin = inaccuracy_sin;
+        spread_samples[i].inaccuracy_cos = inaccuracy_cos;
+        spread_samples[i].spread_sin = spread_sin;
+        spread_samples[i].spread_cos = spread_cos;
     }
 }
 
 int aim::hitchance(const Vector& aim_angle)
 {
-    // Use member variable instead of local
     final_hitchance = 0;
     auto weapon_info = g_ctx.globals.weapon->get_csweapon_info();
 
@@ -1953,10 +1774,8 @@ int aim::hitchance(const Vector& aim_angle)
     math::fast_vec_normalize(right);
     math::fast_vec_normalize(up);
 
-    // Use weapon's actual calculated inaccuracy instead of static values
     auto real_inaccuracy = max(g_ctx.globals.inaccuracy, g_ctx.globals.weapon->get_inaccuracy());
 
-    // Edge case: ladder movement has special inaccuracy
     if (g_ctx.local()->get_move_type() == MOVETYPE_LADDER)
         real_inaccuracy = max(real_inaccuracy, weapon_info->flInaccuracyLadder);
 
@@ -1991,92 +1810,66 @@ int aim::hitchance(const Vector& aim_angle)
         return final_hitchance;
     }
 
+    build_seed_table();
+
+    const auto configured = cfg.ragebot.weapon[g_ctx.globals.current_weapon].hitchance
+        ? math::clamp(cfg.ragebot.weapon[g_ctx.globals.current_weapon].hitchance_amount, 1, 100) : 1;
+
+    const auto needed = configured * 256 / 100;
+
+    auto intersecting = 0;
+    auto evaluated = 0;
+    auto reaching = 0;
+    auto budget = 48;
+    auto sampled = 0;
+
+    for (auto i = 0; i < 256; ++i)
     {
-        static auto setup_spread_values = true;
-        static float spread_values[256][6];
+        if (256 - i + intersecting < needed)
+            break;
 
-        if (setup_spread_values)
-        {
-            setup_spread_values = false;
+        ++sampled;
 
-            for (auto i = 0; i < 256; ++i)
-            {
-                math::random_seed(i + 1);
+        const auto& sample = spread_samples[i];
 
-                auto a = math::random_float(0.0f, 1.0f);
-                auto b = math::random_float(0.0f, DirectX::XM_2PI);
-                auto c = math::random_float(0.0f, 1.0f);
-                auto d = math::random_float(0.0f, DirectX::XM_2PI);
+        auto inaccuracy = sample.inaccuracy_scale * g_ctx.globals.inaccuracy;
+        auto spread = sample.spread_scale * g_ctx.globals.spread;
 
-                spread_values[i][0] = a;
-                spread_values[i][1] = c;
+        auto spread_x = sample.inaccuracy_cos * inaccuracy + sample.spread_cos * spread;
+        auto spread_y = sample.inaccuracy_sin * inaccuracy + sample.spread_sin * spread;
 
-                auto sin_b = 0.0f, cos_b = 0.0f;
-                DirectX::XMScalarSinCos(&sin_b, &cos_b, b);
+        auto direction = ZERO;
 
-                auto sin_d = 0.0f, cos_d = 0.0f;
-                DirectX::XMScalarSinCos(&sin_d, &cos_d, d);
+        direction.x = forward.x + right.x * spread_x + up.x * spread_y;
+        direction.y = forward.y + right.y * spread_x + up.y * spread_y;
+        direction.z = forward.z + right.z * spread_x + up.z * spread_y;
 
-                spread_values[i][2] = sin_b;
-                spread_values[i][3] = cos_b;
-                spread_values[i][4] = sin_d;
-                spread_values[i][5] = cos_d;
-            }
-        }
+        auto end = g_ctx.globals.eye_pos + direction * weapon_info->flRange;
 
-        const auto configured = cfg.ragebot.weapon[g_ctx.globals.current_weapon].hitchance
-            ? math::clamp(cfg.ragebot.weapon[g_ctx.globals.current_weapon].hitchance_amount, 1, 100) : 1;
+        if (!hitbox_intersection(final_target.record->player, final_target.record->matrixes_data.main, final_target.data.hitbox, g_ctx.globals.eye_pos, end))
+            continue;
 
-        const auto needed = configured * 256 / 100;
+        ++intersecting;
 
-        auto intersecting = 0;
-        auto evaluated = 0;
-        auto reaching = 0;
-        auto budget = 48;
+        if (budget <= 0)
+            continue;
 
-        for (auto i = 0; i < 256; ++i)
-        {
-            if (256 - i + intersecting < needed)
-                break;
+        --budget;
+        ++evaluated;
 
-            auto inaccuracy = spread_values[i][0] * g_ctx.globals.inaccuracy;
-            auto spread = spread_values[i][1] * g_ctx.globals.spread;
+        auto fire_data = autowall::get().wall_penetration(g_ctx.globals.eye_pos, end, final_target.record->player, minimum_damage);
 
-            auto spread_x = spread_values[i][3] * inaccuracy + spread_values[i][5] * spread;
-            auto spread_y = spread_values[i][2] * inaccuracy + spread_values[i][4] * spread;
-
-            auto direction = ZERO;
-
-            direction.x = forward.x + right.x * spread_x + up.x * spread_y;
-            direction.y = forward.y + right.y * spread_x + up.y * spread_y;
-            direction.z = forward.z + right.z * spread_x + up.z * spread_y;
-
-            auto end = g_ctx.globals.eye_pos + direction * weapon_info->flRange;
-
-            if (!hitbox_intersection(final_target.record->player, final_target.record->matrixes_data.main, final_target.data.hitbox, g_ctx.globals.eye_pos, end))
-                continue;
-
-            ++intersecting;
-
-            if (budget <= 0)
-                continue;
-
-            --budget;
-            ++evaluated;
-
-            auto fire_data = autowall::get().wall_penetration(g_ctx.globals.eye_pos, end, final_target.record->player, minimum_damage);
-
-            if (fire_data.valid && (float)fire_data.damage >= minimum_damage)
-                ++reaching;
-        }
-
-        if (evaluated > 0 && reaching == 0)
-            return final_hitchance;
-
-        const auto reach = evaluated > 0 ? (float)reaching / (float)evaluated : 1.0f;
-
-        final_hitchance = (int)((float)intersecting / 2.56f * reach);
+        if (fire_data.valid && (float)fire_data.damage >= minimum_damage)
+            ++reaching;
     }
+
+    if (evaluated > 0 && reaching == 0)
+        return final_hitchance;
+
+    const auto reach = evaluated > 0 ? (float)reaching / (float)evaluated : 1.0f;
+    const auto bounded = intersecting + (256 - sampled);
+
+    final_hitchance = (int)((float)bounded / 2.56f * reach);
 
     return final_hitchance;
 }
@@ -2113,6 +1906,9 @@ bool aim::hitbox_intersection(player_t* e, matrix3x4_t* matrix, int hitbox, cons
     if (!studio_hitbox)
         return false;
 
+    if (studio_hitbox->bone < 0 || studio_hitbox->bone >= MAXSTUDIOBONES)
+        return false;
+
     trace_t trace;
 
     Ray_t ray;
@@ -2136,7 +1932,3 @@ bool aim::hitbox_intersection(player_t* e, matrix3x4_t* matrix, int hitbox, cons
 
     return intersected;
 }
-
-/*
-            TODO // ĶÅ ÄĪĻČŃĄĶĄß ×ĄŃŅÜ
-*/

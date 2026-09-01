@@ -1,7 +1,3 @@
-/*
-            By Semmxz
-*/
-
 #include "RageBackTracking.h"
 #include "Aim.h"
 #include "..\Lagcompensation\Animation_system.h"
@@ -9,8 +5,6 @@
 
 static std::deque<CIncomingSequence>sequences;
 static int lastincomingsequencenumber;
-int Real_m_nInSequencenumber;
-
 
 void CBacktracking::UpdateIncomingSequences()
 {
@@ -34,6 +28,7 @@ void CBacktracking::UpdateIncomingSequences()
 void CBacktracking::ClearIncomingSequences()
 {
     sequences.clear();
+    lastincomingsequencenumber = 0;
 }
 
 void CBacktracking::AddLatencyToNetchan(INetChannel* netchan, float Latency)

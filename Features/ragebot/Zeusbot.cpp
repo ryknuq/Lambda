@@ -1,6 +1,3 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: http://www.viva64.com
-
 #include "zeusbot.h"
 #include "..\misc\misc.h"
 #include "..\misc\logs.h"
@@ -59,14 +56,6 @@ void zeusbot::run(CUserCmd* cmd)
 	restore_players();
 }
 
-static bool compare_records(const adjust_data& first, const adjust_data& second)
-{
-	if (first.origin != second.origin)
-		return first.origin.DistTo(g_ctx.local()->GetAbsOrigin()) < second.origin.DistTo(g_ctx.local()->GetAbsOrigin());
-
-	return first.simulation_time > second.simulation_time;
-}
-
 void zeusbot::scan_targets()
 {
 	if (aim::get().targets.empty())
@@ -74,11 +63,11 @@ void zeusbot::scan_targets()
 
 	for (auto& target : aim::get().targets)
 	{
-		if (target.history_record->valid())
+		if (target.history_record && target.history_record->valid())
 		{
 			scan_data last_data;
 
-			if (target.last_record->valid())
+			if (target.last_record && target.last_record->valid())
 			{
 				target.last_record->adjust_player();
 				scan(target.last_record, last_data);
@@ -96,7 +85,7 @@ void zeusbot::scan_targets()
 		}
 		else
 		{
-			if (!target.last_record->valid())
+			if (!target.last_record || !target.last_record->valid())
 				continue;
 
 			scan_data last_data;
@@ -258,30 +247,68 @@ void zeusbot::fire(CUserCmd* cmd)
 #endif
 	cmd->m_viewangles = aim_angle;
 	cmd->m_buttons |= IN_ATTACK;
-	cmd->m_tickcount = TIME_TO_TICKS(final_target.record->simulation_time + util::get_interpolation());
+	cmd->m_tickcount = TIME_TO_TICKS(final_target.record->simulation_time) + TIME_TO_TICKS(util::get_interpolation());
 
 	g_ctx.globals.aimbot_working = true;
 	g_ctx.globals.last_aimbot_shot = m_globals()->m_tickcount;
 }
 
+static const float zeus_ring_x[8] = { 1.0f, 0.70710678f, 0.0f, -0.70710678f, -1.0f, -0.70710678f, 0.0f, 0.70710678f };
+static const float zeus_ring_y[8] = { 0.0f, 0.70710678f, 1.0f, 0.70710678f, 0.0f, -0.70710678f, -1.0f, -0.70710678f };
+
 int zeusbot::hitchance(const Vector& aim_angle)
 {
 	auto max_range = zeus_range();
+	auto distance = g_ctx.globals.eye_pos.DistTo(final_target.data.point.point);
 
-	if (g_ctx.globals.eye_pos.DistTo(final_target.data.point.point) > max_range)
+	if (distance > max_range)
 		return 0;
 
 	auto forward = ZERO;
+	auto right = ZERO;
+	auto up = ZERO;
 
-	math::angle_vectors(aim_angle, forward);
+	math::angle_vectors(aim_angle, &forward, &right, &up);
+
 	math::fast_vec_normalize(forward);
+	math::fast_vec_normalize(right);
+	math::fast_vec_normalize(up);
 
 	auto end = g_ctx.globals.eye_pos + forward * max_range;
 
 	if (!hitbox_intersection(final_target.record->player, final_target.record->matrixes_data.main, final_target.data.hitbox, g_ctx.globals.eye_pos, end))
 		return 0;
 
-	return 101;
+	auto drift = final_target.record->player->m_vecVelocity().Length2D() * (util::get_interpolation() + m_globals()->m_intervalpertick);
+
+	if (drift <= 0.0f || distance <= 1.0f)
+		return 101;
+
+	auto tolerance = drift / distance;
+
+	auto intersecting = 0;
+	auto samples = 0;
+
+	for (auto ring = 1; ring <= 3; ++ring)
+	{
+		auto radius = tolerance * ((float)ring / 3.0f);
+
+		for (auto step = 0; step < 8; ++step)
+		{
+			auto direction = forward + right * (zeus_ring_x[step] * radius) + up * (zeus_ring_y[step] * radius);
+			auto sample_end = g_ctx.globals.eye_pos + direction * max_range;
+
+			++samples;
+
+			if (hitbox_intersection(final_target.record->player, final_target.record->matrixes_data.main, final_target.data.hitbox, g_ctx.globals.eye_pos, sample_end))
+				++intersecting;
+		}
+	}
+
+	if (intersecting == samples)
+		return 101;
+
+	return (int)((float)intersecting / (float)samples * 100.0f);
 }
 
 static int clip_ray_to_hitbox(const Ray_t& ray, mstudiobbox_t* hitbox, matrix3x4_t& matrix, trace_t& trace)
@@ -314,6 +341,9 @@ bool zeusbot::hitbox_intersection(player_t* e, matrix3x4_t* matrix, int hitbox, 
 	auto studio_hitbox = studio_set->pHitbox(hitbox);
 
 	if (!studio_hitbox)
+		return false;
+
+	if (studio_hitbox->bone < 0 || studio_hitbox->bone >= MAXSTUDIOBONES)
 		return false;
 
 	trace_t trace;

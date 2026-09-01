@@ -85,9 +85,9 @@ namespace util
 		CTraceFilter filter;
 		filter.pSkip = from;
 
-		g_ctx.globals.autowalling = true;
+		++g_ctx.globals.autowalling;
 		m_trace()->TraceRay(ray, MASK_SHOT_HULL | CONTENTS_HITBOX, &filter, &trace);
-		g_ctx.globals.autowalling = false;
+		--g_ctx.globals.autowalling;
 
 		return trace.hit_entity == entity || trace.fraction == 1.0f;
 	}
@@ -298,7 +298,7 @@ namespace util
 			range = ray.Length();
 		}
 
-		if (range <= 60.f) {
+		if (range <= (maxs - mins).Length()) {
 			trace_t trace;
 
 			Ray_t ray;

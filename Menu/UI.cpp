@@ -235,9 +235,9 @@ void draw_keybind(const char* label, key_bind* key_bind, const char* unique_id, 
 }
 
 
-void draw_combo(const char* name, int& variable, const char* labels[], int count)
+bool draw_combo(const char* name, int& variable, const char* labels[], int count, int popup_height = -1)
 {
-	ImGui::Combo(std::string(name).c_str(), &variable, labels, count);
+	return ImGui::Combo(std::string(name).c_str(), &variable, labels, count, popup_height);
 }
 
 void draw_combo(const char* name, int& variable, bool (*items_getter)(void*, int, const char**), void* data, int count)
@@ -1353,7 +1353,13 @@ void c_menu::misc_tab() // misc
 			ImGui::Checkbox(crypt_str("Keybinds"), &cfg.menu.keybinds);
 
 			ImGui::Checkbox(crypt_str("Spectators list"), &cfg.misc.spectators_list);
-			draw_combo(crypt_str("Hitsound"), cfg.esp.hitsound, sounds, ARRAYSIZE(sounds));
+			if (draw_combo(crypt_str("Hitsound"), cfg.esp.hitsound, sounds, ARRAYSIZE(sounds), 10))
+			{
+				auto preview = cfg.esp.hitsound - 1;
+
+				if (preview >= 0 && preview < hitsound_count)
+					m_surface()->PlaySound_(hitsound_entries[preview].file);
+			}
 
 			draw_multicombo(crypt_str("Logs"), cfg.misc.events_to_log, events, ARRAYSIZE(events), preview);
 			padding(0, 3);

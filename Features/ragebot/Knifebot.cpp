@@ -35,9 +35,9 @@ void knifebot::scan_targets()
 
 	for (auto& target : aim::get().targets)
 	{
-		if (target.history_record->valid())
+		if (target.history_record && target.history_record->valid())
 		{
-			if (target.last_record->valid())
+			if (target.last_record && target.last_record->valid())
 			{
 				auto last_distance = g_ctx.globals.eye_pos.DistTo(target.last_record->origin);
 				auto history_distance = g_ctx.globals.eye_pos.DistTo(target.history_record->origin);
@@ -53,17 +53,13 @@ void knifebot::scan_targets()
 		}
 		else
 		{
+			if (!target.last_record || !target.last_record->valid())
+				continue;
+
 			final_target.record = target.last_record;
 			final_target.record->adjust_player();
 		}
 	}
-}
-
-int GetMinimalHp() {
-	if (TICKS_TO_TIME(g_ctx.globals.fixed_tickbase) > (g_ctx.globals.weapon->m_flNextPrimaryAttack() + 0.4f))
-		return 34;
-
-	return 21;
 }
 
 void knifebot::fire(CUserCmd* cmd)
@@ -81,13 +77,12 @@ void knifebot::fire(CUserCmd* cmd)
 
 	auto vecEyePos = final_target.record->player->get_shoot_position();
 
-	if (vecMins < vecEyePos)
-		vecMins = vecEyePos;
+	auto closest = Vector(
+		math::clamp(vecEyePos.x, vecMins.x, vecMaxs.x),
+		math::clamp(vecEyePos.y, vecMins.y, vecMaxs.y),
+		math::clamp(g_ctx.globals.eye_pos.z, vecMins.z, vecMaxs.z));
 
-	if (vecMins > vecMaxs)
-		vecMins = vecMaxs;
-
-	auto vecDelta = vecMins - g_ctx.globals.eye_pos;
+	auto vecDelta = closest - g_ctx.globals.eye_pos;
 
 	if (vecDelta.Length() > 60.0f)
 		return;
@@ -95,19 +90,14 @@ void knifebot::fire(CUserCmd* cmd)
 	vecDelta.Normalize();
 	auto delta = fabs(math::normalize_yaw(final_target.record->angles.y - math::calculate_angle(final_target.record->player->get_shoot_position(), g_ctx.local()->GetAbsOrigin()).y));
 
-	if (final_target.record->player->m_iHealth() > 46 && delta < 120.0f)
-	{
-		cmd->m_viewangles = vecDelta.ToEulerAngles();
-		cmd->m_buttons |= IN_ATTACK;
-		cmd->m_tickcount = TIME_TO_TICKS(final_target.record->simulation_time + util::get_interpolation());
-	}
+	auto stab = final_target.record->player->m_iHealth() > 46 && delta < 120.0f && determinate_hit_type(1, vecDelta);
 
-	if (!determinate_hit_type(1, vecDelta))
+	if (!stab && !determinate_hit_type(0, vecDelta))
 		return;
 
 	cmd->m_viewangles = vecDelta.ToEulerAngles();
-	cmd->m_buttons |= IN_ATTACK2;
-	cmd->m_tickcount = TIME_TO_TICKS(final_target.record->simulation_time + util::get_interpolation());
+	cmd->m_buttons |= stab ? IN_ATTACK2 : IN_ATTACK;
+	cmd->m_tickcount = TIME_TO_TICKS(final_target.record->simulation_time) + TIME_TO_TICKS(util::get_interpolation());
 }
 
 int knifebot::determinate_hit_type(bool stab_type, const Vector& delta)

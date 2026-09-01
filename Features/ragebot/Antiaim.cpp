@@ -534,9 +534,9 @@ bool antiaim::cover_scores(float& left, float& right)
 			CTraceFilter filter;
 			filter.pSkip = g_ctx.local();
 
-			g_ctx.globals.autowalling = true;
+			++g_ctx.globals.autowalling;
 			m_trace()->TraceRay(ray, MASK_SOLID & ~CONTENTS_MONSTER, &filter, &trace);
-			g_ctx.globals.autowalling = false;
+			--g_ctx.globals.autowalling;
 
 			if (trace.fraction < 0.97f)
 				score += weights[i];

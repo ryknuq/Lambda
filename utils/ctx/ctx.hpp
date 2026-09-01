@@ -117,7 +117,7 @@ public:
 		bool force_send_packet = false;
 		bool exploits = false;
 		bool scoped = false;
-		bool autowalling = false;
+		int autowalling = 0;
 		bool setuping_bones = false;
 		bool updating_animation = false;
 		bool aimbot_working = false;

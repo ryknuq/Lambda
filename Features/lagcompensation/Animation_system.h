@@ -10,7 +10,9 @@ enum
 	NONE,
 	FIRST,
 	SECOND,
-	THIRD
+	THIRD,
+	HALF_FIRST,
+	HALF_SECOND
 };
 
 enum
@@ -101,7 +103,7 @@ inline constexpr float resolver_candidate_scale[resolver_candidate_count] =
 
 inline constexpr int resolver_candidate_matrix[resolver_candidate_count] =
 {
-	NONE, FIRST, SECOND, -1, -1, -1, -1, -1, -1
+	NONE, FIRST, SECOND, HALF_FIRST, HALF_SECOND, -1, -1, -1, -1
 };
 
 inline constexpr resolver_side resolver_candidate_sides[resolver_candidate_count] =
@@ -128,12 +130,21 @@ inline constexpr animstate_layer_t resolver_scored_layers[] =
 
 static constexpr int resolver_memory_slots = 32;
 
+inline float resolver_max_delta(player_t* e)
+{
+	if (!e)
+		return 0.0f;
+
+	return std::clamp(std::fabs(e->get_max_desync_delta()), 10.0f, 60.0f);
+}
+
 struct resolver_memory
 {
 	uint64_t identity = 0ull;
 	float weight[resolver_candidate_count] = { };
 	int samples = 0;
 	float touched = 0.0f;
+	float updated = 0.0f;
 };
 
 struct matrixes
@@ -155,62 +166,30 @@ class resolver
 	adjust_data* player_record = nullptr;
 	adjust_data* previous_player_record = nullptr;
 
-	bool side = false;
-	bool fake = false;
-	bool got = false;
-	bool was_first_bruteforce = false;
-	bool was_second_bruteforce = false;
-	bool was_first_low_bruteforce = false;
-	bool was_second_low_bruteforce = false;
-	int RightSide;
-	int LeftSide;
-	int last_delta1 = false;
-	int last_delta2 = false;
-	int last_delta3 = false;
-	int resolving_way = false;
-	float lock_side = 0.0f;
-	int m_side;
-	int m_way = 1;
-	int FreestandSide[64];
 	float original_pitch = 0.0f;
-	float angle = 0.f;
-
-	int pside = 0;
-	int plast_side = 0;
 
 public:
 
 	void initialize(player_t* e, adjust_data* record, const float& goal_feet_yaw, const float& pitch);
 	void reset();
-	//float BuildMoveYaw(player_t* e, float flFootYaw);
-	//float BuildMoveYaw(player_t* e, float flFootYaw);
 	void resolve();
-	void update_animation_layers(player_t* player);
 	void BuildMoveYaw(player_t* player, float& foot_yaw);
-	float resolve_pitch();
-	//bool NoSpreadResolver();
+
 	float goal_feet_yaw = 0.0f;
-	float zero_feet_yaw = 0.0f;
-	AnimationLayer resolver_layers[3][13];
 	AnimationLayer previous_layers[13];
-	AnimationLayer prev_server_layers[6];
-	AnimationLayer layers[12];
-	AnimationLayer moveLayers[3][13];
 
 	float original_goal_feet_yaw = 0.0f;
 
 	resolver_side last_side = RESOLVER_ORIGINAL;
-	resolver_side way = RESOLVER_LEFT;
-
-	float gfy_default = 0.0f;
-	float positive_side = 0.0f;
-	float negative_side = 0.0f;
 
 	float last_resolved_yaw = 0.0f;
 	float last_resolved_time = 0.0f;
 
-	int bruteforce_ticks = 0;
-	int freestand_side = 0;
+	float last_error = 0.0f;
+	float last_confidence = 0.0f;
+	int stable_ticks = 0;
+	int tried_mask = 0;
+	int last_missed = 0;
 };
 
 class adjust_data
@@ -218,27 +197,18 @@ class adjust_data
 public:
 	player_t* player;
 	int i;
-	AnimationLayer right_layers[13];
-	AnimationLayer left_layers[13];
-	AnimationLayer center_layers[13];
 	AnimationLayer layers[13];
-	AnimationLayer Animlayers[4][13];
 	matrixes matrixes_data;
-	// fix
 	AnimationLayer resolver_layers[resolver_candidate_count][15];
 	float resolver_poses[resolver_candidate_count][24];
 	float network_poses[24];
-	AnimationLayer m_pResolveLayers[4][15];
-	AnimationLayer pre_orig[13] = {};
 	resolver_type type;
 	resolver_side side;
-	layers_t lay;
 
-
-	float left_side = 0.f, right_side = 0.f;
 	bool moving_resolver_active;
 	bool high_desync_resolver_active;
 	bool resolver_confident;
+	float resolver_confidence;
 
 	bool invalid;
 	bool immune;
@@ -273,12 +243,6 @@ public:
 	Vector maxs;
 	Vector hittable_point;
 
-	matrix3x4_t leftmatrixes[128] = {};
-	matrix3x4_t rightmatrixes[128] = {};
-
-	std::array<float, 24> left_poses = {};
-	std::array<float, 24> right_poses = {};
-
 	adjust_data()
 	{
 		reset();
@@ -295,6 +259,7 @@ public:
 		moving_resolver_active = false;
 		high_desync_resolver_active = false;
 		resolver_confident = false;
+		resolver_confidence = 0.0f;
 
 		invalid = false;
 		immune = false;
@@ -302,7 +267,6 @@ public:
 		bot = false;
 		shot = false;
 		exploited = false;
-
 		hittable = false;
 		selected = false;
 		hittable_damage = 0;
@@ -315,7 +279,6 @@ public:
 		tickbase = 0;
 		weapon_sequence = -1;
 
-		std::memset(this->pre_orig, 0, sizeof(pre_orig));
 		std::memset(&matrixes_data, 0, sizeof(matrixes_data));
 		std::memset(resolver_layers, 0, sizeof(resolver_layers));
 		std::memset(resolver_poses, 0, sizeof(resolver_poses));
@@ -344,6 +307,7 @@ public:
 		moving_resolver_active = false;
 		high_desync_resolver_active = false;
 		resolver_confident = false;
+		resolver_confidence = 0.0f;
 
 		hittable = false;
 		selected = false;
@@ -435,9 +399,6 @@ public:
 
 	bool valid(bool extra_checks = true)
 	{
-		if (!this)
-			return false;
-
 		if (i > 0)
 			player = (player_t*)m_entitylist()->GetClientEntity(i);
 
@@ -505,7 +466,7 @@ struct player_settings
 	int neg;
 	int pos;
 
-	player_settings(__int64 id, resolver_history res_type, bool faking, int left, int right) noexcept : id(id), res_type(res_type), faking(faking), neg(neg), pos(pos) { }
+	player_settings(__int64 id, resolver_history res_type, bool faking, int left, int right) noexcept : id(id), res_type(res_type), faking(faking), low_move(false), low_stand(false), neg(left), pos(right) { }
 };
 
 class optimized_adjust_data
@@ -539,15 +500,6 @@ public:
 		angles.Zero();
 		origin.Zero();
 	}
-};
-
-class lagdata
-{
-	c_baseplayeranimationstate* animstate;
-public:
-	float side;
-	float realtime = animstate->m_flLastClientSideAnimationUpdateTime;
-	float resolving_way;
 };
 
 extern std::deque <adjust_data> player_records[65];

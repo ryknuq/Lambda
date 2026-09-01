@@ -1,0 +1,109 @@
+#include "hitsounds.hpp"
+#include "custom_sounds.hpp"
+
+extern const unsigned char hs_hit9[15156];
+extern const unsigned char hs_ting[15778];
+extern const unsigned char hs_click[10820];
+extern const unsigned char hs_satisfying[7508];
+extern const unsigned char hs_pop[6276];
+extern const unsigned char hs_bonk[17212];
+extern const unsigned char hs_kick[35404];
+extern const unsigned char hs_bell[10296];
+extern const unsigned char hs_bubble[6094];
+extern const unsigned char hs_flush[88244];
+extern const unsigned char hs_door[19648];
+extern const unsigned char hs_waterdrop[11004];
+extern const unsigned char hs_quaver[3710];
+extern const unsigned char hs_combobreak[50686];
+extern const unsigned char hs_killcard[5854];
+extern const unsigned char hs_arenaswitch[14976];
+extern const unsigned char hs_rankdown[83838];
+extern const unsigned char hs_zelda[18898];
+extern const unsigned char hs_spiral[10660];
+extern const unsigned char hs_regulus[9292];
+extern const unsigned char hs_brotato[4642];
+extern const unsigned char hs_trident[7510];
+extern const unsigned char hs_mchit[4572];
+extern const unsigned char hs_mcold[4318];
+extern const unsigned char hs_mcbow[42462];
+extern const unsigned char hs_mcbutton[6374];
+extern const unsigned char hs_mcegg[4848];
+extern const unsigned char hs_mcxp[20896];
+extern const unsigned char hs_pubgpan[24028];
+extern const unsigned char hs_rusthead[42670];
+extern const unsigned char hs_codhit[1244];
+extern const unsigned char hs_fatality[19952];
+extern const unsigned char hs_killdoof[28404];
+extern const unsigned char hs_amongus[33794];
+extern const unsigned char hs_aimbooster[4404];
+extern const unsigned char hs_tavern[6792];
+extern const unsigned char hs_moneyclaim[27576];
+extern const unsigned char hs_applepay[36614];
+extern const unsigned char hs_bameware[14600];
+extern const unsigned char hs_msfrs[7766];
+extern const unsigned char hs_stony[40510];
+extern const unsigned char hs_ben[41584];
+extern const unsigned char hs_mouth[9946];
+extern const unsigned char hs_agpa1[39032];
+extern const unsigned char hs_agpa2[34398];
+extern const unsigned char hs_hentai1[20276];
+extern const unsigned char hs_hentai2[28990];
+extern const unsigned char hs_hentai3[17662];
+
+const hitsound_entry hitsound_entries[] =
+{
+	{ "body.wav", body, 82506 },
+	{ "phonk.wav", phonk, 31784 },
+	{ "rifk1.wav", rifk1, 102600 },
+	{ "primordial.wav", primordial, 8190 },
+	{ "lmb_hit9.wav", hs_hit9, 15156 },
+	{ "lmb_ting.wav", hs_ting, 15778 },
+	{ "lmb_click.wav", hs_click, 10820 },
+	{ "lmb_satisfying.wav", hs_satisfying, 7508 },
+	{ "lmb_pop.wav", hs_pop, 6276 },
+	{ "lmb_bonk.wav", hs_bonk, 17212 },
+	{ "lmb_kick.wav", hs_kick, 35404 },
+	{ "lmb_bell.wav", hs_bell, 10296 },
+	{ "lmb_bubble.wav", hs_bubble, 6094 },
+	{ "lmb_flush.wav", hs_flush, 88244 },
+	{ "lmb_door.wav", hs_door, 19648 },
+	{ "lmb_waterdrop.wav", hs_waterdrop, 11004 },
+	{ "lmb_quaver.wav", hs_quaver, 3710 },
+	{ "lmb_combobreak.wav", hs_combobreak, 50686 },
+	{ "lmb_killcard.wav", hs_killcard, 5854 },
+	{ "lmb_arenaswitch.wav", hs_arenaswitch, 14976 },
+	{ "lmb_rankdown.wav", hs_rankdown, 83838 },
+	{ "lmb_zelda.wav", hs_zelda, 18898 },
+	{ "lmb_spiral.wav", hs_spiral, 10660 },
+	{ "lmb_regulus.wav", hs_regulus, 9292 },
+	{ "lmb_brotato.wav", hs_brotato, 4642 },
+	{ "lmb_trident.wav", hs_trident, 7510 },
+	{ "lmb_mchit.wav", hs_mchit, 4572 },
+	{ "lmb_mcold.wav", hs_mcold, 4318 },
+	{ "lmb_mcbow.wav", hs_mcbow, 42462 },
+	{ "lmb_mcbutton.wav", hs_mcbutton, 6374 },
+	{ "lmb_mcegg.wav", hs_mcegg, 4848 },
+	{ "lmb_mcxp.wav", hs_mcxp, 20896 },
+	{ "lmb_pubgpan.wav", hs_pubgpan, 24028 },
+	{ "lmb_rusthead.wav", hs_rusthead, 42670 },
+	{ "lmb_codhit.wav", hs_codhit, 1244 },
+	{ "lmb_fatality.wav", hs_fatality, 19952 },
+	{ "lmb_killdoof.wav", hs_killdoof, 28404 },
+	{ "lmb_amongus.wav", hs_amongus, 33794 },
+	{ "lmb_aimbooster.wav", hs_aimbooster, 4404 },
+	{ "lmb_tavern.wav", hs_tavern, 6792 },
+	{ "lmb_moneyclaim.wav", hs_moneyclaim, 27576 },
+	{ "lmb_applepay.wav", hs_applepay, 36614 },
+	{ "lmb_bameware.wav", hs_bameware, 14600 },
+	{ "lmb_msfrs.wav", hs_msfrs, 7766 },
+	{ "lmb_stony.wav", hs_stony, 40510 },
+	{ "lmb_ben.wav", hs_ben, 41584 },
+	{ "lmb_mouth.wav", hs_mouth, 9946 },
+	{ "lmb_agpa1.wav", hs_agpa1, 39032 },
+	{ "lmb_agpa2.wav", hs_agpa2, 34398 },
+	{ "lmb_hentai1.wav", hs_hentai1, 20276 },
+	{ "lmb_hentai2.wav", hs_hentai2, 28990 },
+	{ "lmb_hentai3.wav", hs_hentai3, 17662 },
+};
+
+const int hitsound_count = (int)(sizeof(hitsound_entries) / sizeof(hitsound_entries[0]));

@@ -280,21 +280,10 @@ void C_HookedEvents::FireGameEvent(IGameEvent* event)
 		{
 			if (cfg.esp.hitsound && cfg.player.enable)
 			{
-				switch (cfg.esp.hitsound)
-				{
-				case 1:
-					m_surface()->PlaySound_(crypt_str("body.wav"));
-					break;
-				case 2:
-					m_surface()->PlaySound_(crypt_str("phonk.wav"));
-					break;
-				case 3:
-					m_surface()->PlaySound_(crypt_str("rifk1.wav"));
-					break;
-				case 4:
-					m_surface()->PlaySound_(crypt_str("primordial.wav"));
-					break;
-				}
+				auto index = cfg.esp.hitsound - 1;
+
+				if (index >= 0 && index < hitsound_count)
+					m_surface()->PlaySound_(hitsound_entries[index].file);
 			}
 
 			auto entity = static_cast<player_t*>(m_entitylist()->GetClientEntity(user_id));

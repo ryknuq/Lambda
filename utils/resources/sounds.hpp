@@ -1,23 +1,30 @@
 #include "custom_sounds.hpp"
+#include "hitsounds.hpp"
+#include <sys/stat.h>
 
 __forceinline void setup_sounds()
 {
-	CreateDirectory("csgo\\sound", nullptr);
-	FILE* file = nullptr;
+	CreateDirectory(crypt_str("csgo\\sound"), nullptr);
 
-	file = fopen(crypt_str("csgo\\sound\\body.wav"), crypt_str("wb"));
-	fwrite(body, sizeof(unsigned char), 82506, file);
-	fclose(file);
+	char path[MAX_PATH];
 
-	file = fopen(crypt_str("csgo\\sound\\phonk.wav"), crypt_str("wb"));
-	fwrite(phonk, sizeof(unsigned char), 31784, file);
-	fclose(file);
+	for (auto i = 0; i < hitsound_count; ++i)
+	{
+		auto entry = &hitsound_entries[i];
 
-	file = fopen(crypt_str("csgo\\sound\\rifk1.wav"), crypt_str("wb"));
-	fwrite(rifk1, sizeof(unsigned char), 102600, file);
-	fclose(file);
+		sprintf_s(path, crypt_str("csgo\\sound\\%s"), entry->file);
 
-	file = fopen(crypt_str("csgo\\sound\\primordial.wav"), crypt_str("wb"));
-	fwrite(primordial, sizeof(unsigned char), 8190, file);
-	fclose(file);
+		struct _stat info;
+
+		if (_stat(path, &info) == 0 && info.st_size == (long)entry->size)
+			continue;
+
+		auto file = fopen(path, crypt_str("wb"));
+
+		if (!file)
+			continue;
+
+		fwrite(entry->data, sizeof(unsigned char), entry->size, file);
+		fclose(file);
+	}
 }

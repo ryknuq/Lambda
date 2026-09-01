@@ -247,6 +247,9 @@
     <ClCompile Include="Utils\recv\recv.cpp" />
     <ClCompile Include="Utils\render\Render.cpp" />
     <ClCompile Include="Utils\resources\custom_sounds.cpp" />
+    <ClCompile Include="Utils\resources\hitsounds.cpp" />
+    <ClCompile Include="Utils\resources\hitsounds_data0.cpp" />
+    <ClCompile Include="Utils\resources\hitsounds_data1.cpp" />
     <ClCompile Include="Utils\twofish\twofish.cpp" />
     <ClCompile Include="Utils\util.cpp" />
   </ItemGroup>
@@ -449,6 +452,7 @@
     <ClInclude Include="Utils\recv\recv.h" />
     <ClInclude Include="Utils\render\Render.h" />
     <ClInclude Include="Utils\resources\custom_sounds.hpp" />
+    <ClInclude Include="Utils\resources\hitsounds.hpp" />
     <ClInclude Include="Utils\resources\sounds.hpp" />
     <ClInclude Include="Utils\singleton.h" />
     <ClInclude Include="Utils\twofish\twofish.h" />

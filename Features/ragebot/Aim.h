@@ -158,57 +158,35 @@ public:
 	}
 };
 
-class player_gay {
-public:
-	Vector get_eye_pos();
-};
-
 class aim : public singleton <aim>
 {
 	void automatic_revolver(CUserCmd* cmd);
-	void AdjustRevolverData(CUserCmd* cmd, int32_t nCommand, int32_t nButtons);
-	//void AdjustRevolverData(CUserCmd* cmd);
 	void prepare_targets();
 	adjust_data* get_record(std::deque <adjust_data>* records, bool history);
 	void collect_records(target& current);
 	float probe_record(adjust_data* record);
 	float rate_record(adjust_data* record, scan_data& data, float newest_time);
 	void select_record(target& current);
-	float optimized_mindmg(bool vis, int hl);
 	int get_minimum_damage(bool visible, int health);
-	int get_adaptive_minimum_damage(bool visible, int health, int hitbox);
 	void scan_targets();
-	bool HasMaximumAccuracy();
-	void AutoStop(CUserCmd* cmd);
 	bool automatic_stop(CUserCmd* cmd);
 	bool standing_in_fire();
-	bool IsAbleToShoot();
-	int GetTicksToShoot();
-	bool HoldFiringAnimation();
 	void find_best_target();
 	void automatic_scope(CUserCmd* cmd);
 	void fire(CUserCmd* cmd);
 	void build_seed_table();
-	float hitchance_mashup(player_t* e);
 	int hitchance(const Vector& aim_angle);
-	//float hitchance(const Vector& aim_angle);
-	bool calculate_hitchance(const Vector& aim_angle, player_t* ent, int& final_hitchance);
-	int calc_bt_ticks();
 	float final_hitchance;
 	std::vector <scanned_target> scanned_targets;
 	scanned_target final_target;
 public:
-	float LerpTime();
 	int backtrack_window();
 	void run(CUserCmd* cmd);
 	float bodyscale(player_t* e);
 	float GetHeadScale(player_t* e);
-	//int hitchance(const Vector& aim_angle);
-	void SetAnims(CUserCmd* cmd, player_t* e);
 	void scan(adjust_data* record, scan_data& data, const Vector& shoot_position = g_ctx.globals.eye_pos);
 	std::vector<int> get_hitboxes(adjust_data* record);
 	void update_peek_state();
-	//std::vector<scan_point> get_points(adjust_data* record, int hitbox);
 	std::vector <scan_point> get_points(adjust_data* record, int hitbox, bool from_aim = true);
 	bool hitbox_intersection(player_t* e, matrix3x4_t* matrix, int hitbox, const Vector& start, const Vector& end, float* safe = nullptr);
 	float safe_point_margin(adjust_data* record, int hitbox, const Vector& shoot_position, const Vector& point);

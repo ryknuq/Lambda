@@ -143,12 +143,29 @@ bool autowall::trace_to_exit(CGameTrace& enterTrace, CGameTrace& exitTrace, Vect
 
 	const auto enter_nodraw = (enterTrace.surface.flags & SURF_NODRAW) != 0;
 
+	IClientEntity* breakable_entity = nullptr;
+	auto breakable_result = false;
+
+	auto cached_is_breakable = [&](IClientEntity* entity)
+		{
+			if (!entity)
+				return false;
+
+			if (entity != breakable_entity)
+			{
+				breakable_entity = entity;
+				breakable_result = is_breakable_entity(entity);
+			}
+
+			return breakable_result;
+		};
+
 	auto enter_breakable = -1;
 
 	auto enter_is_breakable = [&]
 	{
 		if (enter_breakable < 0)
-			enter_breakable = is_breakable_entity(enterTrace.hit_entity) ? 1 : 0;
+			enter_breakable = cached_is_breakable(enterTrace.hit_entity) ? 1 : 0;
 
 		return enter_breakable == 1;
 	};
@@ -214,7 +231,7 @@ bool autowall::trace_to_exit(CGameTrace& enterTrace, CGameTrace& exitTrace, Vect
 
 		if (exitTrace.surface.flags & SURF_NODRAW)
 		{
-			if (is_breakable_entity(exitTrace.hit_entity) && enter_is_breakable())
+			if (cached_is_breakable(exitTrace.hit_entity) && enter_is_breakable())
 				return true;
 
 			if (!enter_nodraw)
@@ -375,7 +392,10 @@ bool autowall::fire_bullet(weapon_t* pWeapon, Vector& direction, bool& visible, 
 		auto isPlayer = hit_player && hit_player->is_player();
 		auto isEnemy = isPlayer && hit_player->m_iTeamNum() != g_ctx.local()->m_iTeamNum();
 
-		if (canDoDamage && isPlayer && isEnemy)
+		if (isPlayer && e && enterTrace.hit_entity != e)
+			return false;
+
+		if (canDoDamage && isPlayer && (isEnemy || enterTrace.hit_entity == e))
 		{
 			scale_damage(hit_player, enterTrace, weaponData, currentDamage);
 			hitbox = enterTrace.hitbox;
@@ -405,9 +425,9 @@ autowall::returninfo_t autowall::wall_penetration(const Vector& eye_pos, Vector&
 	auto local = g_ctx.local();
 
 	if (!local)
-		return returninfo_t(false, -1, -1);
+		return returninfo_t();
 
-	g_ctx.globals.autowalling = true;
+	++g_ctx.globals.autowalling;
 	auto tmp = point - eye_pos;
 
 	auto angles = ZERO;
@@ -426,12 +446,12 @@ autowall::returninfo_t autowall::wall_penetration(const Vector& eye_pos, Vector&
 
 	if (fire_bullet(weapon, direction, visible, damage, hitbox, e, 0.0f, eye_pos, minimum_damage))
 	{
-		g_ctx.globals.autowalling = false;
+		--g_ctx.globals.autowalling;
 		return returninfo_t(visible, (int)damage, hitbox); //-V2003
 	}
 	else
 	{
-		g_ctx.globals.autowalling = false;
-		return returninfo_t(false, -1, -1);
+		--g_ctx.globals.autowalling;
+		return returninfo_t();
 	}
 }

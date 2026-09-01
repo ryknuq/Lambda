@@ -135,7 +135,10 @@ const char* RCSType[] =
 
 const char* selection[] =
 {
-	"Highest damage"
+	"Highest damage",
+	"Closest to crosshair",
+	"Closest distance",
+	"Lowest health"
 };
 
 const char* bodyaimlevel[] =
@@ -435,7 +438,55 @@ const char* sounds[] =
 	"sparkle",
 	"phonk",
 	"rifk1",
-	"primordial"
+	"primordial",
+	"hit9",
+	"ting",
+	"click",
+	"satisfying",
+	"pop",
+	"bonk",
+	"kick",
+	"bell",
+	"bubble",
+	"flush",
+	"door",
+	"water drop",
+	"quaver",
+	"combo break",
+	"killcard",
+	"arena switch",
+	"rankdown",
+	"zelda",
+	"spiral knight",
+	"regulus",
+	"brotato",
+	"trident",
+	"minecraft hit",
+	"minecraft old hit",
+	"minecraft bow",
+	"minecraft button",
+	"minecraft egg",
+	"minecraft xp",
+	"pubg pan",
+	"rust headshot",
+	"cod",
+	"fatality",
+	"kill doof",
+	"amongus kill",
+	"aimbooster",
+	"tavern",
+	"money claim",
+	"apple pay",
+	"bameware",
+	"msfrs",
+	"stony",
+	"ben",
+	"mouthsound",
+	"agpa 1",
+	"agpa 2",
+	"hentai 1",
+	"hentai 2",
+	"hentai 3"
 };
 
 const char* player_models[] =
