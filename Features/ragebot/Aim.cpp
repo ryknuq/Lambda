@@ -26,18 +26,21 @@ void aim::run(CUserCmd* cmd)
 
     if (!cfg.ragebot.enable)
     {
-        // Clear player records when ragebot is disabled to prevent memory accumulation
         for (auto i = 1; i <= m_globals()->m_maxclients; i++)
+        {
             player_records[i].clear();
+
+            g_ctx.globals.backtrack_time[i] = 0.0f;
+            g_ctx.globals.backtrack_ticks[i] = 0;
+        }
+
         return;
     }
 
-    // Limit player records size to prevent memory leak
     for (auto i = 1; i <= m_globals()->m_maxclients; i++)
     {
         if (player_records[i].size() > 64)
         {
-            // Keep only the most recent 32 records
             while (player_records[i].size() > 32)
                 player_records[i].pop_back();
         }
@@ -52,7 +55,6 @@ void aim::run(CUserCmd* cmd)
             record.adjust_player();
     };
 
-    // Safety check: ensure weapon is valid
     if (!g_ctx.globals.weapon)
         return;
 
@@ -69,7 +71,6 @@ void aim::run(CUserCmd* cmd)
         auto max_speed = 260.0f;
         auto weapon_info = g_ctx.globals.weapon->get_csweapon_info();
 
-        // Safety check before accessing weapon_info
         if (weapon_info)
             max_speed = g_ctx.globals.scoped ? weapon_info->flMaxPlayerSpeedAlt : weapon_info->flMaxPlayerSpeed;
 
@@ -261,6 +262,54 @@ float aim::LerpTime() {
     return fmaxf(a1, v2);
 };
 
+int aim::backtrack_window()
+{
+    static auto sv_maxunlag = m_cvar()->FindVar(crypt_str("sv_maxunlag"));
+
+    auto server_limit = sv_maxunlag ? TIME_TO_TICKS(sv_maxunlag->GetFloat()) : 12;
+    auto configured = cfg.ragebot.backtrack_ticks;
+
+    if (configured < 1)
+        configured = 1;
+
+    return min(configured, server_limit);
+}
+
+void aim::collect_records(target& current)
+{
+    auto records = &player_records[current.e->EntIndex()];
+
+    if (!current.last_record)
+        return;
+
+    const auto window = backtrack_window();
+    const auto newest_tick = TIME_TO_TICKS(current.last_record->simulation_time);
+
+    auto previous_tick = INT_MIN;
+
+    current.records.reserve(min(records->size(), (size_t)(window + 1)));
+
+    for (auto& record : *records)
+    {
+        const auto tick = TIME_TO_TICKS(record.simulation_time);
+
+        if (newest_tick - tick > window)
+            break;
+
+        if (tick == previous_tick)
+            continue;
+
+        if (&record != current.last_record && !record.valid())
+            continue;
+
+        previous_tick = tick;
+        current.records.emplace_back(&record);
+
+        if (current.records.size() >= 24)
+            break;
+    }
+}
+
 void aim::prepare_targets()
 {
     for (auto i = 1; i <= m_globals()->m_maxclients; i++)
@@ -287,13 +336,11 @@ void aim::prepare_targets()
         targets.emplace_back(target(e, latest, history));
     }
 
-    // Limit targets to reasonable count without expensive sorting
     if (targets.size() > 5)
     {
         Vector engine_angles;
         m_engine()->GetViewAngles(engine_angles);
 
-        // Simple distance-based culling instead of O(n²)
         std::sort(targets.begin(), targets.end(), [&engine_angles](const target& a, const target& b) {
             auto dist_a = a.e->GetAbsOrigin().DistTo(g_ctx.local()->GetAbsOrigin());
             auto dist_b = b.e->GetAbsOrigin().DistTo(g_ctx.local()->GetAbsOrigin());
@@ -304,7 +351,10 @@ void aim::prepare_targets()
     }
 
     for (auto& target : targets)
+    {
+        collect_records(target);
         backup.emplace_back(adjust_data(target.e));
+    }
 }
 
 static bool compare_records(const optimized_adjust_data& first, const optimized_adjust_data& second)
@@ -385,6 +435,172 @@ int aim::get_adaptive_minimum_damage(bool visible, int health, int hitbox)
     return get_minimum_damage(visible, health);
 }
 
+float aim::probe_record(adjust_data* record)
+{
+    static const int probe_hitboxes[] = { HITBOX_HEAD, HITBOX_CHEST };
+
+    auto health = record->player->m_iHealth();
+    auto best = -1.0f;
+
+    for (auto hitbox : probe_hitboxes)
+    {
+        auto position = record->player->hitbox_position_matrix(hitbox, record->matrixes_data.main);
+
+        if (position.IsZero())
+            continue;
+
+        if (!hitbox_intersection(record->player, record->matrixes_data.main, hitbox, g_ctx.globals.eye_pos, position))
+            continue;
+
+        auto fire_data = autowall::get().wall_penetration(g_ctx.globals.eye_pos, position, record->player);
+
+        if (!fire_data.valid || fire_data.damage < 1)
+            continue;
+
+        auto rating = (float)min(fire_data.damage, health);
+
+        if (fire_data.damage >= health)
+            rating += 40.0f;
+
+        if (fire_data.visible)
+            rating += 12.0f;
+
+        best = max(best, rating);
+    }
+
+    return best;
+}
+
+float aim::rate_record(adjust_data* record, scan_data& data, float newest_time)
+{
+    auto health = record->player->m_iHealth();
+    auto rating = (float)min(data.damage, health);
+
+    if (data.damage >= health)
+        rating += 60.0f;
+
+    if (data.visible)
+        rating += 18.0f;
+
+    if (data.point.safe > 0.0f)
+        rating += 6.0f;
+
+    if (data.point.center)
+        rating += 3.0f;
+
+    if (record->shot)
+        rating += 4.0f;
+
+    if (record->resolver_confident)
+        rating += 3.0f;
+
+    auto age = TIME_TO_TICKS(newest_time - record->simulation_time);
+
+    if (age > 0)
+        rating -= (float)age * 0.35f;
+
+    return rating;
+}
+
+void aim::select_record(target& current)
+{
+    const auto index = current.e->EntIndex();
+    const auto newest_time = current.last_record->simulation_time;
+    const auto health = current.e->m_iHealth();
+
+    g_ctx.globals.backtrack_time[index] = 0.0f;
+    g_ctx.globals.backtrack_ticks[index] = 0;
+
+    adjust_data* best_record = nullptr;
+    scan_data best_data;
+
+    auto best_rating = -FLT_MAX;
+
+    auto consider = [&](adjust_data* record)
+    {
+        scan_data data;
+
+        record->adjust_player();
+        scan(record, data);
+
+        if (!data.valid())
+            return false;
+
+        auto rating = rate_record(record, data, newest_time);
+
+        if (rating > best_rating)
+        {
+            best_rating = rating;
+            best_record = record;
+            best_data = data;
+        }
+
+        return true;
+    };
+
+    consider(current.last_record);
+
+    auto flawless = best_record && best_data.visible && best_data.point.center
+        && best_data.point.safe > 0.0f && best_data.damage >= health;
+
+    if (!flawless && current.records.size() > 1)
+    {
+        struct probe_t
+        {
+            adjust_data* record;
+            float rating;
+        };
+
+        probe_t probes[24];
+        auto probe_count = 0;
+
+        auto previous_origin = current.last_record->origin;
+
+        for (auto record : current.records)
+        {
+            if (record == current.last_record)
+                continue;
+
+            if (probe_count >= 10)
+                break;
+
+            if (!record->shot && record->origin.DistTo(previous_origin) < 2.0f)
+                continue;
+
+            previous_origin = record->origin;
+
+            record->adjust_player();
+
+            auto rating = probe_record(record);
+
+            if (rating < 0.0f)
+                continue;
+
+            probes[probe_count].record = record;
+            probes[probe_count].rating = rating;
+
+            ++probe_count;
+        }
+
+        std::sort(probes, probes + probe_count, [](const probe_t& first, const probe_t& second) {
+            return first.rating > second.rating;
+            });
+
+        auto scans = min(probe_count, 2);
+
+        for (auto i = 0; i < scans; i++)
+            consider(probes[i].record);
+    }
+
+    if (!best_record)
+        return;
+
+    g_ctx.globals.backtrack_time[index] = best_record->simulation_time;
+    g_ctx.globals.backtrack_ticks[index] = max(TIME_TO_TICKS(newest_time - best_record->simulation_time), 0);
+
+    scanned_targets.emplace_back(scanned_target(best_record, best_data));
+}
+
 void aim::scan_targets()
 {
     if (targets.empty())
@@ -395,42 +611,10 @@ void aim::scan_targets()
         if (!target.last_record || !target.last_record->valid())
             continue;
 
-        if (target.history_record && target.history_record != target.last_record && target.history_record->valid())
-        {
-            scan_data last_data;
+        if (target.records.empty())
+            target.records.emplace_back(target.last_record);
 
-            target.last_record->adjust_player();
-            scan(target.last_record, last_data);
-
-            scan_data history_data;
-
-            target.history_record->adjust_player();
-            scan(target.history_record, history_data);
-
-            if (last_data.valid() && history_data.valid())
-            {
-                if (last_data.damage + 5 >= history_data.damage || (last_data.visible && !history_data.visible))
-                    scanned_targets.emplace_back(scanned_target(target.last_record, last_data));
-                else
-                    scanned_targets.emplace_back(scanned_target(target.history_record, history_data));
-            }
-            else if (last_data.valid())
-                scanned_targets.emplace_back(scanned_target(target.last_record, last_data));
-            else if (history_data.valid())
-                scanned_targets.emplace_back(scanned_target(target.history_record, history_data));
-        }
-        else
-        {
-            scan_data last_data;
-
-            target.last_record->adjust_player();
-            scan(target.last_record, last_data);
-
-            if (!last_data.valid())
-                continue;
-
-            scanned_targets.emplace_back(scanned_target(target.last_record, last_data));
-        }
+        select_record(target);
     }
 }
 
@@ -1081,15 +1265,18 @@ bool aim::calculate_hitchance(const Vector& aim_angle, player_t* ent, int& final
 
 int aim::calc_bt_ticks()
 {
+    if (!final_target.record || !final_target.record->player)
+        return 0;
+
     auto records = &player_records[final_target.record->player->EntIndex()];
 
-    for (auto i = 0; i < records->size(); i++)
+    for (size_t i = 0; i < records->size(); i++)
     {
-        auto record = &records->at(i);
-
-        if (record->simulation_time == final_target.record->simulation_time)
-            return i;
+        if (records->at(i).simulation_time == final_target.record->simulation_time) //-V550
+            return (int)i;
     }
+
+    return 0;
 }
 
 void aim::automatic_scope(CUserCmd* cmd)
@@ -1211,19 +1398,9 @@ void aim::fire(CUserCmd* cmd)
         return;
 
     auto backtrack_ticks = 0;
-    auto net_channel_info = m_engine()->GetNetChannelInfo();
 
-    if (net_channel_info)
-    {
-        auto original_tickbase = g_ctx.globals.backup_tickbase;
-
-        static auto sv_maxunlag = m_cvar()->FindVar(crypt_str("sv_maxunlag"));
-
-        auto correct = math::clamp(net_channel_info->GetLatency(FLOW_OUTGOING) + net_channel_info->GetLatency(FLOW_INCOMING) + util::get_interpolation(), 0.0f, sv_maxunlag->GetFloat());
-        auto delta_time = correct - (TICKS_TO_TIME(original_tickbase) - final_target.record->simulation_time);
-
-        backtrack_ticks = TIME_TO_TICKS(fabs(delta_time));
-    }
+    if (final_target.record->player)
+        backtrack_ticks = g_ctx.globals.backtrack_ticks[final_target.record->player->EntIndex()];
 
 
     static auto get_hitbox_name = [](int hitbox, bool shot_info = false) -> std::string
@@ -1268,9 +1445,8 @@ void aim::fire(CUserCmd* cmd)
 
     cmd->m_viewangles = aim_angle;
     cmd->m_buttons |= IN_ATTACK;
-    
-    // Use tick-accurate value for lag compensation
-    cmd->m_tickcount = TIME_TO_TICKS(final_target.record->simulation_time + util::get_interpolation());
+
+    cmd->m_tickcount = TIME_TO_TICKS(final_target.record->simulation_time) + TIME_TO_TICKS(util::get_interpolation());
 
     last_target_index = final_target.record->i;
     last_shoot_position = g_ctx.globals.eye_pos;

@@ -159,6 +159,9 @@ public:
 		int fired_shots[65];
 		int missed_shots[65];
 
+		float backtrack_time[65];
+		int backtrack_ticks[65];
+
 		float next_lby_update = 0.0f;
 		float last_lby_move = 0.0f;
 		float inaccuracy = 0.0f;
@@ -169,8 +172,7 @@ public:
 
 		std::string time = crypt_str("unknown");
 
-		// Miss reason statistics (accumulated during game session)
-		int miss_reason_count[6] = { 0 };  // [0]=Spread, [1]=Occlusion, [2]=Prediction, [3]=Correction, [4]=Resolver, [5]=Ping
+		int miss_reason_count[6] = { 0 };
 		int total_shots_fired = 0;
 		int total_shots_hit = 0;
 		std::string current_map = crypt_str("unknown");

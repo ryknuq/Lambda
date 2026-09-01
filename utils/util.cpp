@@ -312,6 +312,23 @@ namespace util
 		if (records->empty())
 			return false;
 
+		auto selected = g_ctx.globals.backtrack_time[i];
+
+		if (selected > 0.0f)
+		{
+			for (auto& record : *records)
+			{
+				if (record.simulation_time != selected) //-V550
+					continue;
+
+				if (!record.valid())
+					break;
+
+				memcpy(matrix, record.matrixes_data.main, MAXSTUDIOBONES * sizeof(matrix3x4_t));
+				return true;
+			}
+		}
+
 		for (auto record = records->rbegin(); record != records->rend(); ++record)
 		{
 			if (!record->valid())

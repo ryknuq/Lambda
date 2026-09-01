@@ -118,6 +118,7 @@ void C_ConfigManager::setup()
 	setup_item(&cfg.ragebot.roll, false, crypt_str("Ragebot.roll"));
 	setup_item(&cfg.ragebot.lag_exploit, false, crypt_str("Ragebot.lag_exploit"));
 	setup_item(&cfg.ragebot.dt_lag, 0, crypt_str("Ragebot.dt_lag"));
+	setup_item(&cfg.ragebot.backtrack_ticks, 12, crypt_str("Ragebot.backtrack_ticks"));
 
 	for (auto i = 0; i < 8; i++)
 	{
@@ -349,7 +350,7 @@ void C_ConfigManager::setup()
 	setup_item(&cfg.esp.peek_style, 0, crypt_str("Esp.Peek_Style"));
 	setup_item(&cfg.misc.peekkk, false, crypt_str("Esp.pepeeek"));
 
-	setup_item(&cfg.misc.extended_backtack, false, crypt_str("Misc.extended_backtack"));
+	setup_item(&cfg.misc.extended_backtack, true, crypt_str("Misc.extended_backtack"));
 
 
 	setup_item(&cfg.misc.ingame_radar, false, crypt_str("Misc.ingame_radar"));

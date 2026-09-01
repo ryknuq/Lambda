@@ -437,7 +437,6 @@ public:
 		auto outgoing = net_channel_info->GetLatency(FLOW_OUTGOING);
 		auto incoming = net_channel_info->GetLatency(FLOW_INCOMING);
 
-		// Apply 10ms safety buffer to ensure server compensation window doesn't expire (0.19s instead of 0.2s)
 		auto unlag_buffer = 0.01f;
 		auto max_unlag = sv_maxunlag->GetFloat() - unlag_buffer;
 
@@ -455,9 +454,9 @@ public:
 			extra_choke = 14 - m_clientstate()->iChokedCommands;
 
 		auto server_tickcount = extra_choke + m_globals()->m_tickcount + TIME_TO_TICKS(outgoing + incoming);
-		auto dead_time = (int)(TICKS_TO_TIME(server_tickcount) - max_unlag);
+		auto dead_time = TICKS_TO_TIME(server_tickcount) - max_unlag;
 
-		if (simulation_time < (float)dead_time)
+		if (simulation_time < dead_time)
 			return false;
 
 		return true;

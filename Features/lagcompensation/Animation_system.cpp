@@ -182,6 +182,8 @@ bool lagcompensation::valid(int i, player_t* e)
 {
 	if (!cfg.ragebot.enable || !e || !e->valid(false))
 	{
+		auto keep_records = false;
+
 		if (!e || !e->is_alive())
 		{
 			is_dormant[i] = false;
@@ -189,11 +191,18 @@ bool lagcompensation::valid(int i, player_t* e)
 
 			g_ctx.globals.fired_shots[i] = 0;
 			g_ctx.globals.missed_shots[i] = 0;
+			g_ctx.globals.backtrack_time[i] = 0.0f;
+			g_ctx.globals.backtrack_ticks[i] = 0;
 		}
 		else if (e->IsDormant())
+		{
 			is_dormant[i] = true;
+			keep_records = cfg.ragebot.enable && cfg.misc.extended_backtack;
+		}
 
-		player_records[i].clear();
+		if (!keep_records)
+			player_records[i].clear();
+
 		return false;
 	}
 

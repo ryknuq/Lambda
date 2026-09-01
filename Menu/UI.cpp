@@ -603,6 +603,8 @@ void c_menu::rage_tab() // rage tab
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
 			ImGui::Checkbox(crypt_str("Defensive"), &cfg.ragebot.defensive_doubletap);
 			ImGui::Checkbox(crypt_str("Anti exploit"), &cfg.ragebot.anti_exploit);
+			ImGui::Checkbox(crypt_str("Extended backtrack"), &cfg.misc.extended_backtack);
+			ImGui::SliderInt(crypt_str("Backtrack ticks"), &cfg.ragebot.backtrack_ticks, 1, 12, true);
 		}
 		ImGui::EndChild();
 	}

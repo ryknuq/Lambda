@@ -79,6 +79,8 @@ void __fastcall hooks::hooked_painttraverse(void* ecx, void* edx, vgui::VPANEL p
 		{
 			g_ctx.globals.fired_shots[i] = 0;
 			g_ctx.globals.missed_shots[i] = 0;
+			g_ctx.globals.backtrack_time[i] = 0.0f;
+			g_ctx.globals.backtrack_ticks[i] = 0;
 			player_records[i].clear();
 			lagcompensation::get().is_dormant[i] = false;
 			playeresp::get().esp_alpha_fade[i] = 0.0f;

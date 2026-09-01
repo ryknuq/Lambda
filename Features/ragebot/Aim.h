@@ -10,6 +10,8 @@ public:
 	adjust_data* last_record;
 	adjust_data* history_record;
 
+	std::vector <adjust_data*> records;
+
 	target()
 	{
 		e = nullptr;
@@ -168,6 +170,11 @@ class aim : public singleton <aim>
 	//void AdjustRevolverData(CUserCmd* cmd);
 	void prepare_targets();
 	adjust_data* get_record(std::deque <adjust_data>* records, bool history);
+	void collect_records(target& current);
+	int backtrack_window();
+	float probe_record(adjust_data* record);
+	float rate_record(adjust_data* record, scan_data& data, float newest_time);
+	void select_record(target& current);
 	float optimized_mindmg(bool vis, int hl);
 	int get_minimum_damage(bool visible, int health);
 	int get_adaptive_minimum_damage(bool visible, int health, int hitbox);
