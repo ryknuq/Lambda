@@ -302,6 +302,7 @@ struct Config
 		int dt_lag;
 		bool lag_exploit;
 		int backtrack_ticks;
+		bool unlock_backtrack;
 		bool static_scale;
 		int scale_head;
 		int scale_body;
@@ -494,7 +495,10 @@ struct Config
 		Color enemy_bullet_tracer_color;
 		bool preserve_killfeed;
 		int hitsound;
-		bool killsound;
+		int hitsound_volume;
+		int killsound;
+		int killsound_head;
+		int killsound_body;
 
 		bool damage_marker;
 		Color damage_marker_headdead;

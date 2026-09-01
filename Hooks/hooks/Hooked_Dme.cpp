@@ -2,6 +2,7 @@
 #include "..\..\features\misc\fakelag.h"
 #include "..\..\features\lagcompensation\local_animations.h"
 #include "..\..\features\visuals\playeresp.h"
+#include "..\..\features\ragebot\aim.h"
 
 IMaterial* CreateMaterial(bool lit, const std::string& material_data)
 {
@@ -213,11 +214,11 @@ static void draw_model_chams(IMatRenderContext* ctx, const DrawModelState_t& sta
 
 						if (backtrack_material && !backtrack_material->IsErrorMaterial())
 						{
-							matrix3x4_t* record_matrixes[12];
-							float record_alpha[12];
-							bool record_hittable[12];
+							matrix3x4_t* record_matrixes[backtrack_chams_records];
+							float record_alpha[backtrack_chams_records];
+							bool record_hittable[backtrack_chams_records];
 
-							auto record_count = util::get_backtrack_records(model_entity, record_matrixes, record_alpha, record_hittable, 12);
+							auto record_count = util::get_backtrack_records(model_entity, record_matrixes, record_alpha, record_hittable, backtrack_chams_records);
 
 							for (auto record = 0; record < record_count; record++)
 							{
@@ -342,11 +343,11 @@ static void draw_model_chams(IMatRenderContext* ctx, const DrawModelState_t& sta
 
 						if (backtrack_material && !backtrack_material->IsErrorMaterial())
 						{
-							matrix3x4_t* record_matrixes[12];
-							float record_alpha[12];
-							bool record_hittable[12];
+							matrix3x4_t* record_matrixes[backtrack_chams_records];
+							float record_alpha[backtrack_chams_records];
+							bool record_hittable[backtrack_chams_records];
 
-							auto record_count = util::get_backtrack_records(model_entity, record_matrixes, record_alpha, record_hittable, 12);
+							auto record_count = util::get_backtrack_records(model_entity, record_matrixes, record_alpha, record_hittable, backtrack_chams_records);
 
 							for (auto record = 0; record < record_count; record++)
 							{

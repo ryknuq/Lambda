@@ -61,7 +61,7 @@ void aim::run(CUserCmd* cmd)
 
         for (auto& target : targets)
         {
-            if (!target.last_record || !target.last_record->valid())
+            if (!target.last_record || !target.last_record->usable())
                 continue;
 
             scan_data last_data;
@@ -140,6 +140,34 @@ void aim::automatic_revolver(CUserCmd* cmd)
     g_ctx.globals.revolver_working = true;
 }
 
+int aim::backtrack_limit()
+{
+    if (!cfg.misc.extended_backtack || !cfg.ragebot.unlock_backtrack)
+        return backtrack_locked_ticks;
+
+    static auto sv_maxunlag = m_cvar()->FindVar(crypt_str("sv_maxunlag"));
+
+    auto max_unlag = sv_maxunlag ? sv_maxunlag->GetFloat() : 0.2f;
+    auto interval = m_globals()->m_intervalpertick;
+
+    if (interval <= 0.0f)
+        return backtrack_locked_ticks;
+
+    auto best_case = (int)(max(max_unlag - 0.01f, 0.0f) / interval);
+
+    return std::clamp(best_case, backtrack_locked_ticks, backtrack_max_ticks);
+}
+
+int aim::backtrack_records()
+{
+    auto limit = backtrack_limit();
+
+    if (limit <= backtrack_locked_ticks)
+        return backtrack_min_records;
+
+    return std::clamp(min(cfg.ragebot.backtrack_ticks, limit) + 8, backtrack_min_records, backtrack_max_ticks + 8);
+}
+
 int aim::backtrack_window()
 {
     static auto sv_maxunlag = m_cvar()->FindVar(crypt_str("sv_maxunlag"));
@@ -158,10 +186,15 @@ int aim::backtrack_window()
     if (server_limit < 1)
         server_limit = 1;
 
+    if (server_limit > backtrack_max_ticks)
+        server_limit = backtrack_max_ticks;
+
     auto configured = cfg.ragebot.backtrack_ticks;
 
     if (configured < 1)
         configured = 1;
+
+    configured = min(configured, backtrack_limit());
 
     return min(configured, server_limit);
 }
@@ -173,8 +206,10 @@ void aim::collect_records(target& current)
     if (!current.last_record)
         return;
 
-    const auto window = backtrack_window();
+    const auto breaking = lagcompensation::get().is_breaking_lagcomp(current.e->EntIndex());
+    const auto window = breaking ? 0 : backtrack_window();
     const auto newest_tick = TIME_TO_TICKS(current.last_record->simulation_time);
+    const auto record_cap = (size_t)std::clamp(window + 1, 1, backtrack_max_ticks + 1);
 
     auto previous_tick = INT_MIN;
 
@@ -204,7 +239,10 @@ void aim::collect_records(target& current)
 
         current.records.emplace_back(&record);
 
-        if (current.records.size() >= 24)
+        if (current.records.size() >= record_cap)
+            break;
+
+        if (record.teleport_break)
             break;
     }
 }
@@ -256,9 +294,6 @@ void aim::prepare_targets()
             continue;
 
         if (!e->valid(true, false))
-            continue;
-
-        if (e->m_flSimulationTime() < e->m_flOldSimulationTime())
             continue;
 
         auto records = &player_records[i];
@@ -314,6 +349,17 @@ adjust_data* aim::get_record(std::deque <adjust_data>* records, bool history)
 	{
 		auto record = &records->at(i);
 		if (record->valid())
+			return record;
+	}
+
+	if (history)
+		return nullptr;
+
+	for (auto i = start; i < records->size(); ++i)
+	{
+		auto record = &records->at(i);
+
+		if (record->valid(false) && record->bone_count > 0)
 			return record;
 	}
 
@@ -493,7 +539,7 @@ void aim::select_record(target& current)
             float rating;
         };
 
-        probe_t probes[24];
+        probe_t probes[backtrack_max_ticks + 1];
         auto probe_count = 0;
 
         for (auto record : current.records)
@@ -501,7 +547,7 @@ void aim::select_record(target& current)
             if (record == current.last_record)
                 continue;
 
-            if (probe_count >= 24)
+            if (probe_count >= (int)ARRAYSIZE(probes))
                 break;
 
             record->adjust_player();
@@ -545,7 +591,10 @@ void aim::scan_targets()
 
     for (auto& target : targets)
     {
-        if (!target.last_record || !target.last_record->valid())
+        if (!target.last_record)
+            continue;
+
+        if (!target.last_record->usable())
             continue;
 
         if (target.records.empty())
@@ -1157,7 +1206,7 @@ void aim::update_peek_state()
 
         auto record = &records->front();
 
-        if (!record->valid())
+        if (!record->usable())
             continue;
 
         record->adjust_player();
@@ -1428,7 +1477,7 @@ void aim::automatic_scope(CUserCmd* cmd)
 
     for (auto& target : targets)
     {
-        if (!target.last_record || !target.last_record->valid())
+        if (!target.last_record || !target.last_record->usable())
             continue;
 
         if (predicted_eye_pos.DistTo(target.last_record->origin) > weapon_info->flRange)

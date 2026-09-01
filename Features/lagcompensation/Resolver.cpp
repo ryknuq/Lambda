@@ -8,6 +8,66 @@ Vector player_t::get_eye_pos()
 	return m_vecOrigin() + m_vecViewOffset();
 }
 
+static matrix3x4_t* resolver_candidate_bones(matrixes& data, int candidate)
+{
+	if (candidate < 0 || candidate >= resolver_candidate_count)
+		return nullptr;
+
+	switch (resolver_candidate_matrix[candidate])
+	{
+	case NONE:
+		return data.zero;
+	case FIRST:
+		return data.first;
+	case SECOND:
+		return data.second;
+	case HALF_FIRST:
+		return data.positive;
+	case HALF_SECOND:
+		return data.negative;
+	}
+
+	return nullptr;
+}
+
+static int resolver_wall_side(player_t* e, const Vector& origin)
+{
+	if (!e || !g_ctx.local())
+		return 0;
+
+	const auto eye = origin + Vector(0.0f, 0.0f, 60.0f);
+	const auto angle = math::calculate_angle(eye, g_ctx.globals.eye_pos);
+
+	Vector forward, right, up;
+	math::angle_vectors(Vector(0.0f, angle.y, 0.0f), &forward, &right, &up);
+
+	right.z = 0.0f;
+
+	const auto length = right.Length();
+
+	if (length <= 0.0f)
+		return 0;
+
+	right /= length;
+
+	const auto left_start = eye - right * 25.0f;
+	const auto right_start = eye + right * 25.0f;
+
+	const auto left_end = g_ctx.globals.eye_pos - right * 25.0f;
+	const auto right_end = g_ctx.globals.eye_pos + right * 25.0f;
+
+	const auto left_open = util::visible(left_start, left_end, e, g_ctx.local());
+	const auto right_open = util::visible(right_start, right_end, e, g_ctx.local());
+
+	if (left_open == right_open)
+		return 0;
+
+	if (util::visible(eye, left_open ? left_end : right_end, e, g_ctx.local()))
+		return 0;
+
+	return left_open ? 1 : -1;
+}
+
 void resolver::initialize(player_t* e, adjust_data* record, const float& goal_feet_yaw, const float& pitch)
 {
 	player = e;
@@ -40,7 +100,14 @@ void resolver::reset()
 	last_confidence = 0.0f;
 	stable_ticks = 0;
 	tried_mask = 0;
+	ruled_out_mask = 0;
+	preferred_mask = 0;
+	mask_time = 0.0f;
 	last_missed = 0;
+
+	flip_mode = 0;
+	flip_time = 0.0f;
+	last_eye_yaw = 0.0f;
 }
 
 void resolver::resolve()
@@ -506,9 +573,109 @@ void resolver::resolve()
 		}
 	}
 
-	auto cover_bias = 0.0f;
-
 	{
+		const auto previous_eye_yaw = last_eye_yaw;
+
+		last_eye_yaw = eye_yaw;
+
+		if (last_resolved_time > 0.0f)
+		{
+			const auto delta = math::normalize_yaw(eye_yaw - previous_eye_yaw);
+
+			if (std::fabs(delta) > 30.0f)
+			{
+				flip_mode = delta > 0.0f ? -1 : 1;
+				flip_time = player_record->simulation_time;
+			}
+		}
+	}
+
+	if (flip_mode)
+	{
+		const auto elapsed = TIME_TO_TICKS(player_record->simulation_time - flip_time);
+
+		if (elapsed < 0 || elapsed > 5)
+			flip_mode = 0;
+		else
+		{
+			const auto weight = 0.4f * (1.0f - (float)elapsed / 6.0f);
+
+			for (auto i = 0; i < resolver_candidate_count; ++i)
+				error[i] += weight * (resolver_candidate_scale[i] * (float)flip_mode > 0.0f ? 0.0f : 1.0f);
+
+			terms += weight;
+		}
+	}
+
+	auto freestanding_pick = -1;
+
+	const auto wall_side = resolver_wall_side(player, player_record->origin);
+
+	if (wall_side)
+	{
+		const auto angle = math::calculate_angle(player_record->origin + Vector(0.0f, 0.0f, 60.0f), g_ctx.globals.eye_pos);
+
+		Vector forward, right, up;
+		math::angle_vectors(Vector(0.0f, angle.y, 0.0f), &forward, &right, &up);
+
+		right.z = 0.0f;
+
+		const auto length = right.Length();
+
+		if (length > 0.0f)
+		{
+			right /= length;
+
+			auto best = -1;
+			auto best_lateral = -FLT_MAX;
+			auto spread = 0.0f;
+			auto lowest_lateral = FLT_MAX;
+
+			for (auto i = 0; i < resolver_candidate_count; ++i)
+			{
+				const auto bones = resolver_candidate_bones(player_record->matrixes_data, i);
+
+				if (!bones)
+					continue;
+
+				const auto head = player->hitbox_position_matrix(HITBOX_HEAD, bones);
+
+				if (head.LengthSqr() <= 0.0f)
+					continue;
+
+				const auto lateral = (head - player_record->origin).Dot(right) * (float)wall_side;
+
+				lowest_lateral = min(lowest_lateral, lateral);
+
+				if (lateral > best_lateral)
+				{
+					best_lateral = lateral;
+					best = i;
+				}
+			}
+
+			if (best >= 0 && lowest_lateral < FLT_MAX)
+				spread = best_lateral - lowest_lateral;
+
+			if (best >= 0 && spread > 1.5f)
+			{
+				const auto weight = 1.15f * min(spread / 6.0f, 1.0f);
+
+				for (auto i = 0; i < resolver_candidate_count; ++i)
+				{
+					const auto affinity = max(0.0f, 1.0f - std::fabs(resolver_candidate_scale[i] - resolver_candidate_scale[best]) * 2.0f);
+					error[i] += weight * (1.0f - affinity);
+				}
+
+				terms += weight;
+				freestanding_pick = best;
+			}
+		}
+	}
+	else
+	{
+		auto cover_bias = 0.0f;
+
 		const auto first_head = player->hitbox_position_matrix(HITBOX_HEAD, player_record->matrixes_data.first);
 		const auto second_head = player->hitbox_position_matrix(HITBOX_HEAD, player_record->matrixes_data.second);
 
@@ -520,14 +687,63 @@ void resolver::resolve()
 			if (first_visible != second_visible)
 				cover_bias = first_visible ? -1.0f : 1.0f;
 		}
+
+		if (cover_bias != 0.0f) //-V550
+		{
+			const auto weight = 0.45f;
+
+			for (auto i = 0; i < resolver_candidate_count; ++i)
+				error[i] += weight * (resolver_candidate_scale[i] * cover_bias > 0.0f ? 0.0f : 1.0f);
+
+			terms += weight;
+			freestanding_pick = cover_bias > 0.0f ? 1 : 2;
+		}
 	}
 
-	if (cover_bias != 0.0f) //-V550
+	if (mask_time > 0.0f && m_globals()->m_curtime - mask_time > 2.0f)
 	{
-		const auto weight = 0.45f;
+		ruled_out_mask = 0;
+		preferred_mask = 0;
+		mask_time = 0.0f;
+	}
+
+	if (ruled_out_mask)
+	{
+		auto weight = 0.0f;
 
 		for (auto i = 0; i < resolver_candidate_count; ++i)
-			error[i] += weight * (resolver_candidate_scale[i] * cover_bias > 0.0f ? 0.0f : 1.0f);
+		{
+			if (!(ruled_out_mask & (1 << i)))
+				continue;
+
+			for (auto j = 0; j < resolver_candidate_count; ++j)
+			{
+				const auto affinity = max(0.0f, 1.0f - std::fabs(resolver_candidate_scale[j] - resolver_candidate_scale[i]) * 2.0f);
+				error[j] += 1.7f * affinity;
+			}
+
+			weight += 1.7f;
+		}
+
+		terms += weight;
+	}
+
+	if (preferred_mask)
+	{
+		const auto weight = 2.2f;
+
+		for (auto i = 0; i < resolver_candidate_count; ++i)
+		{
+			auto affinity = 0.0f;
+
+			for (auto j = 0; j < resolver_candidate_count; ++j)
+			{
+				if (preferred_mask & (1 << j))
+					affinity = max(affinity, 1.0f - std::fabs(resolver_candidate_scale[i] - resolver_candidate_scale[j]) * 2.0f);
+			}
+
+			error[i] += weight * (1.0f - max(0.0f, affinity));
+		}
 
 		terms += weight;
 	}
@@ -736,11 +952,9 @@ void resolver::resolve()
 		return;
 	}
 
-	if (cover_bias != 0.0f) //-V550
+	if (freestanding_pick >= 0)
 	{
-		const auto hidden = cover_bias > 0.0f ? 1 : 2;
-
-		commit(resolver_candidate_sides[hidden], candidate_yaw[hidden], 0.35f);
+		commit(resolver_candidate_sides[freestanding_pick], candidate_yaw[freestanding_pick], 0.35f);
 		return;
 	}
 
@@ -867,6 +1081,134 @@ void lagcompensation::resolver_feedback(int index, resolver_side side, bool hit)
 			continue;
 
 		memory->weight[i] = std::clamp(memory->weight[i] + (hit ? 1.0f : -0.7f) * affinity, -6.0f, 6.0f);
+	}
+
+	memory->samples = min(memory->samples + 1, 4096);
+	memory->updated = m_globals()->m_curtime;
+}
+
+void lagcompensation::resolver_shot_feedback(int index, const Vector& start, const Vector& end, bool hurt, int hitgroup)
+{
+	if (index < 1 || index > 64)
+		return;
+
+	if (!g_ctx.local())
+		return;
+
+	auto record = &aim::get().last_target[index].record;
+
+	if (record->i != index || record->bot || record->bone_count <= 0 || !record->valid(false))
+		return;
+
+	auto e = record->player;
+
+	if (!e || e->m_iTeamNum() == g_ctx.local()->m_iTeamNum())
+		return;
+
+	auto direction = end - start;
+	const auto length = direction.Length();
+
+	if (length <= 1.0f)
+		return;
+
+	direction /= length;
+
+	auto backup = adjust_data(e);
+	record->adjust_player();
+
+	const auto bone_count = std::clamp(e->m_CachedBoneData().Count(), 0, MAXSTUDIOBONES);
+
+	Ray_t ray;
+	ray.Init(start, end + direction * 16.0f);
+
+	auto ruled_out = 0;
+	auto matched = 0;
+	auto traced = 0;
+
+	auto best = -1;
+	auto best_distance = FLT_MAX;
+
+	for (auto i = 0; i < resolver_candidate_count; ++i)
+	{
+		const auto bones = resolver_candidate_bones(record->matrixes_data, i);
+
+		if (!bones || bone_count <= 0)
+			continue;
+
+		memcpy(e->m_CachedBoneData().Base(), bones, bone_count * sizeof(matrix3x4_t));
+
+		trace_t trace;
+		m_trace()->ClipRayToEntity(ray, MASK_SHOT_HULL | CONTENTS_HITBOX, e, &trace);
+
+		traced |= 1 << i;
+
+		const auto hit = trace.hit_entity == e;
+
+		if (!hurt)
+		{
+			if (hit)
+				ruled_out |= 1 << i;
+
+			continue;
+		}
+
+		if (!hit || (hitgroup > 0 && trace.hitgroup != hitgroup))
+		{
+			ruled_out |= 1 << i;
+			continue;
+		}
+
+		matched |= 1 << i;
+
+		const auto distance = trace.endpos.DistTo(end);
+
+		if (distance < best_distance)
+		{
+			best_distance = distance;
+			best = i;
+		}
+	}
+
+	backup.adjust_player();
+
+	if (!traced || ruled_out == traced)
+		return;
+
+	auto& resolve = player_resolver[index];
+
+	if (hurt)
+	{
+		if (best < 0)
+			return;
+
+		resolve.preferred_mask = matched;
+		resolve.ruled_out_mask = ruled_out;
+	}
+	else
+	{
+		if (!ruled_out)
+			return;
+
+		resolve.ruled_out_mask |= ruled_out;
+		resolve.preferred_mask &= ~ruled_out;
+
+		if (resolve.preferred_mask == 0 && (resolve.ruled_out_mask & traced) == traced)
+			resolve.ruled_out_mask = ruled_out;
+	}
+
+	resolve.mask_time = m_globals()->m_curtime;
+
+	const auto memory = resolver_memory_for(e);
+
+	if (!memory)
+		return;
+
+	for (auto i = 0; i < resolver_candidate_count; ++i)
+	{
+		if (ruled_out & (1 << i))
+			memory->weight[i] = std::clamp(memory->weight[i] - 0.45f, -6.0f, 6.0f);
+		else if (matched & (1 << i))
+			memory->weight[i] = std::clamp(memory->weight[i] + 0.6f, -6.0f, 6.0f);
 	}
 
 	memory->samples = min(memory->samples + 1, 4096);

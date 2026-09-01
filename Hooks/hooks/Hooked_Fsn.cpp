@@ -405,6 +405,9 @@ void __stdcall hooks::hooked_fsn(ClientFrameStage_t stage)
 					static auto weapon_accuracy_nospread = m_cvar()->FindVar(crypt_str("weapon_accuracy_nospread"));
 					const auto no_spread = weapon_accuracy_nospread && weapon_accuracy_nospread->GetBool();
 
+					if (current_shot->impacts)
+						lagcompensation::get().resolver_shot_feedback(current_shot->last_target, current_shot->shoot_position, current_shot->impact_position, false, 0);
+
 					// OCCLUSION CHECK FIRST - Must check if autowall actually returned invalid
 					if (current_shot->occlusion)
 					{

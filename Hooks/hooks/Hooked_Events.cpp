@@ -9,6 +9,7 @@
 #include "..\..\features\misc\misc.h"
 #include "..\..\features\visuals\dormantesp.h"
 #include "..\..\features\lagcompensation\animation_system.h"
+#include "..\..\utils\resources\sound_player.hpp"
 
 bool weapon_is_aim(const std::string& weapon)
 {
@@ -216,43 +217,19 @@ void C_HookedEvents::FireGameEvent(IGameEvent* event)
 		if (g_ctx.local()->is_alive() && attacker_id == m_engine()->GetLocalPlayer() && user_id != m_engine()->GetLocalPlayer())
 		{
 			auto entity = static_cast<player_t*>(m_entitylist()->GetClientEntity(user_id));
-			if (cfg.esp.killsound)
-			{
-				auto headshot = event->GetBool(crypt_str("headshot"));
+			auto headshot = event->GetBool(crypt_str("headshot"));
 
-				switch (g_ctx.globals.kills)
-				{
-				case 0:
-					m_surface()->PlaySound_(headshot ? crypt_str("kill2.wav") : crypt_str("kill1.wav"));
-					break;
-				case 1:
-					m_surface()->PlaySound_(crypt_str("kill3.wav"));
-					break;
-				case 2:
-					m_surface()->PlaySound_(crypt_str("kill4.wav"));
-					break;
-				case 3:
-					m_surface()->PlaySound_(crypt_str("kill5.wav"));
-					break;
-				case 4:
-					m_surface()->PlaySound_(crypt_str("kill6.wav"));
-					break;
-				case 5:
-					m_surface()->PlaySound_(crypt_str("kill7.wav"));
-					break;
-				case 6:
-					m_surface()->PlaySound_(crypt_str("kill8.wav"));
-					break;
-				case 7:
-					m_surface()->PlaySound_(crypt_str("kill9.wav"));
-					break;
-				case 8:
-					m_surface()->PlaySound_(crypt_str("kill10.wav"));
-					break;
-				default:
-					m_surface()->PlaySound_(crypt_str("kill11.wav"));
-					break;
-				}
+			if (cfg.player.enable)
+			{
+				auto killsound = cfg.esp.killsound;
+
+				if (!killsound)
+					killsound = headshot ? cfg.esp.killsound_head : cfg.esp.killsound_body;
+
+				--killsound;
+
+				if (killsound >= 0 && killsound < hitsound_count)
+					play_hitsound(killsound, cfg.esp.hitsound_volume);
 			}
 
 			g_ctx.globals.kills++;
@@ -283,7 +260,7 @@ void C_HookedEvents::FireGameEvent(IGameEvent* event)
 				auto index = cfg.esp.hitsound - 1;
 
 				if (index >= 0 && index < hitsound_count)
-					m_surface()->PlaySound_(hitsound_entries[index].file);
+					play_hitsound(index, cfg.esp.hitsound_volume);
 			}
 
 			auto entity = static_cast<player_t*>(m_entitylist()->GetClientEntity(user_id));
@@ -396,7 +373,12 @@ void C_HookedEvents::FireGameEvent(IGameEvent* event)
 					g_ctx.globals.missed_shots[current_shot->last_target] = 0;
 
 					if (user_id == current_shot->last_target)
+					{
 						lagcompensation::get().resolver_feedback(current_shot->last_target, (resolver_side)current_shot->side, true);
+
+						if (current_shot->impacts)
+							lagcompensation::get().resolver_shot_feedback(current_shot->last_target, current_shot->shoot_position, current_shot->impact_position, true, hitgroup);
+					}
 				}
 			}
 		}
@@ -414,6 +396,9 @@ void C_HookedEvents::FireGameEvent(IGameEvent* event)
 			g_ctx.globals.fired_shots[i] = 0;
 			g_ctx.globals.missed_shots[i] = 0;
 			lagcompensation::get().is_dormant[i] = false;
+			lagcompensation::get().lagcomp_break_time[i] = 0.0f;
+			lagcompensation::get().lagcomp_break_count[i] = 0;
+			lagcompensation::get().last_simulation_time[i] = 0.0f;
 			lagcompensation::get().player_resolver[i].reset();
 			playeresp::get().esp_alpha_fade[i] = 0.0f;
 			playeresp::get().health[i] = 100;

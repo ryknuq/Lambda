@@ -5,6 +5,8 @@
 #include "../constchars.h"
 #include "../features/misc/logs.h"
 #include "../utils/lg/logging.h"
+#include "../utils/resources/sound_player.hpp"
+#include "../features/ragebot/aim.h"
 
 #define ALPHA (ImGuiColorEditFlags_AlphaPreview | ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_AlphaBar| ImGuiColorEditFlags_InputRGB | ImGuiColorEditFlags_Float)
 #define NOALPHA (ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_InputRGB | ImGuiColorEditFlags_Float)
@@ -604,7 +606,16 @@ void c_menu::rage_tab() // rage tab
 			ImGui::Checkbox(crypt_str("Defensive"), &cfg.ragebot.defensive_doubletap);
 			ImGui::Checkbox(crypt_str("Anti exploit"), &cfg.ragebot.anti_exploit);
 			ImGui::Checkbox(crypt_str("Extended backtrack"), &cfg.misc.extended_backtack);
-			ImGui::SliderInt(crypt_str("Backtrack ticks"), &cfg.ragebot.backtrack_ticks, 1, 12, true);
+
+			if (cfg.misc.extended_backtack)
+				ImGui::Checkbox(crypt_str("Unlock slider (w.i.p)"), &cfg.ragebot.unlock_backtrack);
+
+			const auto tick_limit = aim::get().backtrack_limit();
+
+			if (cfg.ragebot.backtrack_ticks > tick_limit)
+				cfg.ragebot.backtrack_ticks = tick_limit;
+
+			ImGui::SliderInt(crypt_str("Backtrack ticks"), &cfg.ragebot.backtrack_ticks, 1, tick_limit, true);
 		}
 		ImGui::EndChild();
 	}
@@ -1353,12 +1364,50 @@ void c_menu::misc_tab() // misc
 			ImGui::Checkbox(crypt_str("Keybinds"), &cfg.menu.keybinds);
 
 			ImGui::Checkbox(crypt_str("Spectators list"), &cfg.misc.spectators_list);
-			if (draw_combo(crypt_str("Hitsound"), cfg.esp.hitsound, sounds, ARRAYSIZE(sounds), 10))
-			{
-				auto preview = cfg.esp.hitsound - 1;
 
-				if (preview >= 0 && preview < hitsound_count)
-					m_surface()->PlaySound_(hitsound_entries[preview].file);
+			auto sound_combo = [](const char* label, int& value)
+				{
+					if (!draw_combo(label, value, sounds, ARRAYSIZE(sounds), 10))
+						return;
+
+					const auto selected = value - 1;
+
+					if (selected >= 0 && selected < hitsound_count)
+						play_hitsound(selected, cfg.esp.hitsound_volume);
+				};
+
+			sound_combo(crypt_str("Hitsound"), cfg.esp.hitsound);
+			padding(0, 3);
+			sound_combo(crypt_str("Killsound"), cfg.esp.killsound);
+			padding(0, 3);
+			sound_combo(crypt_str("Head killsound"), cfg.esp.killsound_head);
+			padding(0, 3);
+			sound_combo(crypt_str("Body killsound"), cfg.esp.killsound_body);
+
+			if (cfg.esp.hitsound || cfg.esp.killsound || cfg.esp.killsound_head || cfg.esp.killsound_body)
+			{
+				padding(0, 3);
+
+				ImGui::SliderInt(crypt_str("Sound volume"), &cfg.esp.hitsound_volume, 0, 100, true);
+
+				if (ImGui::IsItemDeactivatedAfterEdit())
+				{
+					auto selected = cfg.esp.hitsound;
+
+					if (!selected)
+						selected = cfg.esp.killsound;
+
+					if (!selected)
+						selected = cfg.esp.killsound_head;
+
+					if (!selected)
+						selected = cfg.esp.killsound_body;
+
+					--selected;
+
+					if (selected >= 0 && selected < hitsound_count)
+						play_hitsound(selected, cfg.esp.hitsound_volume);
+				}
 			}
 
 			draw_multicombo(crypt_str("Logs"), cfg.misc.events_to_log, events, ARRAYSIZE(events), preview);

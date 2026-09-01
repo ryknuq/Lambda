@@ -119,6 +119,7 @@ void C_ConfigManager::setup()
 	setup_item(&cfg.ragebot.lag_exploit, false, crypt_str("Ragebot.lag_exploit"));
 	setup_item(&cfg.ragebot.dt_lag, 0, crypt_str("Ragebot.dt_lag"));
 	setup_item(&cfg.ragebot.backtrack_ticks, 12, crypt_str("Ragebot.backtrack_ticks"));
+	setup_item(&cfg.ragebot.unlock_backtrack, false, crypt_str("Ragebot.unlock_backtrack"));
 
 	for (auto i = 0; i < 8; i++)
 	{
@@ -288,7 +289,10 @@ void C_ConfigManager::setup()
 	setup_item(&cfg.esp.enemy_bullet_tracer_color, Color(255, 255, 255), crypt_str("Esp.enemy_bullet_tracer_color"));
 	setup_item(&cfg.esp.preserve_killfeed, false, crypt_str("Esp.preserve_killfeed"));
 	setup_item(&cfg.esp.hitsound, 0, crypt_str("Esp.hitsound"));
-	setup_item(&cfg.esp.killsound, false, crypt_str("Esp.killsound"));
+	setup_item(&cfg.esp.hitsound_volume, 50, crypt_str("Esp.hitsound_volume"));
+	setup_item(&cfg.esp.killsound, 0, crypt_str("Esp.killsound_general"));
+	setup_item(&cfg.esp.killsound_head, 0, crypt_str("Esp.killsound_head"));
+	setup_item(&cfg.esp.killsound_body, 0, crypt_str("Esp.killsound_body"));
 
 	setup_item(&cfg.esp.damage_marker, false, crypt_str("Esp.damage_marker"));
 	setup_item(&cfg.esp.damage_marker_color, Color(255, 255, 255), crypt_str("Esp.damage_marker_color"));

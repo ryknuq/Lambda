@@ -189,7 +189,14 @@ public:
 	float last_confidence = 0.0f;
 	int stable_ticks = 0;
 	int tried_mask = 0;
+	int ruled_out_mask = 0;
+	int preferred_mask = 0;
+	float mask_time = 0.0f;
 	int last_missed = 0;
+
+	int flip_mode = 0;
+	float flip_time = 0.0f;
+	float last_eye_yaw = 0.0f;
 };
 
 class adjust_data
@@ -216,6 +223,7 @@ public:
 	bool bot;
 	bool shot;
 	bool exploited;
+	bool teleport_break;
 
 	bool hittable;
 	bool selected;
@@ -267,6 +275,7 @@ public:
 		bot = false;
 		shot = false;
 		exploited = false;
+		teleport_break = false;
 		hittable = false;
 		selected = false;
 		hittable_damage = 0;
@@ -317,6 +326,7 @@ public:
 		hittable_point.Zero();
 
 		invalid = false;
+		teleport_break = false;
 		store_data(e, store);
 	}
 
@@ -454,6 +464,14 @@ public:
 
 		return true;
 	}
+
+	bool usable()
+	{
+		if (valid(true))
+			return true;
+
+		return bone_count > 0 && valid(false);
+	}
 };
 
 struct player_settings
@@ -567,8 +585,12 @@ public:
 
 	bool is_unsafe_tick(player_t* player);
 
+	void mark_lagcomp_break(int index);
+	bool is_breaking_lagcomp(int index);
+
 	resolver_memory* resolver_memory_for(player_t* e);
 	void resolver_feedback(int index, resolver_side side, bool hit);
+	void resolver_shot_feedback(int index, const Vector& start, const Vector& end, bool hurt, int hitgroup);
 
 	resolver player_resolver[65];
 	resolver_memory resolver_memories[resolver_memory_slots];
@@ -577,4 +599,8 @@ public:
 	bool is_dormant[65];
 	float previous_goal_feet_yaw[65];
 	float feet_delta[65];
+
+	float lagcomp_break_time[65];
+	int lagcomp_break_count[65];
+	float last_simulation_time[65];
 };

@@ -1,6 +1,7 @@
 ﻿#include "animation_system.h"
 #include "..\misc\misc.h"
 #include "..\misc\logs.h"
+#include "..\ragebot\aim.h"
 
 std::deque <adjust_data> player_records[65];
 
@@ -9,6 +10,19 @@ void lagcompensation::fsn(ClientFrameStage_t stage) // Паста
 {
 	if (stage != FRAME_NET_UPDATE_END)
 		return;
+
+	static auto sv_lagcompensation_teleport_dist = m_cvar()->FindVar(crypt_str("sv_lagcompensation_teleport_dist"));
+	static auto sv_maxusrcmdprocessticks = m_cvar()->FindVar(crypt_str("sv_maxusrcmdprocessticks"));
+
+	auto teleport_dist = sv_lagcompensation_teleport_dist ? sv_lagcompensation_teleport_dist->GetFloat() : 64.0f;
+	auto teleport_dist_sqr = teleport_dist * teleport_dist;
+	auto max_process_ticks = sv_maxusrcmdprocessticks ? sv_maxusrcmdprocessticks->GetInt() : 16;
+
+	if (max_process_ticks < 2)
+		max_process_ticks = 16;
+
+	auto record_limit = aim::get().backtrack_records();
+
 	for (auto i = 1; i <= m_globals()->m_maxclients; i++) //-V807
 	{
 		auto e = static_cast<player_t*>(m_entitylist()->GetClientEntity(i));
@@ -17,7 +31,10 @@ void lagcompensation::fsn(ClientFrameStage_t stage) // Паста
 			continue;
 
 		if (!valid(i, e))
+		{
+			last_simulation_time[i] = 0.0f;
 			continue;
+		}
 
 		auto time_delta = abs(TIME_TO_TICKS(e->m_flSimulationTime()) - m_globals()->m_tickcount);
 
@@ -46,17 +63,61 @@ void lagcompensation::fsn(ClientFrameStage_t stage) // Паста
 
 		if (update) //-V550
 		{
-			if (!player_records[i].empty() && (e->m_vecOrigin() - player_records[i].front().origin).LengthSqr() > 4096.0f)
+			auto previous_simulation_time = last_simulation_time[i];
+
+			last_simulation_time[i] = e->m_flSimulationTime();
+
+			if (previous_simulation_time > 0.0f)
+			{
+				auto simulation_delta = TIME_TO_TICKS(e->m_flSimulationTime() - previous_simulation_time);
+
+				if (simulation_delta < 0 || simulation_delta > max_process_ticks + 1)
+					mark_lagcomp_break(i);
+			}
+
+			auto teleported = !player_records[i].empty() && (e->m_vecOrigin() - player_records[i].front().origin).LengthSqr() > teleport_dist_sqr;
+
+			if (teleported)
+			{
+				mark_lagcomp_break(i);
+
 				for (auto& record : player_records[i])
 					record.invalid = true;
+			}
 
 			player_records[i].emplace_front(adjust_data());
 			update_player_animations(e);
 
-			while (player_records[i].size() > 32)
+			if (teleported)
+				player_records[i].front().teleport_break = true;
+
+			while (player_records[i].size() > (size_t)record_limit)
 				player_records[i].pop_back();
 		}
 	}
+}
+
+void lagcompensation::mark_lagcomp_break(int index)
+{
+	if (index < 1 || index > 64)
+		return;
+
+	if (lagcomp_break_time[index] < m_globals()->m_curtime - 1.0f)
+		lagcomp_break_count[index] = 0;
+
+	lagcomp_break_time[index] = m_globals()->m_curtime;
+	++lagcomp_break_count[index];
+}
+
+bool lagcompensation::is_breaking_lagcomp(int index)
+{
+	if (index < 1 || index > 64)
+		return false;
+
+	if (lagcomp_break_time[index] <= 0.0f)
+		return false;
+
+	return m_globals()->m_curtime - lagcomp_break_time[index] < 0.6f;
 }
 
 void lagcompensation::upd_nw(player_t* m_pPlayer)
@@ -669,7 +730,10 @@ void lagcompensation::update_player_animations(player_t* e)
 	record->store_data(e, false);
 
 	if (e->m_flSimulationTime() < e->m_flOldSimulationTime())
+	{
 		record->invalid = true;
+		mark_lagcomp_break(e->EntIndex());
+	}
 
 	e->invalidate_physics_recursive(8);
 	e->invalidate_bone_cache();

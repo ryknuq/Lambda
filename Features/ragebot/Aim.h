@@ -2,6 +2,11 @@
 #include "..\..\includes.hpp"
 #include "..\lagcompensation\animation_system.h"
 
+static constexpr int backtrack_locked_ticks = 12;
+static constexpr int backtrack_max_ticks = 64;
+static constexpr int backtrack_min_records = 32;
+static constexpr int backtrack_chams_records = 24;
+
 class target
 {
 public:
@@ -181,6 +186,8 @@ class aim : public singleton <aim>
 	scanned_target final_target;
 public:
 	int backtrack_window();
+	int backtrack_limit();
+	int backtrack_records();
 	void run(CUserCmd* cmd);
 	float bodyscale(player_t* e);
 	float GetHeadScale(player_t* e);
