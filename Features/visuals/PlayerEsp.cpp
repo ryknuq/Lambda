@@ -80,12 +80,10 @@ void playeresp::paint_traverse()
 		if (type == LOCAL && !m_input()->m_fCameraInThirdPerson)
 			continue;
 
-		auto valid_dormant = false;
-		if (e->IsDormant() && esp_alpha_fade[i] <= 0.0f && !valid_dormant)
-			continue;
-
 		auto backup_flags = e->m_fFlags();
 		auto backup_origin = e->GetAbsOrigin();
+
+		auto valid_dormant = false;
 
 		if (e->IsDormant())
 		{
@@ -102,6 +100,14 @@ void playeresp::paint_traverse()
 					valid_dormant = true;
 				}
 			}
+
+			if (!valid_dormant && esp_alpha_fade[i] <= 0.0f)
+			{
+				e->m_fFlags() = backup_flags;
+				e->set_abs_origin(backup_origin);
+
+				continue;
+			}
 		}
 		else
 		{
@@ -111,6 +117,12 @@ void playeresp::paint_traverse()
 
 		if (radar_base && hud_radar && e->IsDormant() && e->m_iTeamNum() != g_ctx.local()->m_iTeamNum() && e->m_bSpotted())
 			health[i] = hud_radar->radar_info[i].health;
+
+		if (health[i] <= 0 && e->IsDormant())
+			health[i] = e->m_iHealth();
+
+		if (health[i] <= 0 && valid_dormant)
+			health[i] = 100;
 
 		if (health[i] <= 0)
 		{
@@ -150,13 +162,13 @@ void playeresp::paint_traverse()
 			draw_skeleton(e, color, e->m_CachedBoneData().Base());
 		}
 
+		if (type == ENEMY && !e->IsDormant())
+			draw_backtrack(e);
+
 		Box box;
 
-		if (util::get_bbox(e, box, true))
+		if (util::get_bbox(e, box, true) && e->GetRenderOrigin() != Vector(0, 0, 0))
 		{
-			if (e->GetRenderOrigin() == Vector(0, 0, 0))
-				continue;
-
 			draw_box(e, box);
 			draw_name(e, box);
 			draw_health(e, box);
@@ -222,6 +234,103 @@ void playeresp::draw_skeleton(player_t* e, Color color, matrix3x4_t matrix[MAXST
 		Vector screen1, screen2;
 		if (get_cached_w2s(segment[0], screen1) && get_cached_w2s(segment[1], screen2))
 			g_Render->DrawLine(screen1.x, screen1.y, screen2.x, screen2.y, color);
+	}
+}
+
+void playeresp::draw_backtrack(player_t* e)
+{
+	if (!cfg.player.backtrack_hittable || !cfg.ragebot.enable)
+		return;
+
+	auto index = e->EntIndex();
+
+	if (index < 1 || index > 64)
+		return;
+
+	auto records = &player_records[index];
+
+	if (records->empty())
+		return;
+
+	auto window = aim::get().backtrack_window();
+
+	auto hittable_color = cfg.player.backtrack_hittable_color;
+	auto unhittable_color = cfg.player.backtrack_unhittable_color;
+
+	auto newest_tick = INT_MIN;
+	auto previous_tick = INT_MIN;
+
+	Vector previous_chain = ZERO;
+	auto chain_valid = false;
+
+	for (auto& record : *records)
+	{
+		if (!record.valid())
+			continue;
+
+		auto tick = TIME_TO_TICKS(record.simulation_time);
+
+		if (newest_tick == INT_MIN)
+			newest_tick = tick;
+		else if (newest_tick - tick > window)
+			break;
+
+		if (tick == previous_tick)
+			continue;
+
+		previous_tick = tick;
+
+		auto head = record.player->hitbox_position_matrix(HITBOX_HEAD, record.matrixes_data.main);
+
+		if (head.IsZero())
+			continue;
+
+		Vector head_screen;
+
+		if (!math::WorldToScreen(head, head_screen))
+		{
+			chain_valid = false;
+			continue;
+		}
+
+		auto fresh = record.hittable_tick > m_globals()->m_tickcount - 4;
+		auto hittable = fresh && record.hittable;
+		auto color = hittable ? hittable_color : unhittable_color;
+
+		if (chain_valid)
+			g_Render->DrawLine(previous_chain.x, previous_chain.y, head_screen.x, head_screen.y, Color(color.r(), color.g(), color.b(), color.a() / 2));
+
+		previous_chain = head_screen;
+		chain_valid = true;
+
+		if (record.selected)
+		{
+			g_Render->CircleFilled(head_screen.x, head_screen.y, 3.0f, color, 12);
+			g_Render->DrawCircle(head_screen.x, head_screen.y, 5.0f, 12.0f, Color(255, 255, 255, color.a()));
+		}
+		else
+			g_Render->CircleFilled(head_screen.x, head_screen.y, hittable ? 2.5f : 1.5f, color, 10);
+
+		if (!hittable || record.hittable_point.IsZero())
+			continue;
+
+		auto point = record.hittable_point;
+
+		if (point.DistTo(head) < 1.0f)
+			continue;
+
+		Vector point_screen;
+
+		if (!math::WorldToScreen(point, point_screen))
+			continue;
+
+		auto lethal = record.hittable_damage >= record.player->m_iHealth();
+		auto size = lethal ? 3.0f : 2.0f;
+
+		g_Render->Rect(point_screen.x - size, point_screen.y - size, size * 2.0f, size * 2.0f, color);
+
+		if (lethal)
+			g_Render->FilledRect(point_screen.x - 1.0f, point_screen.y - 1.0f, 2.0f, 2.0f, color);
 	}
 }
 

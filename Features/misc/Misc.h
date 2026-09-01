@@ -34,6 +34,9 @@ public:
 	void hide_shots(CUserCmd* m_pcmd, bool should_work);
 	void KillEffect(IGameEvent* pEvent);
 
+	void trashtalk(bool killed);
+	void flush_trashtalk();
+
 	void Trail();
 
 	std::vector<trail_pos_info> trail_pos;

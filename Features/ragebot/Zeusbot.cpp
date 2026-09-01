@@ -21,20 +21,42 @@ void zeusbot::run(CUserCmd* cmd)
 	if (!cfg.ragebot.zeus_bot)
 		return;
 
+	if (!g_ctx.globals.weapon)
+		return;
+
 	if (g_ctx.globals.weapon->m_iItemDefinitionIndex() != WEAPON_TASER)
+		return;
+
+	if (!g_ctx.globals.weapon->can_fire(false))
 		return;
 
 	scan_targets();
 
+	auto restore_players = [&]()
+	{
+		for (auto& record : aim::get().backup)
+			record.adjust_player();
+	};
+
 	if (scanned_targets.empty())
+	{
+		restore_players();
 		return;
+	}
+
+	if (cfg.ragebot.weapon[1].autostop && cfg.ragebot.weapon[1].autostop_modifiers[AUTOSTOP_TASER])
+		slowwalk::get().autostop(cmd);
 
 	find_best_target();
 
 	if (!final_target.data.valid())
+	{
+		restore_players();
 		return;
+	}
 
 	fire(cmd);
+	restore_players();
 }
 
 static bool compare_records(const adjust_data& first, const adjust_data& second)
@@ -90,78 +112,46 @@ void zeusbot::scan_targets()
 	}
 }
 
-static constexpr auto zeus_lethal_range = 180.0f;
+static constexpr auto zeus_fallback_range = 180.0f;
+
+static float zeus_range()
+{
+	auto weapon_info = g_ctx.globals.weapon->get_csweapon_info();
+
+	if (!weapon_info || weapon_info->flRange <= 0.0f)
+		return zeus_fallback_range;
+
+	return weapon_info->flRange;
+}
 
 void zeusbot::scan(adjust_data* record, scan_data& data)
 {
-	auto best_damage = 0;
-	auto hitbox = 0;
+	auto max_range = zeus_range();
+	auto best_distance = FLT_MAX;
 
-	auto weapon_info = g_ctx.globals.weapon->get_csweapon_info();
-
-	if (!weapon_info)
-		return;
-
-	auto max_range = min(weapon_info->flRange, zeus_lethal_range);
-
-	std::vector <scan_point> points;
-
-	for (hitbox = HITBOX_PELVIS; hitbox <= HITBOX_UPPER_CHEST; ++hitbox)
+	for (auto hitbox = (int)HITBOX_PELVIS; hitbox <= (int)HITBOX_UPPER_CHEST; ++hitbox)
 	{
 		auto point = scan_point(record->player->hitbox_position_matrix(hitbox, record->matrixes_data.main), hitbox, true);
 
-		if (!record->bot)
-		{
-			auto safe = 0.0f;
-
-			if (record->matrixes_data.zero[0].GetOrigin() == record->matrixes_data.first[0].GetOrigin() || record->matrixes_data.zero[0].GetOrigin() == record->matrixes_data.second[0].GetOrigin() || record->matrixes_data.first[0].GetOrigin() == record->matrixes_data.second[0].GetOrigin())
-				safe = 0.0f;
-			else if (!hitbox_intersection(record->player, record->matrixes_data.zero, hitbox, g_ctx.globals.eye_pos, point.point, &safe))
-				safe = 0.0f;
-			else if (!hitbox_intersection(record->player, record->matrixes_data.first, hitbox, g_ctx.globals.eye_pos, point.point, &safe))
-				safe = 0.0f;
-			else if (!hitbox_intersection(record->player, record->matrixes_data.second, hitbox, g_ctx.globals.eye_pos, point.point, &safe))
-				safe = 0.0f;
-
-			point.safe = safe;
-		}
-		else
-			point.safe = 1.0f;
-
-		points.emplace_back(point);
-	}
-
-	if (points.empty())
-		return;
-
-	for (auto& point : points)
-	{
-		if (data.point.safe && data.point.safe < point.safe)
+		if (point.point.IsZero())
 			continue;
 
-		if (g_ctx.globals.eye_pos.DistTo(point.point) > max_range)
+		auto distance = g_ctx.globals.eye_pos.DistTo(point.point);
+
+		if (distance > max_range || distance >= best_distance)
 			continue;
 
 		auto fire_data = autowall::get().wall_penetration(g_ctx.globals.eye_pos, point.point, record->player);
 
-		if (!fire_data.valid)
+		if (!fire_data.valid || !fire_data.visible || fire_data.damage < 1)
 			continue;
 
-		if (fire_data.damage < 1)
-			continue;
+		best_distance = distance;
 
-		if (!fire_data.visible)
-			continue;
-
-		if (fire_data.damage >= best_damage)
-		{
-			best_damage = fire_data.damage;
-
-			data.point = point;
-			data.visible = fire_data.visible;
-			data.damage = fire_data.damage;
-			data.hitbox = fire_data.hitbox;
-		}
+		data.point = point;
+		data.visible = fire_data.visible;
+		data.damage = fire_data.damage;
+		data.hitbox = fire_data.hitbox;
 	}
 }
 
@@ -176,9 +166,6 @@ void zeusbot::find_best_target()
 
 	for (auto& target : scanned_targets)
 	{
-		if (target.fov > (float)cfg.ragebot.field_of_view)
-			continue;
-
 		final_target = target;
 		final_target.record->adjust_player();
 		break;
@@ -279,92 +266,22 @@ void zeusbot::fire(CUserCmd* cmd)
 
 int zeusbot::hitchance(const Vector& aim_angle)
 {
-	auto final_hitchance = 0;
-	auto weapon_info = g_ctx.globals.weapon->get_csweapon_info();
+	auto max_range = zeus_range();
 
-	if (!weapon_info)
-		return final_hitchance;
-
-	if ((g_ctx.globals.eye_pos - final_target.data.point.point).Length() > weapon_info->flRange)
-		return final_hitchance;
+	if (g_ctx.globals.eye_pos.DistTo(final_target.data.point.point) > max_range)
+		return 0;
 
 	auto forward = ZERO;
-	auto right = ZERO;
-	auto up = ZERO;
 
-	math::angle_vectors(aim_angle, &forward, &right, &up);
-
+	math::angle_vectors(aim_angle, forward);
 	math::fast_vec_normalize(forward);
-	math::fast_vec_normalize(right);
-	math::fast_vec_normalize(up);
 
-	auto inaccuracy = weapon_info->flInaccuracyStand;
+	auto end = g_ctx.globals.eye_pos + forward * max_range;
 
-	if (g_ctx.local()->m_fFlags() & FL_DUCKING)
-		inaccuracy = weapon_info->flInaccuracyCrouch;
+	if (!hitbox_intersection(final_target.record->player, final_target.record->matrixes_data.main, final_target.data.hitbox, g_ctx.globals.eye_pos, end))
+		return 0;
 
-	if (g_ctx.globals.inaccuracy - 0.000001f < inaccuracy)
-		final_hitchance = 101;
-	else
-	{
-		static auto setup_spread_values = true;
-		static float spread_values[256][6];
-
-		if (setup_spread_values)
-		{
-			setup_spread_values = false;
-
-			for (auto i = 0; i < 256; ++i)
-			{
-				math::random_seed(i + 1);
-
-				auto a = math::random_float(0.0f, 1.0f);
-				auto b = math::random_float(0.0f, DirectX::XM_2PI);
-				auto c = math::random_float(0.0f, 1.0f);
-				auto d = math::random_float(0.0f, DirectX::XM_2PI);
-
-				spread_values[i][0] = a;
-				spread_values[i][1] = c;
-
-				auto sin_b = 0.0f, cos_b = 0.0f;
-				DirectX::XMScalarSinCos(&sin_b, &cos_b, b);
-
-				auto sin_d = 0.0f, cos_d = 0.0f;
-				DirectX::XMScalarSinCos(&sin_d, &cos_d, d);
-
-				spread_values[i][2] = sin_b;
-				spread_values[i][3] = cos_b;
-				spread_values[i][4] = sin_d;
-				spread_values[i][5] = cos_d;
-			}
-		}
-
-		auto hits = 0;
-
-		for (auto i = 0; i < 256; ++i)
-		{
-			auto inaccuracy = spread_values[i][0] * g_ctx.globals.inaccuracy;
-			auto spread = spread_values[i][1] * g_ctx.globals.spread;
-
-			auto spread_x = spread_values[i][3] * inaccuracy + spread_values[i][5] * spread;
-			auto spread_y = spread_values[i][2] * inaccuracy + spread_values[i][4] * spread;
-
-			auto direction = ZERO;
-
-			direction.x = forward.x + right.x * spread_x + up.x * spread_y;
-			direction.y = forward.y + right.y * spread_x + up.y * spread_y;
-			direction.z = forward.z + right.z * spread_x + up.z * spread_y; //-V778
-
-			auto end = g_ctx.globals.eye_pos + direction * weapon_info->flRange;
-
-			if (hitbox_intersection(final_target.record->player, final_target.record->matrixes_data.main, final_target.data.hitbox, g_ctx.globals.eye_pos, end))
-				++hits;
-		}
-
-		final_hitchance = (int)((float)hits / 2.56f);
-	}
-
-	return final_hitchance;
+	return 101;
 }
 
 static int clip_ray_to_hitbox(const Ray_t& ray, mstudiobbox_t* hitbox, matrix3x4_t& matrix, trace_t& trace)

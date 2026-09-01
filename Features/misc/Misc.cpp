@@ -468,6 +468,105 @@ void misc::spectators_list()
 	}
 }
 
+static const char* trashtalk_kill_phrases[] =
+{
+	"discord.gg/lmbda stop using your shitty cheat dog",
+	"Maybe if you used lambda you wouldnt stress",
+	"lmao you just died to a open sourced cheat <3",
+	"open source > your paid paste, discord.gg/lmbda",
+	"get lambda or get free, pick one",
+	"that was a free cheat by the way",
+	"imagine paying monthly for that resolver",
+	"your config is the only thing holding you back",
+	"another one for the open source team <3",
+	"lambda beta and you still cant handle it"
+};
+
+static const char* trashtalk_death_phrases[] =
+{
+	"your lucky lambda is still in beta, otherwise i wouldve shit on you",
+	"sigh, you got lucky this time...",
+	"lambda isnt performing very well, maybe its config issue?",
+	"hey lambda user, fix your config you bot",
+	"one tick off, ill take it next round",
+	"thats a config issue not a cheat issue",
+	"beta build, beta results, still free though",
+	"resolver said no. discord.gg/lmbda",
+	"i had 1 hp dont act like you outplayed me",
+	"note to self, stop using the default config"
+};
+
+static std::vector <std::string> trashtalk_pending;
+
+static int trashtalk_random(int limit)
+{
+	static auto state = 0u;
+
+	if (!state)
+		state = (unsigned int)GetTickCount() | 1u;
+
+	state ^= state << 13;
+	state ^= state >> 17;
+	state ^= state << 5;
+
+	return (int)(state % (unsigned int)limit);
+}
+
+void misc::trashtalk(bool killed)
+{
+	if (!cfg.misc.trashtalk)
+		return;
+
+	auto event = killed ? 0 : 1;
+
+	if (cfg.misc.trashtalk_events.size() < 2 || !cfg.misc.trashtalk_events[event])
+		return;
+
+	auto phrases = killed ? trashtalk_kill_phrases : trashtalk_death_phrases;
+	auto count = killed ? (int)_countof(trashtalk_kill_phrases) : (int)_countof(trashtalk_death_phrases);
+
+	if (count < 1)
+		return;
+
+	static int previous[2] = { -1, -1 };
+
+	auto index = 0;
+
+	if (count > 1)
+	{
+		if (previous[event] < 0 || previous[event] >= count)
+			index = trashtalk_random(count);
+		else
+		{
+			index = trashtalk_random(count - 1);
+
+			if (index >= previous[event])
+				++index;
+		}
+	}
+
+	previous[event] = index;
+
+	trashtalk_pending.emplace_back(phrases[index]);
+}
+
+void misc::flush_trashtalk()
+{
+	if (trashtalk_pending.empty())
+		return;
+
+	if (!m_engine()->IsInGame())
+	{
+		trashtalk_pending.clear();
+		return;
+	}
+
+	for (auto& phrase : trashtalk_pending)
+		m_engine()->ExecuteClientCmd((crypt_str("say \"") + phrase + crypt_str("\"")).c_str());
+
+	trashtalk_pending.clear();
+}
+
 void misc::NoDuck(CUserCmd* cmd)
 {
 	if (!cfg.misc.noduck)
@@ -499,7 +598,7 @@ void misc::AutoCrouch(CUserCmd* cmd)
 		return;
 	}
 
-	if (!key_binds::get().get_key_bind_state(20))
+	if (!key_binds::get().get_key_bind_state(20) && !g_ctx.globals.autostop_fakeduck)
 	{
 		g_ctx.globals.fakeducking = false;
 		return;

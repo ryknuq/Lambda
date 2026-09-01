@@ -144,7 +144,7 @@ void C_HookedEvents::FireGameEvent(IGameEvent* event)
 				aim::get().last_target[current_shot->last_target].record.adjust_player();
 
 				// Capture target position at impact time for prediction error detection
-				current_shot->target_position_at_impact = aim::get().last_target[current_shot->last_target].record.player->GetAbsOrigin();
+				current_shot->target_position_at_impact = backup_data.origin;
 				current_shot->impact_position = position;
 
 				// Capture animation state for correction detection
@@ -184,6 +184,20 @@ void C_HookedEvents::FireGameEvent(IGameEvent* event)
 					const auto aim_distance = current_shot->shoot_position.DistTo(current_shot->shot_info.aim_point);
 					// fix
 					current_shot->occlusion = impact_distance + 1.0f < aim_distance;
+
+					auto direction = position - current_shot->shoot_position;
+					auto length = direction.Length();
+
+					if (length > 0.0f)
+					{
+						direction /= length;
+
+						auto to_aim = current_shot->shot_info.aim_point - current_shot->shoot_position;
+						auto along = math::clamp(direction.Dot(to_aim), 0.0f, length);
+						auto closest = current_shot->shoot_position + direction * along;
+
+						current_shot->shot_info.path_deviation = closest.DistTo(current_shot->shot_info.aim_point);
+					}
 				}
 
 				current_shot->impacts = true;
@@ -248,7 +262,11 @@ void C_HookedEvents::FireGameEvent(IGameEvent* event)
 
 			if (weapon && weapon_name.find(crypt_str("knife")) != std::string::npos)
 				SkinChanger::overrideHudIcon(event);
+
+			misc::get().trashtalk(true);
 		}
+		else if (user_id == m_engine()->GetLocalPlayer() && attacker_id != m_engine()->GetLocalPlayer() && attacker_id > 0)
+			misc::get().trashtalk(false);
 	}
 	else if (!strcmp(event_name, crypt_str("player_hurt")))
 	{
@@ -383,6 +401,14 @@ void C_HookedEvents::FireGameEvent(IGameEvent* event)
 
 				current_shot->end = true;
 				current_shot->hurt_player = true;
+
+				if (current_shot->last_target > 0 && current_shot->last_target < 65)
+				{
+					g_ctx.globals.missed_shots[current_shot->last_target] = 0;
+
+					if (user_id == current_shot->last_target)
+						lagcompensation::get().resolver_feedback(current_shot->last_target, (resolver_side)current_shot->side, true);
+				}
 			}
 		}
 	}

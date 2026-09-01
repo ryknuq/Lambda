@@ -41,6 +41,8 @@ struct shot_info
 	// Additional metrics for analysis
 	float impact_distance = 0.0f;
 	float eye_distance = 0.0f;
+	float fire_inaccuracy = 0.0f;
+	float path_deviation = -1.0f;
 	int resolver_side = -1;
 	bool was_visible_when_fired = false;
 	bool point_was_safe = false;
@@ -125,6 +127,7 @@ public:
 		bool drawing_ragdoll = false;
 		bool in_thirdperson = true;
 		bool fakeducking = false;
+		bool autostop_fakeduck = false;
 		bool should_choke_packet = false;
 		bool should_send_packet = false;
 		bool bomb_timer_enable = false;

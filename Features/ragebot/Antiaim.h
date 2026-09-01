@@ -14,6 +14,7 @@ public:
 	bool condition(CUserCmd* m_pcmd, bool dynamic_check = true);
 	bool should_break_lby(CUserCmd* m_pcmd, int lby_type);
 	float at_targets();
+	bool cover_scores(float& left, float& right);
 	bool automatic_direction();
 	void freestanding(CUserCmd* m_pcmd);
 

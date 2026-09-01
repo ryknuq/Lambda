@@ -17,6 +17,7 @@ public:
 	void draw_box(player_t* m_entity, const Box& box);
 	void draw_health(player_t* m_entity, const Box& box);
 	void draw_skeleton(player_t* e, Color color, matrix3x4_t matrix[MAXSTUDIOBONES]);
+	void draw_backtrack(player_t* e);
 	bool draw_ammobar(player_t* m_entity, const Box& box);
 	void draw_name(player_t* m_entity, const Box& box);
 	void draw_weapon(player_t* m_entity, const Box& box, bool space);

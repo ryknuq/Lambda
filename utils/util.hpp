@@ -54,6 +54,7 @@ namespace util
 	unsigned int find_in_datamap(datamap_t * map, const char *name);
 	void color_modulate(float color[3], IMaterial* material);
 	bool get_backtrack_matrix(player_t* e, matrix3x4_t* matrix);
+	int get_backtrack_records(player_t* e, matrix3x4_t** out, float* alpha, bool* hittable, int max_records);
 	void create_state(c_baseplayeranimationstate* state, player_t* e);
 	void update_state(c_baseplayeranimationstate* state, const Vector& angles);
 	void reset_state(c_baseplayeranimationstate* state);

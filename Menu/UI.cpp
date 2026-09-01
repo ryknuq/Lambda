@@ -644,7 +644,7 @@ void c_menu::rage_tab() // rage tab
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
 			ImGui::Checkbox(crypt_str("Auto Stop"), &cfg.ragebot.weapon[hooks::rage_weapon].autostop);
 			if (cfg.ragebot.weapon[hooks::rage_weapon].autostop)
-				draw_multicombo(crypt_str("Auto Stop Modifiers"), cfg.ragebot.weapon[hooks::rage_weapon].autostop_modifiers, autostop_modifiers, ARRAYSIZE(autostop_modifiers), preview);
+				draw_multicombo(crypt_str("Quick stop"), cfg.ragebot.weapon[hooks::rage_weapon].autostop_modifiers, autostop_modifiers, ARRAYSIZE(autostop_modifiers), preview);
 
 			ImGui::Checkbox(crypt_str("Hitchance"), &cfg.ragebot.weapon[hooks::rage_weapon].hitchance);
 			if (cfg.ragebot.weapon[hooks::rage_weapon].hitchance)
@@ -737,6 +737,13 @@ void c_menu::aa_tab() // antiaim tab
 		ImGui::PopStyleColor();
 		ImGui::SameLine();
 		draw_keybind(crypt_str("Manual right"), &cfg.antiaim.manual_right, crypt_str("##HOTKEY_INVERT_RIGHT"));
+
+		ImGui::SetCursorPosX(9);
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.55f, 0.55f, 1.0f));
+		ImGui::Text("Freestanding");
+		ImGui::PopStyleColor();
+		ImGui::SameLine();
+		draw_keybind(crypt_str("Freestanding"), &cfg.antiaim.freestand_key, crypt_str("##HOTKEY_FREESTAND"));
 
 		if (cfg.antiaim.manual_back.key > KEY_NONE && cfg.antiaim.manual_back.key < KEY_MAX || cfg.antiaim.manual_left.key > KEY_NONE && cfg.antiaim.manual_left.key < KEY_MAX || cfg.antiaim.manual_right.key > KEY_NONE && cfg.antiaim.manual_right.key < KEY_MAX)
 		{
@@ -1000,7 +1007,30 @@ void c_menu::visuals_tab() // players + visuals
 							ImGui::PopFont();
 
 						}
+
 					}
+				}
+			}
+
+			if (player == 0)
+			{
+				ImGui::Checkbox(crypt_str("Visualise hittable backtrack"), &cfg.player.backtrack_hittable);
+
+				if (cfg.player.backtrack_hittable)
+				{
+					ImGui::ColorEdit(crypt_str("##backtrackhittablecolor"), &cfg.player.backtrack_hittable_color, ALPHA);
+					ImGui::SameLine();
+					ImGui::PushFont(c_menu::get().MenuFontRender);
+					ImGui::SetCursorPosX(9);
+					ImGui::Text(crypt_str("Hittable "));
+					ImGui::PopFont();
+
+					ImGui::ColorEdit(crypt_str("##backtrackunhittablecolor"), &cfg.player.backtrack_unhittable_color, ALPHA);
+					ImGui::SameLine();
+					ImGui::PushFont(c_menu::get().MenuFontRender);
+					ImGui::SetCursorPosX(9);
+					ImGui::Text(crypt_str("Unhittable "));
+					ImGui::PopFont();
 				}
 			}
 
@@ -1349,6 +1379,14 @@ void c_menu::misc_tab() // misc
 		{
 			ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
 			ImGui::Checkbox(crypt_str("Clantag"), &cfg.misc.clantag_spammer);
+			ImGui::Checkbox(crypt_str("Trashtalk"), &cfg.misc.trashtalk);
+
+			if (cfg.misc.trashtalk)
+			{
+				draw_multicombo(crypt_str("Trashtalk on"), cfg.misc.trashtalk_events, trashtalk_events, ARRAYSIZE(trashtalk_events), preview);
+				padding(0, 3);
+			}
+
 			ImGui::Checkbox(crypt_str("Enable buybot"), &cfg.misc.buybot_enable);
 
 			if (cfg.misc.buybot_enable)
@@ -1362,6 +1400,187 @@ void c_menu::misc_tab() // misc
 		}
 		ImGui::EndChild();
 	}
+}
+
+static const char* default_bind_labels[] =
+{
+	"Damage override",
+	"Hide shots",
+	"Double tap",
+	"Safe point",
+	"Body aim",
+	"Fake duck",
+	"Slow walk",
+	"Auto peek",
+	"Manual left",
+	"Manual right",
+	"Manual back",
+	"Freestanding",
+	"Invert desync",
+	"Thirdperson",
+	"Edge jump"
+};
+
+static const char* default_bind_ids[] =
+{
+	"##DEFAULT_BIND_DAMAGE",
+	"##DEFAULT_BIND_HIDESHOTS",
+	"##DEFAULT_BIND_DOUBLETAP",
+	"##DEFAULT_BIND_SAFEPOINT",
+	"##DEFAULT_BIND_BODYAIM",
+	"##DEFAULT_BIND_FAKEDUCK",
+	"##DEFAULT_BIND_SLOWWALK",
+	"##DEFAULT_BIND_AUTOPEEK",
+	"##DEFAULT_BIND_MANUALLEFT",
+	"##DEFAULT_BIND_MANUALRIGHT",
+	"##DEFAULT_BIND_MANUALBACK",
+	"##DEFAULT_BIND_FREESTAND",
+	"##DEFAULT_BIND_FLIPDESYNC",
+	"##DEFAULT_BIND_THIRDPERSON",
+	"##DEFAULT_BIND_EDGEJUMP"
+};
+
+static key_bind default_binds[_countof(default_bind_labels)];
+
+static void default_bind_targets(key_bind** targets)
+{
+	targets[0] = nullptr;
+	targets[1] = &cfg.antiaim.hide_shots_key;
+	targets[2] = &cfg.ragebot.double_tap_key;
+	targets[3] = &cfg.ragebot.safe_point_key;
+	targets[4] = &cfg.ragebot.body_aim_key;
+	targets[5] = &cfg.misc.fakeduck_key;
+	targets[6] = &cfg.misc.slowwalk_key;
+	targets[7] = &cfg.misc.automatic_peek;
+	targets[8] = &cfg.antiaim.manual_left;
+	targets[9] = &cfg.antiaim.manual_right;
+	targets[10] = &cfg.antiaim.manual_back;
+	targets[11] = &cfg.antiaim.freestand_key;
+	targets[12] = &cfg.antiaim.flip_desync;
+	targets[13] = &cfg.misc.thirdperson_toggle;
+	targets[14] = &cfg.misc.edge_jump;
+}
+
+static void seed_default_binds()
+{
+	key_bind* targets[_countof(default_bind_labels)];
+	default_bind_targets(targets);
+
+	for (auto i = 0; i < (int)_countof(default_bind_labels); i++)
+		default_binds[i] = targets[i] ? *targets[i] : cfg.ragebot.weapon[3].damage_override_key;
+}
+
+static void apply_default_binds()
+{
+	key_bind* targets[_countof(default_bind_labels)];
+	default_bind_targets(targets);
+
+	for (auto i = 0; i < (int)_countof(default_bind_labels); i++)
+	{
+		if (!targets[i])
+			continue;
+
+		*targets[i] = default_binds[i];
+	}
+
+	for (auto i = 0; i < 8; i++)
+		cfg.ragebot.weapon[i].damage_override_key = default_binds[0];
+}
+
+static bool default_source_available()
+{
+	const std::string path = get_config_directory() + crypt_str("n1kvz.cfg");
+	const auto attributes = GetFileAttributes(path.c_str());
+
+	return attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY);
+}
+
+void c_menu::default_config_popup()
+{
+	static auto was_open = false;
+
+	if (default_config_open && !was_open)
+		seed_default_binds();
+
+	was_open = default_config_open;
+
+	auto target = default_config_open ? 1.f : 0.f;
+	auto step = ImGui::GetIO().DeltaTime * 9.f;
+
+	if (default_config_anim < target)
+		default_config_anim = ImMin(default_config_anim + step, target);
+	else if (default_config_anim > target)
+		default_config_anim = ImMax(default_config_anim - step, target);
+
+	if (default_config_anim < 0.005f)
+		return;
+
+	auto alpha = ImClamp(public_alpha, 0.f, 1.f);
+	auto eased = default_config_anim * default_config_anim * (3.f - 2.f * default_config_anim);
+	auto display = ImGui::GetIO().DisplaySize;
+
+	ImGui::GetBackgroundDrawList()->AddRectFilled(ImVec2(0.f, 0.f), display, ImColor(0.f, 0.f, 0.f, 0.55f * eased * alpha));
+
+	ImGui::PushStyleVar(ImGuiStyleVar_Alpha, eased * alpha);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.f, 14.f));
+	ImGui::SetNextWindowSize(ImVec2(392.f, 496.f), ImGuiCond_Always);
+	ImGui::SetNextWindowPos(ImVec2(display.x * 0.5f, display.y * 0.5f + (1.f - eased) * 26.f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+
+	if (ImGui::Begin(crypt_str("##defaultconfig"), nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoMove))
+	{
+		ImGui::PushFont(g_cxmenufont);
+
+		ImGui::Text(crypt_str("default configuration"));
+		ImGui::Spacing();
+		ImGui::TextDisabled(crypt_str("built from n1kvz.cfg, every weapon included."));
+		ImGui::TextDisabled(crypt_str("choose the keys you want bound."));
+		ImGui::Spacing();
+		ImGui::Separator();
+		ImGui::Spacing();
+
+		ImGui::BeginChild(crypt_str("##defaultbinds"), ImVec2(0.f, 300.f), false);
+		{
+			for (auto i = 0; i < (int)_countof(default_bind_labels); i++)
+			{
+				ImGui::SetCursorPosX(9.f);
+				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.55f, 0.55f, 1.f));
+				ImGui::Text(crypt_str("%s"), default_bind_labels[i]);
+				ImGui::PopStyleColor();
+				ImGui::SameLine();
+				draw_keybind(default_bind_labels[i], &default_binds[i], default_bind_ids[i]);
+			}
+		}
+		ImGui::EndChild();
+
+		ImGui::Spacing();
+
+		ImGui::SetCursorPosX((ImGui::GetWindowSize().x - 250.f) * 0.5f);
+
+		if (ImGui::CustomButton(crypt_str("Create default config"), crypt_str("##CreateDefaultConfig"), ImVec2(250, 30), true, c_menu::get().settingicons, "3"))
+		{
+			if (!default_source_available())
+				eventlogs::get().add(crypt_str("Missing n1kvz.cfg in ") + get_config_directory());
+			else
+			{
+				load_config(crypt_str("n1kvz.cfg"));
+				apply_default_binds();
+				add_config(crypt_str("default"));
+
+				loaded_config = crypt_str("default.cfg");
+
+				default_config_open = false;
+			}
+		}
+
+		ImGui::SetCursorPosX((ImGui::GetWindowSize().x - 250.f) * 0.5f);
+
+		if (ImGui::CustomButton(crypt_str("Cancel"), crypt_str("##CancelDefaultConfig"), ImVec2(250, 26), true, c_menu::get().settingicons, "7"))
+			default_config_open = false;
+
+		ImGui::PopFont();
+	}
+	ImGui::End();
+	ImGui::PopStyleVar(2);
 }
 
 void c_menu::settings_tab() // cfg + lua
@@ -1424,6 +1643,9 @@ void c_menu::settings_tab() // cfg + lua
 
 				ShellExecute(NULL, crypt_str("open"), folder.c_str(), NULL, NULL, SW_SHOWNORMAL);
 			}
+
+			if ((ImGui::CustomButton(crypt_str("Default config"), crypt_str("##DefaultConfig"), ImVec2(250, 30), true, c_menu::get().settingicons, "6")))
+				default_config_open = true;
 
 			if (!selected_name.empty())
 			{
@@ -1800,6 +2022,9 @@ void c_menu::draw(bool is_open)
 		ImGui::End();
 		ImGui::PopStyleVar();
 	}
+
+	default_config_popup();
+
 	ImGui::PopStyleVar();
 	ss = previous_style;
 	menu_setupped = false;

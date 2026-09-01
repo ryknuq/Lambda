@@ -237,7 +237,13 @@ enum
 	AUTOSTOP_VISIBLE,
 	AUTOSTOP_CENTER,
 	AUTOSTOP_FORCE_ACCURACY,
-	AUTOSTOP_PREDICTIVE
+	AUTOSTOP_PREDICTIVE,
+	AUTOSTOP_SLOW_MOTION,
+	AUTOSTOP_DUCK,
+	AUTOSTOP_FAKE_DUCK,
+	AUTOSTOP_IGNORE_MOLOTOV,
+	AUTOSTOP_TASER,
+	AUTOSTOP_JUMP_SCOUT
 };
 
 enum
@@ -336,6 +342,7 @@ struct Config
 		key_bind manual_back;
 		key_bind manual_left;
 		key_bind manual_right;
+		key_bind freestand_key;
 		key_bind flip_desync;
 		bool flip_indicator;
 		Color flip_indicator_color;
@@ -394,6 +401,9 @@ struct Config
 		bool backtrack_chams;
 		int backtrack_chams_material;
 		Color backtrack_chams_color;
+		bool backtrack_hittable;
+		Color backtrack_hittable_color;
+		Color backtrack_unhittable_color;
 		bool transparency_in_scope;
 		float transparency_in_scope_amount;
 
@@ -596,6 +606,8 @@ struct Config
 		Color log_color;
 		bool inventory_access;
 		bool clantag_spammer;
+		bool trashtalk;
+		std::vector <int> trashtalk_events;
 		bool buybot_enable;
 		int buybot1;
 		int buybot2;

@@ -65,16 +65,19 @@ void resolver::resolve()
 
 	const auto eye_yaw = math::normalize_yaw(player->m_angEyeAngles().y);
 	const auto max_delta = std::clamp(std::fabs(player->get_max_desync_delta()), 25.0f, 60.0f);
+	const auto missed = std::clamp(g_ctx.globals.missed_shots[player_record->i], 0, 3);
 
 	float candidate_yaw[resolver_candidate_count];
 
 	for (auto i = 0; i < resolver_candidate_count; ++i)
 		candidate_yaw[i] = math::normalize_yaw(eye_yaw + max_delta * resolver_candidate_scale[i]);
 
+	auto trusted = false;
+
 	auto commit = [&](resolver_side selected, float yaw, bool confident = false)
 	{
 		player_record->side = selected;
-		player_record->resolver_confident = confident;
+		player_record->resolver_confident = confident && (trusted || !missed);
 
 		goal_feet_yaw = math::normalize_yaw(yaw);
 
@@ -108,9 +111,74 @@ void resolver::resolve()
 	const auto on_ground = (player_record->flags & FL_ONGROUND) != 0;
 	const auto standing = on_ground && speed < 5.0f;
 
+	auto body_delta = FLT_MAX;
+
+	{
+		const auto network = player_record->network_poses[resolver_body_yaw_pose];
+
+		float sample[resolver_candidate_count];
+		float sample_delta[resolver_candidate_count];
+
+		for (auto i = 0; i < resolver_candidate_count; ++i)
+		{
+			const auto candidate = resolver_candidate_order[i];
+
+			sample[i] = player_record->resolver_poses[candidate][resolver_body_yaw_pose];
+			sample_delta[i] = max_delta * resolver_candidate_scale[candidate];
+		}
+
+		const auto lowest = sample[0];
+		const auto highest = sample[resolver_candidate_count - 1];
+
+		if (std::fabs(highest - lowest) > 0.02f)
+		{
+			for (auto i = 1; i < resolver_candidate_count; ++i)
+			{
+				const auto low = min(sample[i - 1], sample[i]);
+				const auto high = max(sample[i - 1], sample[i]);
+
+				if (high - low < 0.0005f || network < low || network > high)
+					continue;
+
+				const auto fraction = (network - sample[i - 1]) / (sample[i] - sample[i - 1]);
+
+				body_delta = sample_delta[i - 1] + (sample_delta[i] - sample_delta[i - 1]) * fraction;
+				break;
+			}
+
+			if (body_delta == FLT_MAX)
+			{
+				const auto rising = highest > lowest;
+
+				auto direction = 0.0f;
+
+				if (network > max(lowest, highest))
+					direction = rising ? 1.0f : -1.0f;
+				else if (network < min(lowest, highest))
+					direction = rising ? -1.0f : 1.0f;
+
+				if (direction != 0.0f) //-V550
+				{
+					const auto analytic = std::clamp(network * 120.0f - 60.0f, -60.0f, 60.0f);
+
+					body_delta = analytic * direction > max_delta ? analytic : direction * max_delta;
+				}
+			}
+		}
+	}
+
+	const auto body_solved = body_delta != FLT_MAX; //-V550
+	const auto body_yaw = math::normalize_yaw(eye_yaw + (body_solved ? body_delta : 0.0f));
+
 	if (player_record->shot)
 	{
-		commit(RESOLVER_ZERO, eye_yaw, true);
+		trusted = true;
+
+		if (body_solved && std::fabs(body_delta) > 4.0f)
+			commit(nearest_side(body_yaw), body_yaw, true);
+		else
+			commit(RESOLVER_ZERO, eye_yaw, true);
+
 		return;
 	}
 
@@ -213,6 +281,9 @@ void resolver::resolve()
 
 	for (auto pose = 0; pose < 24; ++pose)
 	{
+		if (pose == resolver_body_yaw_pose)
+			continue;
+
 		float sorted[resolver_candidate_count];
 		float sorted_delta[resolver_candidate_count];
 
@@ -293,6 +364,28 @@ void resolver::resolve()
 		terms += 1.5f;
 	}
 
+	if (body_solved)
+	{
+		for (auto i = 0; i < resolver_candidate_count; ++i)
+			error[i] += 2.5f * min(std::fabs(math::normalize_yaw(candidate_yaw[i] - body_yaw)) / max_delta, 1.0f);
+
+		terms += 2.5f;
+
+		const auto pose_agrees = pose_solved && std::fabs(pose_delta - body_delta) <= max_delta * 0.25f;
+		const auto lby_agrees = lby_fresh && std::fabs(math::normalize_yaw(player_record->lby - body_yaw)) <= max_delta * 0.25f;
+
+		const auto repeating = missed >= 1 && last_side != RESOLVER_ORIGINAL && nearest_side(body_yaw) == last_side;
+
+		if (!repeating && std::fabs(body_delta) > 4.0f && (pose_agrees || lby_agrees))
+		{
+			player_record->moving_resolver_active = !standing;
+			player_record->high_desync_resolver_active = std::fabs(body_delta) > max_delta * 0.7f;
+
+			commit(nearest_side(body_yaw), body_yaw, true);
+			return;
+		}
+	}
+
 	if (lby_fresh)
 	{
 		for (auto i = 0; i < resolver_candidate_count; ++i)
@@ -301,7 +394,10 @@ void resolver::resolve()
 		terms += 2.0f;
 	}
 
-	if (last_resolved_time > 0.0f)
+	const auto eye_swing = previous_player_record ?
+		std::fabs(math::normalize_yaw(eye_yaw - math::normalize_yaw(previous_player_record->angles.y))) : 0.0f;
+
+	if (last_resolved_time > 0.0f && eye_swing < 30.0f)
 	{
 		const auto elapsed = TIME_TO_TICKS(player_record->simulation_time - last_resolved_time);
 
@@ -311,6 +407,57 @@ void resolver::resolve()
 
 			for (auto i = 0; i < resolver_candidate_count; ++i)
 				error[i] += weight * min(std::fabs(math::normalize_yaw(candidate_yaw[i] - last_resolved_yaw)) / max_delta, 1.0f);
+
+			terms += weight;
+		}
+	}
+
+	if (missed > 0 && last_side != RESOLVER_ORIGINAL)
+	{
+		auto missed_scale = FLT_MAX;
+
+		for (auto i = 0; i < resolver_candidate_count; ++i)
+		{
+			if (resolver_candidate_sides[i] == last_side)
+				missed_scale = resolver_candidate_scale[i];
+		}
+
+		if (missed_scale != FLT_MAX) //-V550
+		{
+			const auto weight = 2.8f * (float)missed;
+
+			for (auto i = 0; i < resolver_candidate_count; ++i)
+				error[i] += weight * max(0.0f, 1.0f - std::fabs(resolver_candidate_scale[i] - missed_scale) * 0.5f);
+
+			terms += weight;
+		}
+	}
+
+	const auto memory = lagcompensation::get().resolver_memory_for(player);
+
+	auto prior_best = 0.0f;
+	auto prior_span = 0.0f;
+
+	if (memory && memory->samples >= 4)
+	{
+		auto highest = -FLT_MAX;
+		auto lowest = FLT_MAX;
+
+		for (auto i = 0; i < resolver_candidate_count; ++i)
+		{
+			highest = max(highest, memory->weight[i]);
+			lowest = min(lowest, memory->weight[i]);
+		}
+
+		if (highest - lowest > 0.5f)
+		{
+			prior_best = highest;
+			prior_span = highest - lowest;
+
+			const auto weight = 0.6f;
+
+			for (auto i = 0; i < resolver_candidate_count; ++i)
+				error[i] += weight * (prior_best - memory->weight[i]) / prior_span;
 
 			terms += weight;
 		}
@@ -363,11 +510,18 @@ void resolver::resolve()
 			}
 		}
 
-		if (runner_up >= 0 && (error[runner_up] - error[best]) / terms > 0.035f)
+		auto decisive = runner_up >= 0 && (error[runner_up] - error[best]) / terms > 0.12f;
+
+		if (!decisive && memory && prior_span > 0.0f && memory->weight[best] >= prior_best - prior_span * 0.15f)
+			decisive = true;
+
+		if (decisive)
 		{
 			auto resolved = refined;
 
-			if (pose_solved)
+			if (body_solved && std::fabs(math::normalize_yaw(body_yaw - refined)) <= max_delta * 0.35f)
+				resolved = body_yaw;
+			else if (pose_solved)
 			{
 				const auto pose_yaw = math::normalize_yaw(eye_yaw + pose_delta);
 
@@ -421,7 +575,9 @@ void resolver::resolve()
 	{
 		auto resolved = fallback_yaw;
 
-		if (pose_solved)
+		if (body_solved && std::fabs(math::normalize_yaw(body_yaw - fallback_yaw)) <= max_delta * 0.35f)
+			resolved = body_yaw;
+		else if (pose_solved)
 		{
 			const auto pose_yaw = math::normalize_yaw(eye_yaw + pose_delta);
 
@@ -472,4 +628,93 @@ void resolver::BuildMoveYaw(player_t* e, float& foot_yaw)
 		foot_yaw = math::normalize_yaw(RAD2DEG(std::atan2(-e->m_vecVelocity().y, -e->m_vecVelocity().x)));
 	else
 		foot_yaw = math::normalize_yaw(e->m_angEyeAngles().y);
+}
+
+resolver_memory* lagcompensation::resolver_memory_for(player_t* e)
+{
+	if (!e)
+		return nullptr;
+
+	const auto index = e->EntIndex();
+
+	if (index < 1 || index > 64)
+		return nullptr;
+
+	player_info_t info{ };
+
+	if (!m_engine()->GetPlayerInfo(index, &info) || info.fakeplayer)
+		return nullptr;
+
+	const auto identity = (uint64_t)info.steamID64;
+
+	if (!identity)
+		return nullptr;
+
+	for (auto& entry : resolver_memories)
+	{
+		if (entry.identity == identity)
+		{
+			entry.touched = m_globals()->m_curtime;
+			return &entry;
+		}
+	}
+
+	auto slot = &resolver_memories[0];
+
+	for (auto& entry : resolver_memories)
+	{
+		if (!entry.identity)
+		{
+			slot = &entry;
+			break;
+		}
+
+		if (entry.touched < slot->touched)
+			slot = &entry;
+	}
+
+	slot->identity = identity;
+	slot->samples = 0;
+	slot->touched = m_globals()->m_curtime;
+
+	for (auto& value : slot->weight)
+		value = 0.0f;
+
+	return slot;
+}
+
+void lagcompensation::resolver_feedback(int index, resolver_side side, bool hit)
+{
+	if (index < 1 || index > 64)
+		return;
+
+	auto reference = -1;
+
+	for (auto i = 0; i < resolver_candidate_count; ++i)
+	{
+		if (resolver_candidate_sides[i] == side)
+			reference = i;
+	}
+
+	if (reference < 0)
+		return;
+
+	const auto memory = resolver_memory_for((player_t*)m_entitylist()->GetClientEntity(index));
+
+	if (!memory)
+		return;
+
+	for (auto i = 0; i < resolver_candidate_count; ++i)
+	{
+		memory->weight[i] *= 0.985f;
+
+		const auto affinity = max(0.0f, 1.0f - std::fabs(resolver_candidate_scale[i] - resolver_candidate_scale[reference]));
+
+		if (affinity <= 0.0f)
+			continue;
+
+		memory->weight[i] = std::clamp(memory->weight[i] + (hit ? 1.0f : -0.7f) * affinity, -6.0f, 6.0f);
+	}
+
+	memory->samples = min(memory->samples + 1, 4096);
 }

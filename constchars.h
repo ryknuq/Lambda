@@ -157,12 +157,18 @@ const char* bodyaim[] =
 
 const char* autostop_modifiers[] =
 {
-	"Between shots",
+	"Move between shots",
 	"On lethal",
 	"Visible",
 	"Center",
 	"Force accuracy",
-	"Predictive"
+	"Early",
+	"Slow motion",
+	"Duck",
+	"Fake duck",
+	"Ignore molotov",
+	"Taser",
+	"Jump scout"
 };
 
 const char* hitboxes[] =
@@ -391,6 +397,12 @@ const char* events[] =
 	"Player hits",
 	"Items",
 	"Bomb"
+};
+
+const char* trashtalk_events[] =
+{
+	"On kill",
+	"On death"
 };
 
 const char* grenades[] =

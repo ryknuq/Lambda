@@ -4,6 +4,7 @@
 #include "util.hpp"
 #include "..\features\visuals\playeresp.h"
 #include "..\features\lagcompensation\animation_system.h"
+#include "..\features\ragebot\Aim.h"
 #include "..\features\misc\misc.h"
 #include <thread>
 
@@ -196,28 +197,68 @@ namespace util
 
 	bool get_bbox(entity_t* e, Box& box, bool player_esp)
 	{
-		Vector head, feet;
-		Vector head_screen, feet_screen;
+		auto collideable = e->GetCollideable();
 
-		feet = e->GetAbsOrigin();
-
-		auto height = 72.0f;
-		if (e->is_player())
-		{
-			auto player = (player_t*)e;
-			if (player->m_fFlags() & FL_DUCKING)
-				height = 54.0f;
-		}
-
-		head = feet + Vector(0.0f, 0.0f, height);
-
-		if (!math::WorldToScreen(feet, feet_screen) || !math::WorldToScreen(head, head_screen))
+		if (!collideable)
 			return false;
 
-		box.h = feet_screen.y - head_screen.y;
-		box.w = box.h / 2.0f;
-		box.x = head_screen.x - (box.w / 2.0f);
-		box.y = head_screen.y;
+		auto obb_min = collideable->OBBMins();
+		auto obb_max = collideable->OBBMaxs();
+
+		if (obb_min.x == obb_max.x || obb_min.y == obb_max.y || obb_min.z == obb_max.z)
+			return false;
+
+		Vector local_points[8] =
+		{
+			Vector(obb_min.x, obb_min.y, obb_min.z),
+			Vector(obb_min.x, obb_max.y, obb_min.z),
+			Vector(obb_max.x, obb_max.y, obb_min.z),
+			Vector(obb_max.x, obb_min.y, obb_min.z),
+			Vector(obb_min.x, obb_min.y, obb_max.z),
+			Vector(obb_min.x, obb_max.y, obb_max.z),
+			Vector(obb_max.x, obb_max.y, obb_max.z),
+			Vector(obb_max.x, obb_min.y, obb_max.z)
+		};
+
+		auto origin = e->GetAbsOrigin();
+
+		matrix3x4_t transform;
+
+		if (!player_esp)
+			math::angle_matrix(e->GetAbsAngles(), origin, transform);
+
+		float left = FLT_MAX, right = -FLT_MAX, top = FLT_MAX, bottom = -FLT_MAX;
+
+		for (auto i = 0; i < 8; i++)
+		{
+			Vector world;
+
+			if (player_esp)
+				world = origin + local_points[i];
+			else
+				math::vector_transform(local_points[i], transform, world);
+
+			Vector screen;
+
+			if (!math::WorldToScreen(world, screen))
+				return false;
+
+			left = min(left, screen.x);
+			right = max(right, screen.x);
+			top = min(top, screen.y);
+			bottom = max(bottom, screen.y);
+		}
+
+		auto width = right - left;
+		auto height = bottom - top;
+
+		if (width < 1.0f || height < 1.0f)
+			return false;
+
+		box.x = (int)left;
+		box.y = (int)top;
+		box.w = (int)width;
+		box.h = (int)height;
 
 		return true;
 	}
@@ -235,6 +276,7 @@ namespace util
 		Vector mins = e->GetCollideable()->OBBMins(), maxs = e->GetCollideable()->OBBMaxs();
 
 		Vector dir(end - start);
+		auto ray_length = dir.Length();
 		dir.Normalize();
 
 		Vector
@@ -248,7 +290,7 @@ namespace util
 		if (range_along < 0.f)
 			range = -to.Length();
 
-		else if (range_along > dir.Length())
+		else if (range_along > ray_length)
 			range = -(pos - end).Length();
 
 		else {
@@ -342,6 +384,68 @@ namespace util
 		}
 
 		return false;
+	}
+
+	int get_backtrack_records(player_t* e, matrix3x4_t** out, float* alpha, bool* hittable, int max_records)
+	{
+		if (!cfg.ragebot.enable || !out || max_records <= 0)
+			return 0;
+
+		auto i = e->EntIndex();
+
+		if (i < 1 || i > 64)
+			return 0;
+
+		auto records = &player_records[i];
+
+		if (records->empty())
+			return 0;
+
+		auto selected = g_ctx.globals.backtrack_time[i];
+		auto window = aim::get().backtrack_window();
+
+		auto newest_tick = INT_MIN;
+		auto previous_tick = INT_MIN;
+		auto count = 0;
+
+		for (auto& record : *records)
+		{
+			if (!record.valid())
+				continue;
+
+			auto tick = TIME_TO_TICKS(record.simulation_time);
+
+			if (newest_tick == INT_MIN)
+				newest_tick = tick;
+			else if (newest_tick - tick > window)
+				break;
+
+			if (tick == previous_tick)
+				continue;
+
+			previous_tick = tick;
+
+			out[count] = record.matrixes_data.main;
+
+			auto is_selected = selected > 0.0f && fabs(record.simulation_time - selected) < 0.0001f;
+
+			if (hittable)
+				hittable[count] = record.hittable && record.hittable_tick > m_globals()->m_tickcount - 4;
+
+			if (alpha)
+			{
+				auto age = max(newest_tick - tick, 0);
+
+				alpha[count] = is_selected ? 1.0f : max(0.25f, 0.85f - (float)age * 0.06f);
+			}
+
+			++count;
+
+			if (count >= max_records)
+				break;
+		}
+
+		return count;
 	}
 
 	void create_state(c_baseplayeranimationstate* state, player_t* e)
@@ -467,7 +571,7 @@ namespace util
 		if (cl_interp)
 			lerp = cl_interp->GetFloat();
 
-		if (c_min_ratio && c_max_ratio && c_min_ratio->GetFloat() != 1)
+		if (c_min_ratio && c_max_ratio && c_min_ratio->GetFloat() != -1.0f)
 			ratio = math::clamp(ratio, c_min_ratio->GetFloat(), c_max_ratio->GetFloat());
 
 		return max(lerp, ratio / ud_rate);

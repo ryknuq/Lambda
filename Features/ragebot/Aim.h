@@ -171,7 +171,6 @@ class aim : public singleton <aim>
 	void prepare_targets();
 	adjust_data* get_record(std::deque <adjust_data>* records, bool history);
 	void collect_records(target& current);
-	int backtrack_window();
 	float probe_record(adjust_data* record);
 	float rate_record(adjust_data* record, scan_data& data, float newest_time);
 	void select_record(target& current);
@@ -182,6 +181,7 @@ class aim : public singleton <aim>
 	bool HasMaximumAccuracy();
 	void AutoStop(CUserCmd* cmd);
 	bool automatic_stop(CUserCmd* cmd);
+	bool standing_in_fire();
 	bool IsAbleToShoot();
 	int GetTicksToShoot();
 	bool HoldFiringAnimation();
@@ -199,6 +199,7 @@ class aim : public singleton <aim>
 	scanned_target final_target;
 public:
 	float LerpTime();
+	int backtrack_window();
 	void run(CUserCmd* cmd);
 	float bodyscale(player_t* e);
 	float GetHeadScale(player_t* e);
@@ -210,6 +211,9 @@ public:
 	//std::vector<scan_point> get_points(adjust_data* record, int hitbox);
 	std::vector <scan_point> get_points(adjust_data* record, int hitbox, bool from_aim = true);
 	bool hitbox_intersection(player_t* e, matrix3x4_t* matrix, int hitbox, const Vector& start, const Vector& end, float* safe = nullptr);
+	float safe_point_margin(adjust_data* record, int hitbox, const Vector& shoot_position, const Vector& point);
+	float point_clearance(adjust_data* record, const scan_point& point, const Vector& shoot_position, float spread, float damage_floor);
+	bool fallback_point(scanned_target& candidate);
 
 	std::vector <target> targets;
 	std::vector <adjust_data> backup;

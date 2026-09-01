@@ -92,6 +92,7 @@ enum animstate_layer_t
 };
 
 static constexpr int resolver_candidate_count = 9;
+static constexpr int resolver_body_yaw_pose = 11;
 
 inline constexpr float resolver_candidate_scale[resolver_candidate_count] =
 {
@@ -123,6 +124,16 @@ inline constexpr animstate_layer_t resolver_scored_layers[] =
 	ANIMATION_LAYER_WHOLE_BODY,
 	ANIMATION_LAYER_ALIVELOOP,
 	ANIMATION_LAYER_LEAN
+};
+
+static constexpr int resolver_memory_slots = 32;
+
+struct resolver_memory
+{
+	uint64_t identity = 0ull;
+	float weight[resolver_candidate_count] = { };
+	int samples = 0;
+	float touched = 0.0f;
 };
 
 struct matrixes
@@ -236,6 +247,12 @@ public:
 	bool shot;
 	bool exploited;
 
+	bool hittable;
+	bool selected;
+	int hittable_damage;
+	int hittable_hitbox;
+	int hittable_tick;
+
 	int flags;
 	int bone_count;
 	int ammo_count;
@@ -254,6 +271,7 @@ public:
 	Vector origin;
 	Vector mins;
 	Vector maxs;
+	Vector hittable_point;
 
 	matrix3x4_t leftmatrixes[128] = {};
 	matrix3x4_t rightmatrixes[128] = {};
@@ -285,6 +303,12 @@ public:
 		shot = false;
 		exploited = false;
 
+		hittable = false;
+		selected = false;
+		hittable_damage = 0;
+		hittable_hitbox = -1;
+		hittable_tick = INT_MIN;
+
 		flags = 0;
 		bone_count = 0;
 		ammo_count = -1;
@@ -309,6 +333,7 @@ public:
 		origin.Zero();
 		mins.Zero();
 		maxs.Zero();
+		hittable_point.Zero();
 	}
 
 	adjust_data(player_t* e, bool store = true)
@@ -319,6 +344,13 @@ public:
 		moving_resolver_active = false;
 		high_desync_resolver_active = false;
 		resolver_confident = false;
+
+		hittable = false;
+		selected = false;
+		hittable_damage = 0;
+		hittable_hitbox = -1;
+		hittable_tick = INT_MIN;
+		hittable_point.Zero();
 
 		invalid = false;
 		store_data(e, store);
@@ -583,7 +615,11 @@ public:
 
 	bool is_unsafe_tick(player_t* player);
 
+	resolver_memory* resolver_memory_for(player_t* e);
+	void resolver_feedback(int index, resolver_side side, bool hit);
+
 	resolver player_resolver[65];
+	resolver_memory resolver_memories[resolver_memory_slots];
 	std::vector<player_settings> player_sets;
 
 	bool is_dormant[65];

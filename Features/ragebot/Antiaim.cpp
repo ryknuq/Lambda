@@ -136,24 +136,29 @@ float antiaim::get_yaw(CUserCmd* m_pcmd) // fixed by semmxz
 	{
 		final_manual_side = manual_side;
 
-		auto base_angle = m_pcmd->m_viewangles.y + 180.0f;
+		if (manual_side == SIDE_NONE && key_binds::get().get_key_bind_state(25))
+			freestanding(m_pcmd);
+
+		auto reference_angle = m_pcmd->m_viewangles.y;
 
 		if (cfg.antiaim.type[type].base_angle == 1)
-			base_angle = at_targets();
+			reference_angle = at_targets() - 180.0f;
+
+		auto base_angle = reference_angle + 180.0f;
 
 		switch (final_manual_side)
 		{
 		case SIDE_LEFT:
-			base_angle = m_pcmd->m_viewangles.y + 90.0f;
+			base_angle = reference_angle + 90.0f;
 			break;
 		case SIDE_RIGHT:
-			base_angle = m_pcmd->m_viewangles.y - 90.0f;
+			base_angle = reference_angle - 90.0f;
 			break;
 		case SIDE_BACK:
-			base_angle = m_pcmd->m_viewangles.y + 180.0f;
+			base_angle = reference_angle + 180.0f;
 			break;
 		case SIDE_FORWARD:
-			base_angle = m_pcmd->m_viewangles.y;
+			base_angle = reference_angle;
 			break;
 		default:
 			break;
@@ -408,13 +413,31 @@ float antiaim::at_targets()
 {
 	static auto sticky_index = -1;
 
+	Vector view_angles;
+	m_engine()->GetViewAngles(view_angles);
+
+	auto aim_angle_to = [](player_t* e)
+	{
+		auto position = e->GetAbsOrigin();
+		auto records = &player_records[e->EntIndex()];
+
+		if (!records->empty() && records->front().valid())
+			position = records->front().origin;
+
+		return math::calculate_angle(g_ctx.globals.eye_pos, position + e->m_vecViewOffset());
+	};
+
 	player_t* target = nullptr;
-	auto best_distance = FLT_MAX;
+	auto best_fov = FLT_MAX;
+	Vector best_angle(0.0f, 0.0f, 0.0f);
 
 	auto sticky = static_cast<player_t*>(m_entitylist()->GetClientEntity(sticky_index));
 
 	if (sticky && sticky->valid(true))
-		best_distance = g_ctx.globals.eye_pos.DistTo(sticky->GetAbsOrigin()) * 0.85f;
+	{
+		best_angle = aim_angle_to(sticky);
+		best_fov = math::get_fov(view_angles, best_angle) * 0.85f;
+	}
 	else
 	{
 		sticky = nullptr;
@@ -428,7 +451,39 @@ float antiaim::at_targets()
 		if (!e || e == sticky || !e->valid(true))
 			continue;
 
-		auto distance = g_ctx.globals.eye_pos.DistTo(e->GetAbsOrigin());
+		auto angle = aim_angle_to(e);
+		auto fov = math::get_fov(view_angles, angle);
+
+		if (fov >= best_fov)
+			continue;
+
+		best_fov = fov;
+		best_angle = angle;
+		target = e;
+	}
+
+	if (target)
+		sticky_index = target->EntIndex();
+
+	if (!target && !sticky)
+		return g_ctx.get_command()->m_viewangles.y + 180.0f;
+
+	return best_angle.y + 180.0f;
+}
+
+bool antiaim::cover_scores(float& left, float& right)
+{
+	player_t* target = nullptr;
+	auto best_distance = FLT_MAX;
+
+	for (auto i = 1; i <= m_globals()->m_maxclients; i++)
+	{
+		auto e = static_cast<player_t*>(m_entitylist()->GetClientEntity(i));
+
+		if (!e || !e->valid(true))
+			continue;
+
+		const auto distance = g_ctx.globals.eye_pos.DistTo(e->GetAbsOrigin());
 
 		if (distance >= best_distance)
 			continue;
@@ -437,21 +492,74 @@ float antiaim::at_targets()
 		target = e;
 	}
 
-	if (target)
-		sticky_index = target->EntIndex();
-	else
-		target = sticky;
-
 	if (!target)
-		return g_ctx.get_command()->m_viewangles.y + 180.0f;
+		return false;
 
-	auto position = target->GetAbsOrigin();
-	auto record = &player_records[target->EntIndex()];
+	auto source = target->get_eye_pos();
+	auto records = &player_records[target->EntIndex()];
 
-	if (!record->empty() && record->front().valid())
-		position = record->front().origin;
+	if (!records->empty() && records->front().valid())
+		source = records->front().origin + target->m_vecViewOffset();
 
-	return math::calculate_angle(g_ctx.globals.eye_pos, position).y + 180.0f;
+	auto to_us = g_ctx.globals.eye_pos - source;
+	to_us.z = 0.0f;
+
+	const auto length = to_us.Length();
+
+	if (length < 1.0f)
+		return false;
+
+	to_us /= length;
+
+	const Vector perpendicular(-to_us.y, to_us.x, 0.0f);
+
+	const auto origin_z = g_ctx.local()->GetAbsOrigin().z;
+
+	const float heights[3] = { g_ctx.globals.eye_pos.z, origin_z + 50.0f, origin_z + 36.0f };
+	const float weights[3] = { 3.0f, 1.0f, 1.0f };
+
+	auto covered = [&](float offset)
+	{
+		auto score = 0.0f;
+
+		for (auto i = 0; i < 3; i++)
+		{
+			const Vector end(g_ctx.globals.eye_pos.x + perpendicular.x * offset,
+				g_ctx.globals.eye_pos.y + perpendicular.y * offset, heights[i]);
+
+			trace_t trace;
+			Ray_t ray;
+			ray.Init(source, end);
+
+			CTraceFilter filter;
+			filter.pSkip = g_ctx.local();
+
+			g_ctx.globals.autowalling = true;
+			m_trace()->TraceRay(ray, MASK_SOLID & ~CONTENTS_MONSTER, &filter, &trace);
+			g_ctx.globals.autowalling = false;
+
+			if (trace.fraction < 0.97f)
+				score += weights[i];
+		}
+
+		return score;
+	};
+
+	Vector forward, right_vector, up, view_angles;
+	m_engine()->GetViewAngles(view_angles);
+	view_angles.x = 0.0f;
+
+	math::angle_vectors(view_angles, &forward, &right_vector, &up);
+
+	const auto positive_is_left = perpendicular.x * right_vector.x + perpendicular.y * right_vector.y < 0.0f;
+
+	const auto positive = covered(16.0f);
+	const auto negative = covered(-16.0f);
+
+	left = positive_is_left ? positive : negative;
+	right = positive_is_left ? negative : positive;
+
+	return true;
 }
 
 bool antiaim::automatic_direction()
@@ -459,54 +567,28 @@ bool antiaim::automatic_direction()
 	if (!cfg.antiaim.automatic_direction)
 		return false;
 
-	float Right, Left;
-	Vector src3D, dst3D, forward, right, up;
-	trace_t tr;
-	Ray_t ray_right, ray_left;
-	CTraceFilter filter;
+	auto left = 0.0f;
+	auto right = 0.0f;
 
-	Vector engineViewAngles;
-	m_engine()->GetViewAngles(engineViewAngles);
-	engineViewAngles.x = 0.0f;
-
-	math::angle_vectors(engineViewAngles, &forward, &right, &up);
-
-	filter.pSkip = g_ctx.local();
-	src3D = g_ctx.globals.eye_pos;
-	dst3D = src3D + forward * 100.0f;
-
-	ray_right.Init(src3D + right * 35.0f, dst3D + right * 35.0f);
-
-	g_ctx.globals.autowalling = true;
-	m_trace()->TraceRay(ray_right, MASK_SOLID & ~CONTENTS_MONSTER, &filter, &tr);
-	g_ctx.globals.autowalling = false;
-
-	Right = (tr.endpos - tr.startpos).Length();
-
-	ray_left.Init(src3D - right * 35.0f, dst3D - right * 35.0f);
-
-	g_ctx.globals.autowalling = true;
-	m_trace()->TraceRay(ray_left, MASK_SOLID & ~CONTENTS_MONSTER, &filter, &tr);
-	g_ctx.globals.autowalling = false;
-
-	Left = (tr.endpos - tr.startpos).Length();
+	if (!cover_scores(left, right))
+		return flip;
 
 	static auto left_ticks = 0;
 	static auto right_ticks = 0;
 
-	if (Left - Right > 10.0f)
-		left_ticks++;
+	if (left - right > 0.5f)
+		++left_ticks;
 	else
 		left_ticks = 0;
 
-	if (Right - Left > 10.0f)
-		right_ticks++;
+	if (right - left > 0.5f)
+		++right_ticks;
 	else
 		right_ticks = 0;
 
-	if (right_ticks > 10)
+	if (left_ticks > 6)
 		return true;
-	else if (left_ticks > 10)
+	else if (right_ticks > 6)
 		return false;
 
 	return flip;
@@ -515,61 +597,42 @@ bool antiaim::automatic_direction()
 
 void antiaim::freestanding(CUserCmd* m_pcmd)
 {
-	float Right, Left;
-	Vector src3D, dst3D, forward, right, up;
-	trace_t tr;
-	Ray_t ray_right, ray_left;
-	CTraceFilter filter;
+	static auto last_side = (int)SIDE_NONE;
 
-	Vector engineViewAngles;
-	m_engine()->GetViewAngles(engineViewAngles);
-	engineViewAngles.x = 0.0f;
+	auto left = 0.0f;
+	auto right = 0.0f;
 
-	math::angle_vectors(engineViewAngles, &forward, &right, &up);
-
-	filter.pSkip = g_ctx.local();
-	src3D = g_ctx.globals.eye_pos;
-	dst3D = src3D + forward * 100.0f;
-
-	ray_right.Init(src3D + right * 35.0f, dst3D + right * 35.0f);
-
-	g_ctx.globals.autowalling = true;
-	m_trace()->TraceRay(ray_right, MASK_SOLID & ~CONTENTS_MONSTER, &filter, &tr);
-	g_ctx.globals.autowalling = false;
-
-	Right = (tr.endpos - tr.startpos).Length();
-
-	ray_left.Init(src3D - right * 35.0f, dst3D - right * 35.0f);
-
-	g_ctx.globals.autowalling = true;
-	m_trace()->TraceRay(ray_left, MASK_SOLID & ~CONTENTS_MONSTER, &filter, &tr);
-	g_ctx.globals.autowalling = false;
-
-	Left = (tr.endpos - tr.startpos).Length();
+	if (!cover_scores(left, right))
+	{
+		final_manual_side = last_side;
+		return;
+	}
 
 	static auto left_ticks = 0;
 	static auto right_ticks = 0;
 	static auto back_ticks = 0;
 
-	if (Right - Left > 20.0f)
-		left_ticks++;
+	if (left - right > 0.5f)
+		++left_ticks;
 	else
 		left_ticks = 0;
 
-	if (Left - Right > 20.0f)
-		right_ticks++;
+	if (right - left > 0.5f)
+		++right_ticks;
 	else
 		right_ticks = 0;
 
-	if (fabs(Right - Left) <= 20.0f)
-		back_ticks++;
+	if (left <= 0.0f && right <= 0.0f)
+		++back_ticks;
 	else
 		back_ticks = 0;
 
-	if (right_ticks > 10)
-		final_manual_side = SIDE_RIGHT;
-	else if (left_ticks > 10)
-		final_manual_side = SIDE_LEFT;
-	else if (back_ticks > 10)
-		final_manual_side = SIDE_BACK;
+	if (left_ticks > 6)
+		last_side = SIDE_LEFT;
+	else if (right_ticks > 6)
+		last_side = SIDE_RIGHT;
+	else if (back_ticks > 6)
+		last_side = SIDE_BACK;
+
+	final_manual_side = last_side;
 }

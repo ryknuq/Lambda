@@ -10,10 +10,17 @@ bool autowall::is_breakable_entity(IClientEntity* e)
 
 	static auto is_breakable = util::FindSignature(crypt_str("client.dll"), crypt_str("55 8B EC 51 56 8B F1 85 F6 74 68"));
 
+	if (!is_breakable)
+		return false;
+
+	auto client_class = e->GetClientClass();
+
+	if (!client_class || !client_class->m_pNetworkName)
+		return false;
+
 	auto take_damage = *(uintptr_t*)((uintptr_t)is_breakable + 0x26);
 	auto backup = *(uint8_t*)((uintptr_t)e + take_damage);
 
-	auto client_class = e->GetClientClass();
 	auto network_name = client_class->m_pNetworkName;
 
 	if (!strcmp(network_name, "CBreakableSurface"))
@@ -35,30 +42,16 @@ void autowall::scale_damage(player_t* e, CGameTrace& enterTrace, weapon_info_t* 
 
 	auto is_armored = [&]()->bool
 		{
-			auto has_helmet = e->m_bHasHelmet();
-			auto armor_value = e->m_ArmorValue();
+			if (e->m_ArmorValue() <= 0)
+				return false;
 
-			if (armor_value > 0)
-			{
-				switch (enterTrace.hitgroup)
-				{
-				case HITGROUP_GENERIC:
-				case HITGROUP_CHEST:
-				case HITGROUP_STOMACH:
-				case HITGROUP_LEFTARM:
-				case HITGROUP_RIGHTARM:
-				case HITGROUP_LEFTLEG:
-				case HITGROUP_RIGHTLEG:
-				case HITGROUP_GEAR:
-					return true;
-				case HITGROUP_HEAD:
-					return has_helmet || e->m_bHasHeavyArmor();
-				default:
-					return e->m_bHasHeavyArmor();
-				}
-			}
+			if (enterTrace.hitgroup >= HITGROUP_LEFTLEG)
+				return false;
 
-			return false;
+			if (enterTrace.hitgroup == HITGROUP_HEAD)
+				return e->m_bHasHelmet() || e->m_bHasHeavyArmor();
+
+			return true;
 		};
 
 	static auto mp_damage_scale_ct_head = m_cvar()->FindVar(crypt_str("mp_damage_scale_ct_head"));
@@ -252,9 +245,9 @@ bool autowall::handle_bullet_penetration(weapon_info_t* weaponData, CGameTrace& 
 
 	auto enter_material = enterSurfaceData->game.material;
 
-	trace_t exit_trace;
+	trace_t exit_trace{ };
 
-	if (!trace_to_exit(enterTrace, exit_trace, enterTrace.endpos, direction) && !(m_trace()->GetPointContents(enterTrace.endpos, MASK_SHOT_HULL) & MASK_SHOT_HULL))
+	if (!trace_to_exit(enterTrace, exit_trace, enterTrace.endpos, direction))
 		return false;
 
 	auto enter_penetration_modifier = enterSurfaceData->game.flPenetrationModifier;
@@ -276,7 +269,7 @@ bool autowall::handle_bullet_penetration(weapon_info_t* weaponData, CGameTrace& 
 	}
 	else if (contents_grate || surf_nodraw)
 		combined_penetration_modifier = 1.0f;
-	else if (enter_material == CHAR_TEX_FLESH && ((player_t*)enterTrace.hit_entity)->m_iTeamNum() == g_ctx.local()->m_iTeamNum() && !ff_damage_reduction_bullets)
+	else if (enter_material == CHAR_TEX_FLESH && enterTrace.hit_entity && ((player_t*)enterTrace.hit_entity)->is_player() && ((player_t*)enterTrace.hit_entity)->m_iTeamNum() == g_ctx.local()->m_iTeamNum() && !ff_damage_reduction_bullets)
 	{
 		if (!ff_damage_bullet_penetration) //-V550
 			return false;
@@ -344,17 +337,23 @@ bool autowall::fire_bullet(weapon_t* pWeapon, Vector& direction, bool& visible, 
 
 	auto eyePosition = pos;
 	auto currentDistance = 0.0f;
-	auto maxRange = weaponData->flRange;
+	auto totalRange = weaponData->flRange;
 	auto penetrationDistance = 3000.0f;
 	auto possibleHitsRemaining = 4;
 
 	while (currentDamage >= damage_floor)
 	{
-		maxRange -= currentDistance;
+		auto maxRange = totalRange - currentDistance;
+
+		if (maxRange <= 0.0f)
+			break;
+
 		auto end = eyePosition + direction * maxRange;
 
 		util::trace_line(eyePosition, end, MASK_SHOT_HULL | CONTENTS_HITBOX, &filter, &enterTrace);
-		util::clip_trace_to_players(e, eyePosition, end + direction * 40.0f, MASK_SHOT_HULL | CONTENTS_HITBOX, &filter, &enterTrace);
+
+		if (e)
+			util::clip_trace_to_players(e, eyePosition, end, MASK_SHOT_HULL | CONTENTS_HITBOX, &filter, &enterTrace);
 
 		if (enterTrace.fraction == 1.0f)  //-V550
 			break;
@@ -370,21 +369,26 @@ bool autowall::fire_bullet(weapon_t* pWeapon, Vector& direction, bool& visible, 
 		if (!enterSurfaceData)
 			break;
 
-		if (currentDistance > penetrationDistance && weaponData->flPenetration || enterSurfaceData->game.flPenetrationModifier < 0.1f)  //-V1051
-			break;
+		auto hit_player = (player_t*)enterTrace.hit_entity;
 
-		auto canDoDamage = enterTrace.hitgroup != HITGROUP_GEAR && enterTrace.hitgroup != HITGROUP_GENERIC;
-		auto isPlayer = ((player_t*)enterTrace.hit_entity)->is_player();
-		auto isEnemy = ((player_t*)enterTrace.hit_entity)->m_iTeamNum() != g_ctx.local()->m_iTeamNum();
+		auto canDoDamage = enterTrace.hitgroup != HITGROUP_GEAR;
+		auto isPlayer = hit_player && hit_player->is_player();
+		auto isEnemy = isPlayer && hit_player->m_iTeamNum() != g_ctx.local()->m_iTeamNum();
 
 		if (canDoDamage && isPlayer && isEnemy)
 		{
-			scale_damage((player_t*)enterTrace.hit_entity, enterTrace, weaponData, currentDamage);
+			scale_damage(hit_player, enterTrace, weaponData, currentDamage);
 			hitbox = enterTrace.hitbox;
 			return true;
 		}
 
-		if (!possibleHitsRemaining)
+		if (currentDistance > penetrationDistance && weaponData->flPenetration > 0.0f)
+			break;
+
+		if (enterSurfaceData->game.flPenetrationModifier < 0.1f)
+			break;
+
+		if (possibleHitsRemaining <= 0)
 			break;
 
 		if (!handle_bullet_penetration(weaponData, enterTrace, enterSurfaceData, eyePosition, direction, possibleHitsRemaining, currentDamage, damage_floor, ff_reduction, ff_penetration, !e))
@@ -398,6 +402,11 @@ bool autowall::fire_bullet(weapon_t* pWeapon, Vector& direction, bool& visible, 
 
 autowall::returninfo_t autowall::wall_penetration(const Vector& eye_pos, Vector& point, IClientEntity* e, float minimum_damage)
 {
+	auto local = g_ctx.local();
+
+	if (!local)
+		return returninfo_t(false, -1, -1);
+
 	g_ctx.globals.autowalling = true;
 	auto tmp = point - eye_pos;
 
@@ -413,7 +422,7 @@ autowall::returninfo_t autowall::wall_penetration(const Vector& eye_pos, Vector&
 	auto damage = -1.0f;
 	auto hitbox = -1;
 
-	auto weapon = g_ctx.local()->m_hActiveWeapon().Get();
+	auto weapon = local->m_hActiveWeapon().Get();
 
 	if (fire_bullet(weapon, direction, visible, damage, hitbox, e, 0.0f, eye_pos, minimum_damage))
 	{

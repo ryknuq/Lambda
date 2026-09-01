@@ -124,7 +124,7 @@ void C_ConfigManager::setup()
 	{
 		setup_item(&cfg.ragebot.weapon[i].selection_type, 0, std::to_string(i) + crypt_str("Ragebot.selection_type"));
 		setup_item(&cfg.ragebot.weapon[i].autostop, false, std::to_string(i) + crypt_str("Ragebot_automaticstop"));
-		setup_item(&cfg.ragebot.weapon[i].autostop_modifiers, 6, std::to_string(i) + crypt_str("Ragebot.autostop_conditions"));
+		setup_item(&cfg.ragebot.weapon[i].autostop_modifiers, 12, std::to_string(i) + crypt_str("Ragebot.autostop_conditions"));
 		setup_item(&cfg.ragebot.weapon[i].hitchance, false, std::to_string(i) + crypt_str("Ragebot.hitchance"));
 		setup_item(&cfg.ragebot.weapon[i].hitchance_amount, 1, std::to_string(i) + crypt_str("Ragebot.hitchance_amount"));
 		setup_item(&cfg.ragebot.weapon[i].minimum_visible_damage, 1, std::to_string(i) + crypt_str("Ragebot.minimum_visible_damage"));
@@ -153,6 +153,8 @@ void C_ConfigManager::setup()
 	setup_item(&cfg.antiaim.manual_back, key_bind(TOGGLE), crypt_str("Antiaim.manual_back"));
 	setup_item(&cfg.antiaim.manual_left, key_bind(TOGGLE), crypt_str("Antiaim.manual_left"));
 	setup_item(&cfg.antiaim.manual_right, key_bind(TOGGLE), crypt_str("Antiaim.manual_right"));
+	setup_item(&cfg.antiaim.freestand_key, key_bind(TOGGLE), crypt_str("Antiaim.freestand_key"));
+	setup_item(&cfg.antiaim.automatic_direction, false, crypt_str("Antiaim.automatic_direction"));
 	setup_item(&cfg.antiaim.flip_desync, key_bind(TOGGLE), crypt_str("Antiaim.flip_desync"));
 	setup_item(&cfg.antiaim.flip_indicator, false, crypt_str("Antiaim.flip_indicator"));
 	setup_item(&cfg.antiaim.flip_indicator_color, Color(255, 255, 255), crypt_str("Antiaim.flip_indicator_color"));
@@ -201,6 +203,9 @@ void C_ConfigManager::setup()
 	setup_item(&cfg.player.backtrack_chams, false, crypt_str("Player.backtrack_chams"));
 	setup_item(&cfg.player.backtrack_chams_material, 0, crypt_str("Player.backtrack_chams_material"));
 	setup_item(&cfg.player.backtrack_chams_color, Color(255, 255, 255), crypt_str("Player.backtrack_chams_color"));
+	setup_item(&cfg.player.backtrack_hittable, false, crypt_str("Player.backtrack_hittable"));
+	setup_item(&cfg.player.backtrack_hittable_color, Color(120, 255, 150), crypt_str("Player.backtrack_hittable_color"));
+	setup_item(&cfg.player.backtrack_unhittable_color, Color(140, 140, 150, 120), crypt_str("Player.backtrack_unhittable_color"));
 	setup_item(&cfg.player.transparency_in_scope, false, crypt_str("Player.transparency_in_scope"));
 	setup_item(&cfg.player.transparency_in_scope_amount, 1.0f, crypt_str("Player.transparency_in_scope_amount"));
 
@@ -384,6 +389,8 @@ void C_ConfigManager::setup()
 	setup_item(&cfg.misc.log_color, Color(255, 255, 255), crypt_str("Misc.log_color"));
 	setup_item(&cfg.misc.inventory_access, false, crypt_str("Misc.inventory_access"));
 	setup_item(&cfg.misc.clantag_spammer, false, crypt_str("Misc.clantag_spammer"));
+	setup_item(&cfg.misc.trashtalk, false, crypt_str("Misc.trashtalk"));
+	setup_item(&cfg.misc.trashtalk_events, 2, crypt_str("Misc.trashtalk_events"));
 	setup_item(&cfg.misc.aspect_ratio, false, crypt_str("Misc.aspect_ratio"));
 	setup_item(&cfg.misc.aspect_ratio_amount, 1.0f, crypt_str("Misc.aspect_ratio_amount"));
 	setup_item(&cfg.misc.buybot_enable, false, crypt_str("Misc.buybot"));

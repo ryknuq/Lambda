@@ -213,25 +213,31 @@ static void draw_model_chams(IMatRenderContext* ctx, const DrawModelState_t& sta
 
 						if (backtrack_material && !backtrack_material->IsErrorMaterial())
 						{
-							matrix3x4_t matrix[MAXSTUDIOBONES];
+							matrix3x4_t* record_matrixes[12];
+							float record_alpha[12];
+							bool record_hittable[12];
 
-							if (util::get_backtrack_matrix(model_entity, matrix))
+							auto record_count = util::get_backtrack_records(model_entity, record_matrixes, record_alpha, record_hittable, 12);
+
+							for (auto record = 0; record < record_count; record++)
 							{
+								auto& record_color = cfg.player.backtrack_hittable && record_hittable[record] ? cfg.player.backtrack_hittable_color : cfg.player.backtrack_chams_color;
+
 								float backtrack_color[3] =
 								{
-									cfg.player.backtrack_chams_color[0] / 255.0f,
-									cfg.player.backtrack_chams_color[1] / 255.0f,
-									cfg.player.backtrack_chams_color[2] / 255.0f
+									record_color[0] / 255.0f,
+									record_color[1] / 255.0f,
+									record_color[2] / 255.0f
 								};
 
-								set_blend(alpha * alpha_modifier);
+								set_blend(alpha * alpha_modifier * record_alpha[record]);
 								util::color_modulate(backtrack_color, backtrack_material);
 
 								backtrack_material->IncrementReferenceCount(); 
 								backtrack_material->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, true);
 
 								m_modelrender()->ForcedMaterialOverride(backtrack_material);
-								original_fn(m_modelrender(), ctx, state, info, matrix);
+								original_fn(m_modelrender(), ctx, state, info, record_matrixes[record]);
 								m_modelrender()->ForcedMaterialOverride(nullptr);
 							}
 						}
@@ -336,25 +342,31 @@ static void draw_model_chams(IMatRenderContext* ctx, const DrawModelState_t& sta
 
 						if (backtrack_material && !backtrack_material->IsErrorMaterial())
 						{
-							matrix3x4_t matrix[MAXSTUDIOBONES];
+							matrix3x4_t* record_matrixes[12];
+							float record_alpha[12];
+							bool record_hittable[12];
 
-							if (util::get_backtrack_matrix(model_entity, matrix))
+							auto record_count = util::get_backtrack_records(model_entity, record_matrixes, record_alpha, record_hittable, 12);
+
+							for (auto record = 0; record < record_count; record++)
 							{
+								auto& record_color = cfg.player.backtrack_hittable && record_hittable[record] ? cfg.player.backtrack_hittable_color : cfg.player.backtrack_chams_color;
+
 								float backtrack_color[3] =
 								{
-									cfg.player.backtrack_chams_color[0] / 255.0f,
-									cfg.player.backtrack_chams_color[1] / 255.0f,
-									cfg.player.backtrack_chams_color[2] / 255.0f
+									record_color[0] / 255.0f,
+									record_color[1] / 255.0f,
+									record_color[2] / 255.0f
 								};
 
-								set_blend(alpha * alpha_modifier);
+								set_blend(alpha * alpha_modifier * record_alpha[record]);
 								util::color_modulate(backtrack_color, backtrack_material);
 
 								backtrack_material->IncrementReferenceCount();
 								backtrack_material->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, true);
 
 								m_modelrender()->ForcedMaterialOverride(backtrack_material);
-								original_fn(m_modelrender(), ctx, state, info, matrix);
+								original_fn(m_modelrender(), ctx, state, info, record_matrixes[record]);
 								m_modelrender()->ForcedMaterialOverride(nullptr);
 							}
 						}

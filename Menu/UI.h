@@ -51,6 +51,8 @@ public:
 	float dpi_scale = 1.f;
 	bool light_mode = false;
 	bool settings_open = false;
+	bool default_config_open = false;
+	float default_config_anim = 0.f;
 	ImVec4 accent_color = ImVec4(0.68f, 0.68f, 0.72f, 1.0f);
 
 	std::string loaded_config = crypt_str("");
@@ -126,4 +128,5 @@ private:
 	void misc_tab();
 	void settings_tab();
 	void skins_tab();
+	void default_config_popup();
 };

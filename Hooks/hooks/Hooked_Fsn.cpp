@@ -73,56 +73,130 @@ void weather()
 	m_precipitation->PostDataUpdate(0);
 }
 
-void remove_smoke()
+static bool is_smoke_material(IMaterial* material)
 {
-	if (cfg.player.enable && cfg.esp.removals[REMOVALS_SMOKE])
+	if (!material || material->IsErrorMaterial())
+		return false;
+
+	auto name = material->GetName();
+
+	if (!name)
+		return false;
+
+	char path[192];
+	auto length = 0;
+
+	while (name[length] && length < (int)sizeof(path) - 1)
 	{
-		static auto smoke_count = *reinterpret_cast<uint32_t**>(util::FindSignature(crypt_str("client.dll"), crypt_str("A3 ? ? ? ? 57 8B CB")) + 0x1);
-		*(int*)smoke_count = 0;
+		auto character = name[length];
+
+		if (character >= 'A' && character <= 'Z')
+			character += 32;
+		else if (character == '\\')
+			character = '/';
+
+		path[length] = character;
+		++length;
 	}
 
-	if (g_ctx.globals.should_remove_smoke == cfg.player.enable && cfg.esp.removals[REMOVALS_SMOKE])
-		return;
+	path[length] = '\0';
 
-	g_ctx.globals.should_remove_smoke = cfg.player.enable && cfg.esp.removals[REMOVALS_SMOKE];
+	if (!strstr(path, crypt_str("smoke")))
+		return false;
 
-	static std::vector <const char*> smoke_materials =
+	static const char* effect_paths[] =
 	{
-		"effects/overlaysmoke",
-		"particle/beam_smoke_01",
-		"particle/particle_smokegrenade",
-		"particle/particle_smokegrenade1",
-		"particle/particle_smokegrenade2",
-		"particle/particle_smokegrenade3",
-		"particle/particle_smokegrenade_sc",
-		"particle/smoke1/smoke1",
-		"particle/smoke1/smoke1_ash",
-		"particle/smoke1/smoke1_nearcull",
-		"particle/smoke1/smoke1_nearcull2",
-		"particle/smoke1/smoke1_snow",
-		"particle/smokesprites_0001",
-		"particle/smokestack",
-		"particle/vistasmokev1/vistasmokev1",
-		"particle/vistasmokev1/vistasmokev1_emods",
-		"particle/vistasmokev1/vistasmokev1_emods_impactdust",
-		"particle/vistasmokev1/vistasmokev1_fire",
-		"particle/vistasmokev1/vistasmokev1_nearcull",
-		"particle/vistasmokev1/vistasmokev1_nearcull_fog",
-		"particle/vistasmokev1/vistasmokev1_nearcull_nodepth",
-		"particle/vistasmokev1/vistassmokev1_smokegrenade",
-		"particle/vistasmokev1/vistasmokev4_emods_nocull",
-		"particle/vistasmokev1/vistasmokev4_nearcull",
-		"particle/vistasmokev1/vistasmokev4_nocull"
+		crypt_str("particle/"),
+		crypt_str("particles/"),
+		crypt_str("effects/"),
+		crypt_str("sprites/"),
+		crypt_str("overlays/"),
+		crypt_str("decals/")
 	};
 
-	for (auto material_name : smoke_materials)
+	for (auto effect_path : effect_paths)
 	{
-		auto material = m_materialsystem()->FindMaterial(material_name, nullptr);
+		if (!strncmp(path, effect_path, strlen(effect_path)))
+			return true;
+	}
 
-		if (!material)
+	return false;
+}
+
+void suppress_smoke_effects()
+{
+	static auto did_smoke_effect = netvars::get().get_offset(crypt_str("CSmokeGrenadeProjectile"), crypt_str("m_bDidSmokeEffect"));
+
+	if (!did_smoke_effect)
+		return;
+
+	if (!cfg.player.enable || !cfg.esp.removals[REMOVALS_SMOKE])
+		return;
+
+	for (auto i = 1; i <= m_entitylist()->GetHighestEntityIndex(); ++i)
+	{
+		auto e = static_cast <entity_t*> (m_entitylist()->GetClientEntity(i));
+
+		if (!e || e->is_player())
 			continue;
 
-		material->SetMaterialVarFlag(MATERIAL_VAR_NO_DRAW, g_ctx.globals.should_remove_smoke);
+		auto client_class = e->GetClientClass();
+
+		if (!client_class || client_class->m_ClassID != CSmokeGrenadeProjectile)
+			continue;
+
+		*(bool*)((uintptr_t)e + did_smoke_effect) = true;
+	}
+}
+
+void remove_smoke()
+{
+	const auto enabled = cfg.player.enable && cfg.esp.removals[REMOVALS_SMOKE];
+
+	if (enabled)
+	{
+		static auto smoke_count = []() -> int*
+		{
+			const auto address = util::FindSignature(crypt_str("client.dll"), crypt_str("A3 ? ? ? ? 57 8B CB"));
+
+			return address ? *reinterpret_cast <int**> (address + 0x1) : nullptr;
+		}();
+
+		if (smoke_count)
+			*smoke_count = 0;
+	}
+
+	static auto applied = false;
+	static auto next_pass = 0.0f;
+
+	if (!enabled && !applied)
+		return;
+
+	if (g_ctx.globals.should_remove_smoke != enabled)
+	{
+		g_ctx.globals.should_remove_smoke = enabled;
+		next_pass = 0.0f;
+	}
+
+	if (m_globals()->m_realtime < next_pass)
+		return;
+
+	next_pass = m_globals()->m_realtime + 0.25f;
+	applied = enabled;
+
+	auto materialsystem = m_materialsystem();
+
+	for (auto handle = materialsystem->FirstMaterial(); handle != materialsystem->InvalidMaterial(); handle = materialsystem->NextMaterial(handle))
+	{
+		auto material = materialsystem->GetMaterial(handle);
+
+		if (!is_smoke_material(material))
+			continue;
+
+		if (material->GetMaterialVarFlag(MATERIAL_VAR_NO_DRAW) == enabled)
+			continue;
+
+		material->SetMaterialVarFlag(MATERIAL_VAR_NO_DRAW, enabled);
 	}
 }
 
@@ -153,6 +227,9 @@ void __stdcall hooks::hooked_fsn(ClientFrameStage_t stage)
 	SkinChanger::run(stage);
 	local_animations::get().run(stage);
 
+	if (stage == FRAME_NET_UPDATE_POSTDATAUPDATE_START)
+		suppress_smoke_effects();
+
 	if (stage == FRAME_NET_UPDATE_POSTDATAUPDATE_START && g_ctx.local()->is_alive())
 	{
 		auto viewmodel = g_ctx.local()->m_hViewModel().Get();
@@ -179,6 +256,7 @@ void __stdcall hooks::hooked_fsn(ClientFrameStage_t stage)
 		}
 
 		remove_smoke();
+		suppress_smoke_effects();
 
 		if (cfg.esp.removals[REMOVALS_FLASH] && g_ctx.local()->m_flFlashDuration() && cfg.player.enable)
 			g_ctx.local()->m_flFlashDuration() = 0.0f;
@@ -350,7 +428,7 @@ void __stdcall hooks::hooked_fsn(ClientFrameStage_t stage)
 							eventlogs::get().add(log.str());
 						}
 					}
-					else if (!current_shot->impact_hit_player && !no_spread)
+					else if (!current_shot->impact_hit_player && !no_spread && !(current_shot->shot_info.path_deviation >= 0.0f && current_shot->shot_info.path_deviation < 6.0f))
 					{
 						// BRANCH 2: SPREAD MISS (checked third)
 						// No impact hit = pure spread/inaccuracy miss
@@ -366,13 +444,23 @@ void __stdcall hooks::hooked_fsn(ClientFrameStage_t stage)
 								<< crypt_str(" | Target: ") << current_shot->shot_info.target_name
 								<< crypt_str(" | Dist: ") << std::fixed << std::setprecision(0) << current_shot->shot_info.distance_to_target << crypt_str("u")
 								<< crypt_str(" | Lat: ") << current_shot->shot_info.network_latency_ms << crypt_str("ms")
-								<< crypt_str(" | HC: ") << current_shot->shot_info.hitchance << crypt_str("%")
-								<< crypt_str(" | Inaccuracy: ") << std::fixed << std::setprecision(3) << g_ctx.globals.inaccuracy;
+								<< crypt_str(" | HC: ");
+
+							if (current_shot->shot_info.hitchance > 100)
+								log << crypt_str("MA");
+							else
+								log << current_shot->shot_info.hitchance << crypt_str("%");
+
+							log << crypt_str(" | BT: ") << current_shot->shot_info.backtrack_ticks << crypt_str("t")
+								<< crypt_str(" | Inaccuracy: ") << std::fixed << std::setprecision(3) << current_shot->shot_info.fire_inaccuracy;
+
+							if (current_shot->shot_info.path_deviation >= 0.0f)
+								log << crypt_str(" | Dev: ") << std::fixed << std::setprecision(1) << current_shot->shot_info.path_deviation << crypt_str("u");
 
 							eventlogs::get().add(log.str());
 						}
 					}
-					else if (current_shot->target_position_at_fire.DistTo(current_shot->target_position_at_impact) > 16.0f)
+					else if (current_shot->shot_info.backtrack_ticks == 0 && current_shot->target_position_at_fire.DistTo(current_shot->target_position_at_impact) > 16.0f)
 					{
 						// BRANCH 3: PREDICTION ERROR MISS
 						current_shot->shot_info.result = crypt_str("Prediction");
@@ -411,22 +499,22 @@ void __stdcall hooks::hooked_fsn(ClientFrameStage_t stage)
 								is_bot = true;
 						}
 
-						if (!is_bot && current_shot->shot_info.target_animation_sequence > 0 &&
-							current_shot->shot_info.target_animation_cycle > 0.0f)
+						if (is_bot)
 						{
-							miss_reason = crypt_str("Correction");
+							miss_reason = crypt_str("Record mismatch");
 							miss_reason_idx = 3;
-							current_shot->shot_info.correction_failed = true;
 						}
 						else if (current_shot->shot_info.backtrack_ticks > 0)
 						{
 							miss_reason = crypt_str("Backtrack failure");
 							miss_reason_idx = 4;
 						}
-						else if (is_bot)
+						else if (current_shot->shot_info.target_animation_sequence > 0 &&
+							current_shot->shot_info.target_animation_cycle > 0.0f)
 						{
-							miss_reason = crypt_str("Record mismatch");
+							miss_reason = crypt_str("Correction");
 							miss_reason_idx = 3;
+							current_shot->shot_info.correction_failed = true;
 						}
 
 						current_shot->shot_info.result = miss_reason;
@@ -437,7 +525,10 @@ void __stdcall hooks::hooked_fsn(ClientFrameStage_t stage)
 							++g_ctx.globals.missed_shots[current_shot->last_target];
 						++g_ctx.globals.miss_reason_count[miss_reason_idx];
 						if (!is_bot)
+						{
 							lagcompensation::get().player_resolver[current_shot->last_target].last_side = (resolver_side)current_shot->side;
+							lagcompensation::get().resolver_feedback(current_shot->last_target, (resolver_side)current_shot->side, false);
+						}
 
 						if (cfg.misc.events_to_log[EVENTLOG_HIT])
 						{
@@ -448,20 +539,58 @@ void __stdcall hooks::hooked_fsn(ClientFrameStage_t stage)
 								<< crypt_str(" | Dist: ") << std::fixed << std::setprecision(0) << current_shot->shot_info.distance_to_target << crypt_str("u")
 								<< crypt_str(" | Lat: ") << current_shot->shot_info.network_latency_ms << crypt_str("ms");
 
-							if (miss_reason == crypt_str("Resolver") || miss_reason == crypt_str("Backtrack failure"))
+							if (!is_bot)
 							{
 								std::string side_name = crypt_str("Unknown");
-								if (current_shot->side == RESOLVER_LEFT)
-									side_name = crypt_str("Left");
-								else if (current_shot->side == RESOLVER_RIGHT)
-									side_name = crypt_str("Right");
-								else if (current_shot->side == RESOLVER_ZERO)
+
+								switch (current_shot->side)
+								{
+								case RESOLVER_ORIGINAL:
+									side_name = crypt_str("Original");
+									break;
+								case RESOLVER_ZERO:
 									side_name = crypt_str("Zero");
+									break;
+								case RESOLVER_FIRST:
+									side_name = crypt_str("Positive");
+									break;
+								case RESOLVER_SECOND:
+									side_name = crypt_str("Negative");
+									break;
+								case RESOLVER_LOW_FIRST:
+									side_name = crypt_str("Positive 50%");
+									break;
+								case RESOLVER_LOW_SECOND:
+									side_name = crypt_str("Negative 50%");
+									break;
+								case RESOLVER_HIGH_FIRST:
+									side_name = crypt_str("Positive 75%");
+									break;
+								case RESOLVER_HIGH_SECOND:
+									side_name = crypt_str("Negative 75%");
+									break;
+								case RESOLVER_DESYNC_FIRST:
+									side_name = crypt_str("Positive 25%");
+									break;
+								case RESOLVER_DESYNC_SECOND:
+									side_name = crypt_str("Negative 25%");
+									break;
+								case RESOLVER_LEFT:
+									side_name = crypt_str("Left");
+									break;
+								case RESOLVER_RIGHT:
+									side_name = crypt_str("Right");
+									break;
+								default:
+									break;
+								}
+
 								log << crypt_str(" | Resolved Side: ") << side_name;
 							}
 
 							log << crypt_str(" | HC: ") << current_shot->shot_info.hitchance << crypt_str("%")
-								<< crypt_str(" | BT: ") << current_shot->shot_info.backtrack_ticks << crypt_str("t");
+								<< crypt_str(" | BT: ") << current_shot->shot_info.backtrack_ticks << crypt_str("t")
+								<< crypt_str(" | SP: ") << (current_shot->shot_info.point_was_safe ? crypt_str("yes") : crypt_str("no"));
 
 							eventlogs::get().add(log.str());
 						}
@@ -484,6 +613,18 @@ void __stdcall hooks::hooked_fsn(ClientFrameStage_t stage)
 
 					eventlogs::get().add(log.str());
 				}
+			}
+			else if (cfg.misc.events_to_log[EVENTLOG_HIT] && !current_shot->hurt_player)
+			{
+				std::stringstream log;
+				log << crypt_str("MISS [Timeout] - ") << current_shot->shot_info.weapon_name
+					<< crypt_str(" | Target: ") << current_shot->shot_info.target_name
+					<< crypt_str(" | Dist: ") << std::fixed << std::setprecision(0) << current_shot->shot_info.distance_to_target << crypt_str("u")
+					<< crypt_str(" | Lat: ") << current_shot->shot_info.network_latency_ms << crypt_str("ms")
+					<< crypt_str(" | HC: ") << current_shot->shot_info.hitchance << crypt_str("%")
+					<< crypt_str(" | BT: ") << current_shot->shot_info.backtrack_ticks << crypt_str("t");
+
+				eventlogs::get().add(log.str());
 			}
 
 			g_ctx.shots.erase(current_shot);

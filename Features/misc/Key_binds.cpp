@@ -110,7 +110,7 @@ void key_binds::update_manual_binds()
 
 void key_binds::initialize_key_binds()
 {
-	for (auto i = 0; i < 23; i++)
+	for (auto i = 0; i < 26; i++)
 	{
 		keys[i] = false;
 		if (i == 2 || i >= 12 && i <= 17)
@@ -137,6 +137,7 @@ void key_binds::update_key_binds()
 	update_key_bind(&cfg.misc.fakeduck_key, 20);
 	update_key_bind(&cfg.misc.slowwalk_key, 21);
 	update_key_bind(&cfg.ragebot.body_aim_key, 22);
+	update_key_bind(&cfg.antiaim.freestand_key, 25);
 }
 
 bool key_binds::get_key_bind_state(int key_bind_id)
@@ -151,7 +152,7 @@ bool key_binds::get_key_bind_state(int key_bind_id)
 
 bool key_binds::get_key_bind_state_lua(int key_bind_id)
 {
-	if (key_bind_id < 0 || key_bind_id > 22)
+	if (key_bind_id < 0 || key_bind_id > 25)
 		return false;
 
 	switch (key_bind_id)

@@ -220,6 +220,8 @@ void __fastcall hooks::hooked_painttraverse(void* ecx, void* edx, vgui::VPANEL p
 
 	if (panel_id == panel)
 	{
+		misc::get().flush_trashtalk();
+
 		if (g_ctx.available())
 		{
 			static auto alive = false;
