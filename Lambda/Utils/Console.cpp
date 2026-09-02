@@ -1,6 +1,7 @@
 #include "Console.h"
 
 #include "../SDK/Interfaces.h"
+#include "../Features/Visuals/Elements.h"
 
 
 CGameConsole* Console = new CGameConsole;
@@ -25,10 +26,18 @@ void CGameConsole::LambdaTag() {
 }
 
 void CGameConsole::Print(const std::string& msg, Color color_def) {
+	for (const log_segment_t& segment : ParseLogSegments(msg, color_def))
+		ColorPrint(segment.text, segment.color);
+}
+
+std::vector<log_segment_t> ParseLogSegments(const std::string& msg, Color color_def, Color accent) {
+	std::vector<log_segment_t> segments;
+
 	Color current_clr = color_def;
 	std::string str;
 	std::string clr_to_parse;
 	int clr_digits = -1;
+
 	for (auto c : msg) {
 		if (c != '\a' && clr_digits == -1) {
 			str += c;
@@ -37,7 +46,7 @@ void CGameConsole::Print(const std::string& msg, Color color_def) {
 
 		if (c == '\a') {
 			if (!str.empty())
-				ColorPrint(str, current_clr);
+				segments.emplace_back(log_segment_t{ str, current_clr });
 			str.clear();
 			clr_digits = 0;
 			continue;
@@ -49,16 +58,19 @@ void CGameConsole::Print(const std::string& msg, Color color_def) {
 		if (clr_digits == 6) {
 			clr_digits = -1;
 			if (clr_to_parse == "ACCENT")
-				current_clr = Color(191, 198, 227);
+				current_clr = accent;
 			else if (clr_to_parse == "_MAIN_")
-				current_clr = Color(232);
+				current_clr = color_def;
 			else
 				current_clr = ParseColorFromHex(clr_to_parse);
 			clr_to_parse.clear();
 		}
 	}
+
 	if (!str.empty())
-		ColorPrint(str, current_clr);
+		segments.emplace_back(log_segment_t{ str, current_clr });
+
+	return segments;
 }
 
 void CGameConsole::ColorPrint(const std::string& msg, const Color& color) {
@@ -76,4 +88,11 @@ void CGameConsole::Error(const std::string& error) {
 
 	CVar->ConsoleColorPrintf(Color(255, 50, 50), error.c_str());
 	CVar->ConsolePrintf("\n");
+}
+
+void CGameConsole::Event(const std::string& msg) {
+	LambdaTag();
+	Print(msg);
+
+	Elements->AddLog(msg);
 }

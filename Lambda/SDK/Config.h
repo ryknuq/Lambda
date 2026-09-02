@@ -134,10 +134,9 @@ struct config_t {
             CColorPicker* ammo_color;
             CCheckBox* glow;
             CColorPicker* glow_color;
-            CComboBox* hitsound;
+            CComboBox* hitsound_head;
+            CComboBox* hitsound_body;
             CComboBox* killsound;
-            CComboBox* killsound_head;
-            CComboBox* killsound_body;
             CSliderInt* sound_volume;
             CCheckBox* show_server_hitboxes;
             CCheckBox* shared_esp;
@@ -249,6 +248,36 @@ struct config_t {
             CSliderInt* scope_blend;
             CSliderInt* viewmodel_scope_alpha;
         } effects;
+
+        struct elements_t {
+            CCheckBox* bomb_timer;
+            CCheckBox* keybinds;
+            CCheckBox* spectators;
+            CCheckBox* event_log;
+
+            CSliderInt* bomb_opacity;
+            CColorPicker* bomb_active;
+            CColorPicker* bomb_inactive;
+            CCheckBox* bomb_progress;
+            CCheckBox* bomb_defuse;
+
+            CSliderInt* keybinds_opacity;
+            CColorPicker* keybinds_active;
+            CColorPicker* keybinds_inactive;
+            CCheckBox* keybinds_show_all;
+            CCheckBox* keybinds_show_key;
+            CCheckBox* keybinds_show_mode;
+
+            CSliderInt* spectators_opacity;
+            CColorPicker* spectators_active;
+            CColorPicker* spectators_inactive;
+            CCheckBox* spectators_show_mode;
+
+            CSliderInt* log_opacity;
+            CColorPicker* log_accent;
+            CColorPicker* log_text;
+            CSliderInt* log_duration;
+        } elements;
     } visuals;
 
     struct misc_t {

@@ -138,6 +138,7 @@
     <ClCompile Include="Features\RageBot\Resolver.cpp" />
     <ClCompile Include="Features\ShotManager\ShotManager.cpp" />
     <ClCompile Include="Features\Visuals\Chams.cpp" />
+    <ClCompile Include="Features\Visuals\Elements.cpp" />
     <ClCompile Include="Features\Visuals\ESP.cpp" />
     <ClCompile Include="Features\Visuals\GlovesChanger.cpp" />
     <ClCompile Include="Features\Visuals\Glow.cpp" />
@@ -202,6 +203,7 @@
     <ClInclude Include="Features\RageBot\Resolver.h" />
     <ClInclude Include="Features\ShotManager\ShotManager.h" />
     <ClInclude Include="Features\Visuals\Chams.h" />
+    <ClInclude Include="Features\Visuals\Elements.h" />
     <ClInclude Include="Features\Visuals\ESP.h" />
     <ClInclude Include="Features\Visuals\GlovesChanger.h" />
     <ClInclude Include="Features\Visuals\Glow.h" />

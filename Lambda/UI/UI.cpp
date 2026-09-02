@@ -6,28 +6,23 @@
 #include "../Resources/sound_player.hpp"
 
 static void UpdateSoundVisibility() {
-	config.visuals.esp.sound_volume->SetVisible(config.visuals.esp.hitsound->get() || config.visuals.esp.killsound->get()
-		|| config.visuals.esp.killsound_head->get() || config.visuals.esp.killsound_body->get());
+	config.visuals.esp.sound_volume->SetVisible(config.visuals.esp.hitsound_head->get() || config.visuals.esp.hitsound_body->get()
+		|| config.visuals.esp.killsound->get());
 }
 
-static void PreviewHitSound() {
+static void PreviewHeadHitSound() {
 	UpdateSoundVisibility();
-	preview_hitsound(config.visuals.esp.hitsound->get(), config.visuals.esp.sound_volume->get());
+	preview_hitsound(config.visuals.esp.hitsound_head->get(), config.visuals.esp.sound_volume->get());
+}
+
+static void PreviewBodyHitSound() {
+	UpdateSoundVisibility();
+	preview_hitsound(config.visuals.esp.hitsound_body->get(), config.visuals.esp.sound_volume->get());
 }
 
 static void PreviewKillSound() {
 	UpdateSoundVisibility();
 	preview_hitsound(config.visuals.esp.killsound->get(), config.visuals.esp.sound_volume->get());
-}
-
-static void PreviewHeadKillSound() {
-	UpdateSoundVisibility();
-	preview_hitsound(config.visuals.esp.killsound_head->get(), config.visuals.esp.sound_volume->get());
-}
-
-static void PreviewBodyKillSound() {
-	UpdateSoundVisibility();
-	preview_hitsound(config.visuals.esp.killsound_body->get(), config.visuals.esp.sound_volume->get());
 }
 
 void CMenu::SetupUI() {
@@ -52,6 +47,7 @@ void CMenu::SetupUI() {
 
 	auto other_esp = AddGroupBox("Visuals", "Other ESP");
 	auto effects = AddGroupBox("Visuals", "Effects");
+	auto elements = AddGroupBox("Visuals", "Elements", 0.4f, 0);
 
 	auto misc = AddGroupBox("Misc", "Miscellaneous");
 	auto movement = AddGroupBox("Misc", "Movement");
@@ -156,16 +152,14 @@ void CMenu::SetupUI() {
 	config.visuals.esp.ammo_color = player_esp->AddColorPicker("Ammo", Color(80, 140, 200));
 	config.visuals.esp.glow = player_esp->AddCheckBox("Glow");
 	config.visuals.esp.glow_color = player_esp->AddColorPicker("Glow", Color(180, 60, 120));
-	config.visuals.esp.hitsound = player_esp->AddComboBox("Hit sound", GetSoundNames());
+	config.visuals.esp.hitsound_head = player_esp->AddComboBox("Head hit sound", GetSoundNames());
+	config.visuals.esp.hitsound_body = player_esp->AddComboBox("Body hit sound", GetSoundNames());
 	config.visuals.esp.killsound = player_esp->AddComboBox("Kill sound", GetSoundNames());
-	config.visuals.esp.killsound_head = player_esp->AddComboBox("Head kill sound", GetSoundNames());
-	config.visuals.esp.killsound_body = player_esp->AddComboBox("Body kill sound", GetSoundNames());
 	config.visuals.esp.sound_volume = player_esp->AddSliderInt("Sound volume", 0, 100, 50, "%d%%");
 
-	config.visuals.esp.hitsound->SetCallback(PreviewHitSound);
+	config.visuals.esp.hitsound_head->SetCallback(PreviewHeadHitSound);
+	config.visuals.esp.hitsound_body->SetCallback(PreviewBodyHitSound);
 	config.visuals.esp.killsound->SetCallback(PreviewKillSound);
-	config.visuals.esp.killsound_head->SetCallback(PreviewHeadKillSound);
-	config.visuals.esp.killsound_body->SetCallback(PreviewBodyKillSound);
 	config.visuals.esp.show_server_hitboxes = player_esp->AddCheckBox("Show sever hitboxes");
 	config.visuals.esp.shared_esp = player_esp->AddCheckBox("Shared ESP");
 	config.visuals.esp.share_with_enemies = player_esp->AddCheckBox("Share with enemies");
@@ -274,6 +268,54 @@ void CMenu::SetupUI() {
 	config.visuals.effects.sun_distance = effects->AddSliderInt("Sun distance", 0, 2000, 400);
 	config.visuals.effects.scope_blend = effects->AddSliderInt("Scope blend", 0, 100, 30, "%d%%");
 	config.visuals.effects.viewmodel_scope_alpha = effects->AddSliderInt("Viewmodel scope alpha", 0, 100, 0, "%d%%");
+
+	config.visuals.elements.bomb_timer = elements->AddCheckBox("Bomb timer");
+	config.visuals.elements.keybinds = elements->AddCheckBox("Keybinds");
+	config.visuals.elements.spectators = elements->AddCheckBox("Spectators");
+	config.visuals.elements.event_log = elements->AddCheckBox("Event log");
+
+	config.visuals.elements.bomb_opacity = elements->AddSliderInt("Bomb opacity", 0, 100, 94, "%d%%");
+	config.visuals.elements.bomb_active = elements->AddColorPicker("Bomb active", Color(105, 163, 255, 255));
+	config.visuals.elements.bomb_inactive = elements->AddColorPicker("Bomb inactive", Color(255, 255, 255, 71));
+	config.visuals.elements.bomb_progress = elements->AddCheckBox("Bomb progress bar", true);
+	config.visuals.elements.bomb_defuse = elements->AddCheckBox("Bomb defuse row", true);
+
+	config.visuals.elements.keybinds_opacity = elements->AddSliderInt("Keybinds opacity", 0, 100, 94, "%d%%");
+	config.visuals.elements.keybinds_active = elements->AddColorPicker("Keybinds active", Color(105, 163, 255, 255));
+	config.visuals.elements.keybinds_inactive = elements->AddColorPicker("Keybinds inactive", Color(255, 255, 255, 71));
+	config.visuals.elements.keybinds_show_all = elements->AddCheckBox("Keybinds show all");
+	config.visuals.elements.keybinds_show_key = elements->AddCheckBox("Keybinds show key", true);
+	config.visuals.elements.keybinds_show_mode = elements->AddCheckBox("Keybinds show mode", true);
+
+	config.visuals.elements.spectators_opacity = elements->AddSliderInt("Spectators opacity", 0, 100, 94, "%d%%");
+	config.visuals.elements.spectators_active = elements->AddColorPicker("Spectators active", Color(105, 163, 255, 255));
+	config.visuals.elements.spectators_inactive = elements->AddColorPicker("Spectators inactive", Color(255, 255, 255, 71));
+	config.visuals.elements.spectators_show_mode = elements->AddCheckBox("Spectators show mode", true);
+
+	config.visuals.elements.log_opacity = elements->AddSliderInt("Log opacity", 0, 100, 0, "%d%%");
+	config.visuals.elements.log_accent = elements->AddColorPicker("Log accent", Color(105, 163, 255, 255));
+	config.visuals.elements.log_text = elements->AddColorPicker("Log text", Color(255, 255, 255, 255));
+	config.visuals.elements.log_duration = elements->AddSliderInt("Log duration", 1, 20, 5, "%ds");
+
+	config.visuals.elements.bomb_opacity->SetVisible(false);
+	config.visuals.elements.bomb_active->SetVisible(false);
+	config.visuals.elements.bomb_inactive->SetVisible(false);
+	config.visuals.elements.bomb_progress->SetVisible(false);
+	config.visuals.elements.bomb_defuse->SetVisible(false);
+	config.visuals.elements.keybinds_opacity->SetVisible(false);
+	config.visuals.elements.keybinds_active->SetVisible(false);
+	config.visuals.elements.keybinds_inactive->SetVisible(false);
+	config.visuals.elements.keybinds_show_all->SetVisible(false);
+	config.visuals.elements.keybinds_show_key->SetVisible(false);
+	config.visuals.elements.keybinds_show_mode->SetVisible(false);
+	config.visuals.elements.spectators_opacity->SetVisible(false);
+	config.visuals.elements.spectators_active->SetVisible(false);
+	config.visuals.elements.spectators_inactive->SetVisible(false);
+	config.visuals.elements.spectators_show_mode->SetVisible(false);
+	config.visuals.elements.log_opacity->SetVisible(false);
+	config.visuals.elements.log_accent->SetVisible(false);
+	config.visuals.elements.log_text->SetVisible(false);
+	config.visuals.elements.log_duration->SetVisible(false);
 
 	config.misc.miscellaneous.anti_untrusted = misc->AddCheckBox("Anti untrusted");
 	config.misc.miscellaneous.ping_reducer = misc->AddCheckBox("Ping reducer");

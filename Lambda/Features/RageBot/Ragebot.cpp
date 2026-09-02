@@ -845,26 +845,142 @@ void CRagebot::Run() {
 }
 
 
-void CRagebot::Zeusbot() {
-	const float inaccuracy_tan = std::tan(EnginePrediction->WeaponInaccuracy());
+static bool ZeusSelectPoint(CBasePlayer* player, LagRecord* record, float reach, const QAngle& punch, bool has_punch, Vector& out_point, QAngle& out_angle, float& out_distance) {
+	studiohdr_t* studio_model = ModelInfoClient->GetStudioModel(player->GetModel());
 
+	if (!studio_model)
+		return false;
+
+	mstudiohitboxset_t* set = studio_model->GetHitboxSet(player->m_nHitboxSet());
+
+	if (!set)
+		return false;
+
+	static constexpr int scan_order[]{
+		HITBOX_STOMACH, HITBOX_PELVIS, HITBOX_LOWER_CHEST, HITBOX_CHEST, HITBOX_UPPER_CHEST,
+		HITBOX_LEFT_UPPER_ARM, HITBOX_RIGHT_UPPER_ARM, HITBOX_LEFT_FOREARM, HITBOX_RIGHT_FOREARM,
+		HITBOX_LEFT_THIGH, HITBOX_RIGHT_THIGH, HITBOX_NECK, HITBOX_HEAD,
+		HITBOX_LEFT_CALF, HITBOX_RIGHT_CALF
+	};
+
+	bool found = false;
+	out_distance = reach + 1.f;
+
+	for (const int hitbox_id : scan_order) {
+		mstudiobbox_t* hitbox = set->GetHitbox(hitbox_id);
+
+		if (!hitbox || hitbox->flCapsuleRadius <= 0.f)
+			continue;
+
+		const matrix3x4_t& bone_matrix = record->clamped_matrix[hitbox->bone];
+
+		Vector mins, maxs;
+		Math::VectorTransform(hitbox->bbmin, bone_matrix, &mins);
+		Math::VectorTransform(hitbox->bbmax, bone_matrix, &maxs);
+
+		Vector axis = maxs - mins;
+		Vector point = mins;
+
+		const float axis_length = axis.LengthSqr();
+
+		if (axis_length > 0.0001f)
+			point = mins + axis * std::clamp((ctx.shoot_position - mins).Dot(axis) / axis_length, 0.f, 1.f);
+
+		Vector to_eye = ctx.shoot_position - point;
+		const float axis_distance = to_eye.Length();
+
+		if (axis_distance < 0.01f)
+			continue;
+
+		point = point + to_eye * (min(hitbox->flCapsuleRadius * 0.7f, axis_distance * 0.5f) / axis_distance);
+
+		const float distance = (point - ctx.shoot_position).Length();
+
+		if (distance > reach || distance >= out_distance)
+			continue;
+
+		QAngle angle = Math::VectorAngles_p(point - ctx.shoot_position);
+
+		if (has_punch)
+			angle -= punch * 0.5f;
+
+		angle.Normalize();
+
+		const Vector direct_end = ctx.shoot_position + Math::AngleVectors(angle) * reach;
+
+		if (!EngineTrace->RayIntersectPlayer(ctx.shoot_position, direct_end, player, record->clamped_matrix, -1))
+			continue;
+
+		if (has_punch) {
+			const QAngle punched(angle.pitch + punch.pitch, angle.yaw + punch.yaw);
+			const Vector punched_end = ctx.shoot_position + Math::AngleVectors(punched) * reach;
+
+			if (!EngineTrace->RayIntersectPlayer(ctx.shoot_position, punched_end, player, record->clamped_matrix, -1))
+				continue;
+		}
+
+		CGameTrace world = EngineTrace->TraceRay(ctx.shoot_position, point, CONTENTS_SOLID | CONTENTS_MOVEABLE | CONTENTS_WINDOW | CONTENTS_DEBRIS, Cheat.LocalPlayer);
+
+		if (world.fraction < 1.f)
+			continue;
+
+		CGameTrace blocker = EngineTrace->TraceRay(ctx.shoot_position, point, MASK_SHOT, Cheat.LocalPlayer);
+
+		if (blocker.hit_entity && blocker.hit_entity != player && blocker.hit_entity->IsPlayer())
+			continue;
+
+		out_point = point;
+		out_angle = angle;
+		out_distance = distance;
+		found = true;
+	}
+
+	return found;
+}
+
+void CRagebot::Zeusbot() {
 	if (!ctx.active_weapon->CanShoot())
 		return;
 
-	for (int i = 0; i < ClientState->m_nMaxClients; i++) {
+	float range = ctx.weapon_info ? ctx.weapon_info->flRange : 0.f;
+
+	if (range < 32.f || range > 1024.f)
+		range = 150.f;
+
+	const float reach = range - 1.f;
+	const float scan_range = range + 72.f;
+
+	const QAngle punch = Cheat.LocalPlayer->m_aimPunchAngle() * cvars.weapon_recoil_scale->GetFloat();
+	const bool has_punch = fabsf(punch.pitch) + fabsf(punch.yaw) > 0.015f;
+
+	LagRecord* best_record = nullptr;
+	Vector best_point;
+	QAngle best_angle;
+	float best_distance = reach + 1.f;
+
+	for (int i = 1; i <= ClientState->m_nMaxClients && i < 64; i++) {
 		CBasePlayer* player = reinterpret_cast<CBasePlayer*>(EntityList->GetClientEntity(i));
+
+		if (!player || player == Cheat.LocalPlayer || player->IsTeammate() || !player->IsAlive() || player->m_bDormant() || player->m_bGunGameImmunity())
+			continue;
+
 		auto& records = LagCompensation->records(i);
 
-		if (!player || player->IsTeammate() || !player->IsAlive() || player->m_bDormant() || player->m_bGunGameImmunity())
+		if (records.empty())
 			continue;
 
 		LagRecord* backup_record = LagCompensation->BackupData(player);
 
-		for (auto i = records.rbegin(); i != records.rend(); i = std::next(i)) {
-			const auto record = &*i;
-			if (!LagCompensation->ValidRecord(record)) {
+		for (auto it = records.rbegin(); it != records.rend(); it = std::next(it)) {
+			LagRecord* record = &*it;
 
-				WorldESP->AddDebugMessage(std::string(("CRageBot::Knifebot")).append((" -> Invalid Record |")).append((" L") + std::to_string(__LINE__)));
+			const float hull_distance = ((record->m_vecOrigin + (record->m_vecMaxs + record->m_vecMins) * 0.5f) - ctx.shoot_position).LengthSqr();
+
+			if (hull_distance > scan_range * scan_range)
+				continue;
+
+			if (!LagCompensation->ValidRecord(record)) {
+				WorldESP->AddDebugMessage(std::string(("CRageBot::ZeusBot")).append((" -> Invalid Record |")).append((" L") + std::to_string(__LINE__)));
 
 				if (record->breaking_lag_comp)
 					break;
@@ -872,68 +988,53 @@ void CRagebot::Zeusbot() {
 				continue;
 			}
 
-			float distance = ((record->m_vecOrigin + (record->m_vecMaxs + record->m_vecMins) * 0.5f) - ctx.shoot_position).LengthSqr();
-
-			if (distance > 155 * 155)
-				continue;
+			Exploits->block_charge = true;
 
 			LagCompensation->BacktrackEntity(record, false);
 			record->BuildMatrix();
 
-			const Vector points[]{
-				player->GetHitboxCenter(HITBOX_STOMACH, record->clamped_matrix),
-				player->GetHitboxCenter(HITBOX_CHEST, record->clamped_matrix),
-				player->GetHitboxCenter(HITBOX_UPPER_CHEST, record->clamped_matrix),
-				player->GetHitboxCenter(HITBOX_LEFT_UPPER_ARM, record->clamped_matrix),
-				player->GetHitboxCenter(HITBOX_RIGHT_UPPER_ARM, record->clamped_matrix)
-			};
+			Vector point;
+			QAngle angle;
+			float distance;
 
-			for (const auto& point : points) {
-				CGameTrace trace = EngineTrace->TraceRay(ctx.shoot_position, point, MASK_SHOT | CONTENTS_GRATE, Cheat.LocalPlayer);
+			if (!ZeusSelectPoint(player, record, reach, punch, has_punch, point, angle, distance))
+				continue;
 
-				if (trace.hit_entity != player) {
-					CGameTrace clip_trace;
-					Ray_t ray(ctx.shoot_position, point);
-					if (!EngineTrace->ClipRayToPlayer(ray, MASK_SHOT | CONTENTS_GRATE, player, &clip_trace))
-						continue;
-
-					if (clip_trace.fraction < trace.fraction)
-						trace = clip_trace;
-					else
-						continue;
-				}
-
-				float hitchance = min(12.f / ((ctx.shoot_position - point).Length() * inaccuracy_tan), 1.f);
-
-				if (hitchance < 0.7f)
-					continue;
-
-				WorldESP->AddDebugMessage(std::string(("CRageBot::ZeusBot")).append((" -> Hitchance Success |")).append((" L") + std::to_string(__LINE__)));
-
-				if (config.visuals.effects.client_impacts->get()) {
-					Color col = config.visuals.effects.client_impacts_color->get();
-					DebugOverlay->AddBox(trace.endpos, Vector(-1, -1, -1), Vector(1, 1, 1), col, config.visuals.effects.impacts_duration->get());
-				}
-
-				ctx.cmd->viewangles = Math::VectorAngles(point - ctx.shoot_position);
-				ctx.cmd->buttons |= IN_ATTACK;
-				ctx.cmd->tick_count = TIME_TO_TICKS(record->m_flSimulationTime + LagCompensation->GetLerpTime());
-
-				if (!config.antiaim.misc.fake_duck->get())
-					ctx.send_packet = true;
-
-				if (config.visuals.chams.shot_chams->get())
-					Chams->AddShotChams(record);
-
-				LagCompensation->BacktrackEntity(backup_record);
-				delete backup_record;
-				return;
+			if (distance < best_distance) {
+				best_distance = distance;
+				best_point = point;
+				best_angle = angle;
+				best_record = record;
 			}
+
+			break;
 		}
 
 		LagCompensation->BacktrackEntity(backup_record);
 		delete backup_record;
 	}
+
+	if (!best_record)
+		return;
+
+	WorldESP->AddDebugMessage(std::string(("CRageBot::ZeusBot")).append((" -> Shoot |")).append((" L") + std::to_string(__LINE__)));
+
+	if (config.visuals.effects.client_impacts->get()) {
+		Color col = config.visuals.effects.client_impacts_color->get();
+		DebugOverlay->AddBox(best_point, Vector(-1, -1, -1), Vector(1, 1, 1), col, config.visuals.effects.impacts_duration->get());
+	}
+
+	ctx.cmd->viewangles = best_angle;
+	ctx.cmd->buttons |= IN_ATTACK;
+	ctx.cmd->tick_count = TIME_TO_TICKS(best_record->m_flSimulationTime + LagCompensation->GetLerpTime());
+
+	if (!config.antiaim.misc.fake_duck->get())
+		ctx.send_packet = true;
+
+	if (config.visuals.chams.shot_chams->get())
+		Chams->AddShotChams(best_record);
+
+	AutoPeek->Return();
 }
 
 void CRagebot::Knifebot() {

@@ -199,10 +199,9 @@ void CConfig::Init() {
     add(config.visuals.esp.ammo_color);
     add(config.visuals.esp.glow);
     add(config.visuals.esp.glow_color);
-    add(config.visuals.esp.hitsound);
+    add(config.visuals.esp.hitsound_head);
+    add(config.visuals.esp.hitsound_body);
     add(config.visuals.esp.killsound);
-    add(config.visuals.esp.killsound_head);
-    add(config.visuals.esp.killsound_body);
     add(config.visuals.esp.sound_volume);
     add(config.visuals.esp.shared_esp);
     add(config.visuals.esp.share_with_enemies);
@@ -293,6 +292,29 @@ void CConfig::Init() {
     add(config.visuals.effects.sun_distance);
     add(config.visuals.effects.scope_blend);
     add(config.visuals.effects.viewmodel_scope_alpha);
+    add(config.visuals.elements.bomb_timer);
+    add(config.visuals.elements.keybinds);
+    add(config.visuals.elements.spectators);
+    add(config.visuals.elements.event_log);
+    add(config.visuals.elements.bomb_opacity);
+    add(config.visuals.elements.bomb_active);
+    add(config.visuals.elements.bomb_inactive);
+    add(config.visuals.elements.bomb_progress);
+    add(config.visuals.elements.bomb_defuse);
+    add(config.visuals.elements.keybinds_opacity);
+    add(config.visuals.elements.keybinds_active);
+    add(config.visuals.elements.keybinds_inactive);
+    add(config.visuals.elements.keybinds_show_all);
+    add(config.visuals.elements.keybinds_show_key);
+    add(config.visuals.elements.keybinds_show_mode);
+    add(config.visuals.elements.spectators_opacity);
+    add(config.visuals.elements.spectators_active);
+    add(config.visuals.elements.spectators_inactive);
+    add(config.visuals.elements.spectators_show_mode);
+    add(config.visuals.elements.log_opacity);
+    add(config.visuals.elements.log_accent);
+    add(config.visuals.elements.log_text);
+    add(config.visuals.elements.log_duration);
     add(config.misc.miscellaneous.anti_untrusted);
     add(config.misc.miscellaneous.ping_reducer);
     add(config.misc.miscellaneous.automatic_grenade_release);
@@ -350,6 +372,7 @@ void CConfig::parse(nlohmann::json& cfg) {
             case WidgetType::KeyBind:
                 ((CKeyBind*)e)->mode = val[0];
                 ((CKeyBind*)e)->key = val[1];
+                ((CKeyBind*)e)->hidden = val.size() > 2 && val[2].is_boolean() && val[2].get<bool>();
                 break;
             case WidgetType::SliderInt:
                 ((CSliderInt*)e)->value = val;
@@ -414,7 +437,7 @@ nlohmann::json CConfig::dump() {
             result[name] = ((CColorPicker*)e)->value;
             break;
         case WidgetType::KeyBind:
-            result[name] = { ((CKeyBind*)e)->mode, ((CKeyBind*)e)->key };
+            result[name] = { ((CKeyBind*)e)->mode, ((CKeyBind*)e)->key, ((CKeyBind*)e)->hidden };
             break;
         case WidgetType::SliderInt:
             result[name] = ((CSliderInt*)e)->value;

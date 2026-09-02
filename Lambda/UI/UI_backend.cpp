@@ -19,6 +19,7 @@
 #include "../Utils/Console.h"
 
 #include "../Features/RageBot/Ragebot.h"
+#include "../Features/Visuals/Elements.h"
 
 CMenu* Menu = new CMenu;
 
@@ -93,6 +94,8 @@ void CMenu::Draw() {
             insert_pressed = true;
             if (m_bMenuOpened)
                 Ragebot->UpdateUI();
+            else
+                ImGui::GetIO().MouseDown[0] = false;
         }
     }
     else {
@@ -121,10 +124,12 @@ void CMenu::Draw() {
 
             ImGui::GetWindowDrawList()->AddRectFilled(window_pos + ImVec2(181 + item_spacing.x, item_spacing.y), window_pos + ImVec2((window_size.x - item_spacing.x), (item_spacing.y + 58)), ImGui::GetColorU32(c::child::bg), c::child::rounding);
 
-            ImGui::GetWindowDrawList()->AddImage(pic::logo.texture, window_pos + ImVec2(181 / 2 - 128 / 2 + item_spacing.x / 2, item_spacing.y - 16), window_pos + ImVec2(181 / 2 + 128 / 2 + item_spacing.x / 2, item_spacing.y - 16 + 128), ImVec2(0, 0), ImVec2(1, 1));
+            const ImVec2 logo_center = window_pos + ImVec2((item_spacing.x + 181.f) * 0.5f, item_spacing.y + 48.f);
+            const ImVec2 logo_half = ImVec2(39.f, 39.f);
 
-            ImGui::GetWindowDrawList()->AddText(font::general, font::general->FontSize, window_pos + ImVec2(220, 35), ImColor(255, 255, 255, 120), xorstr("credits: @nadoclient"));
-            ImGui::GetWindowDrawList()->AddText(font::general, font::general->FontSize + 5.f, window_pos + ImVec2(220, 13), ImColor(255, 255, 255, 215), xorstr("lambda"));
+            ImGui::GetWindowDrawList()->AddImage(pic::logo.texture, logo_center - logo_half, logo_center + logo_half, ImVec2(0, 0), ImVec2(1, 1));
+
+            ImGui::GetWindowDrawList()->AddText(font::general, font::general->FontSize + 5.f, window_pos + ImVec2(220, 41), ImColor(255, 255, 255, 215), xorstr("lambda"));
 
             static int tabs = 0;
 
@@ -159,6 +164,8 @@ void CMenu::Draw() {
         }
         ImGui::End();
     }
+
+    Elements->Draw();
 
     ImGui::Render();
 

@@ -20,8 +20,6 @@
 
 CEventListner* EventListner = new CEventListner;
 
-static float last_head_hit[65]{};
-
 static std::vector<const char*> s_RgisterEvents = {
 	"player_hurt",
 	"player_death",
@@ -58,20 +56,12 @@ void CEventListner::FireGameEvent(IGameEvent* event) {
 			if (EngineClient->GetPlayerForUserID(event->GetInt("attacker")) == local_id) {
 				const int hitgroup = event->GetInt("hitgroup");
 
-				if (config.visuals.esp.hitsound->get()) {
-					int kill_sound = config.visuals.esp.killsound->get();
+				if (user_id_pl != local_id) {
+					const int hit_sound = hitgroup == HITGROUP_HEAD ? config.visuals.esp.hitsound_head->get() : config.visuals.esp.hitsound_body->get();
 
-					if (!kill_sound)
-						kill_sound = hitgroup == HITGROUP_HEAD ? config.visuals.esp.killsound_head->get() : config.visuals.esp.killsound_body->get();
-
-					const bool lethal = event->GetInt("health") <= 0;
-
-					if (!(lethal && kill_sound))
-						play_hitsound(config.visuals.esp.hitsound->get() - 1, config.visuals.esp.sound_volume->get());
+					if (hit_sound)
+						play_hitsound(hit_sound - 1, config.visuals.esp.sound_volume->get());
 				}
-
-				if (user_id_pl > 0 && user_id_pl < 65 && hitgroup == HITGROUP_HEAD)
-					last_head_hit[user_id_pl] = GlobalVars->curtime;
 
 				if (!skip_hurt) {
 					if (config.visuals.esp.damage_marker->get())
@@ -94,8 +84,7 @@ void CEventListner::FireGameEvent(IGameEvent* event) {
 					if (action == "hit" && hb != HITGROUP_GENERIC)
 						hitbox = " in the \aACCENT" + GetHitgroupName(hb) + "\a_MAIN_";
 
-					Console->LambdaTag();
-					Console->Print(std::format("{} \aACCENT{}\a_MAIN_{} for \aACCENT{}\a_MAIN_ damage (\aACCENT{}\a_MAIN_ remaining)\n", action, victim->GetName(), hitbox, event->GetInt("dmg_health"), event->GetInt("health")));
+					Console->Event(std::format("{} \aACCENT{}\a_MAIN_{} for \aACCENT{}\a_MAIN_ damage (\aACCENT{}\a_MAIN_ remaining)\n", action, victim->GetName(), hitbox, event->GetInt("dmg_health"), event->GetInt("health")));
 				}
 			}
 
@@ -110,26 +99,15 @@ void CEventListner::FireGameEvent(IGameEvent* event) {
 			const int attacker_id = EngineClient->GetPlayerForUserID(event->GetInt("attacker"));
 
 			if (attacker_id == local_id && user_id_pl != local_id) {
-				int kill_sound = config.visuals.esp.killsound->get();
+				const int kill_sound = config.visuals.esp.killsound->get();
 
-				if (!kill_sound) {
-					bool headshot = event->GetBool("headshot");
-
-					if (!headshot && user_id_pl > 0 && user_id_pl < 65 && last_head_hit[user_id_pl] > 0.f && GlobalVars->curtime - last_head_hit[user_id_pl] <= 0.25f)
-						headshot = true;
-
-					kill_sound = headshot ? config.visuals.esp.killsound_head->get() : config.visuals.esp.killsound_body->get();
-				}
-
-				play_hitsound(kill_sound - 1, config.visuals.esp.sound_volume->get());
+				if (kill_sound)
+					play_hitsound(kill_sound - 1, config.visuals.esp.sound_volume->get());
 
 				Miscellaneous::Trashtalk(true);
 			}
 			else if (user_id_pl == local_id && attacker_id != local_id && attacker_id > 0)
 				Miscellaneous::Trashtalk(false);
-
-			if (user_id_pl > 0 && user_id_pl < 65)
-				last_head_hit[user_id_pl] = -1.f;
 
 			if (user_id_pl == local_id) {
 				ctx.reset();
@@ -192,8 +170,7 @@ void CEventListner::FireGameEvent(IGameEvent* event) {
 			std::string item = event->GetString("weapon");
 
 			if (config.misc.miscellaneous.logs->get(2) && player) {
-				Console->LambdaTag();
-				Console->Print(std::format("\aACCENT{} \a_MAIN_bought\aACCENT {}\n", player->GetName(), item));
+				Console->Event(std::format("\aACCENT{} \a_MAIN_bought\aACCENT {}\n", player->GetName(), item));
 			}
 
 			if (player && player->m_bDormant()) {

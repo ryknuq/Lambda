@@ -506,6 +506,17 @@ bool __fastcall hkIsPaused(IVEngineClient* thisptr, void* edx) {
 	return oIsPaused(thisptr, edx);
 }
 
+float __fastcall hkGetScreenAspectRatio(IVEngineClient* thisptr, void* edx, int viewport_width, int viewport_height) {
+	static tGetScreenAspectRatio oGetScreenAspectRatio = (tGetScreenAspectRatio)Hooks::EngineVMT->GetOriginal(101);
+
+	const float ratio = config.visuals.effects.aspect_ratio->get();
+
+	if (ratio > 0.f)
+		return ratio;
+
+	return oGetScreenAspectRatio(thisptr, edx, viewport_width, viewport_height);
+}
+
 void __fastcall hkDrawModelExecute(IVModelRender* thisptr, void* edx, void* ctx, const DrawModelState_t& state, const ModelRenderInfo_t& pInfo, matrix3x4_t* pCustomBoneToWorld) {
 	static tDrawModelExecute oDrawModelExecute = (tDrawModelExecute)Hooks::ModelRenderVMT->GetOriginal(21);
 
@@ -541,7 +552,6 @@ void __fastcall hkFrameStageNotify(IBaseClientDLL* thisptr, void* edx, EClientFr
 		Chams->UpdateSettings();
 		World->SunDirection();
 
-		cvars.r_aspectratio->SetFloat(config.visuals.effects.aspect_ratio->get());
 		cvars.mat_postprocessing_enable->SetInt(!config.visuals.effects.removals->get(0));
 		cvars.cl_csm_shadows->SetInt(!config.visuals.effects.removals->get(2));
 		cvars.cl_foot_contact_shadows->SetInt(0);
@@ -1160,6 +1170,7 @@ void Hooks::Initialize() {
 	PanelVMT->Hook(41, hkPaintTraverse);
 	EngineVMT->Hook(90, hkIsPaused);
 	EngineVMT->Hook(93, hkIsHLTV);
+	EngineVMT->Hook(101, hkGetScreenAspectRatio);
 	ModelRenderVMT->Hook(21, hkDrawModelExecute);
 	ClientVMT->Hook(37, hkFrameStageNotify);
 	ClientVMT->Hook(11, hkHudUpdate);
@@ -1240,6 +1251,7 @@ void Hooks::End() {
 	PanelVMT->UnHook(41);
 	EngineVMT->UnHook(90);
 	EngineVMT->UnHook(93);
+	EngineVMT->UnHook(101);
 	ModelRenderVMT->UnHook(21);
 	ClientVMT->UnHook(37);
 	ClientVMT->UnHook(11);

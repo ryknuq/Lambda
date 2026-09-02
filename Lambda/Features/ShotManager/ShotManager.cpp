@@ -65,8 +65,7 @@ void CShotManager::LogMiss(RegisteredShot_t* shot) {
 	if (shot->safe_point)
 		extra_info += " | \aACCENTsafe\a_MAIN_";
 
-	Console->LambdaTag();
-	Console->Print(std::format("missed \aACCENT{}\a_MAIN_'s \aACCENT{}\a_MAIN_ due to {}{}\a_MAIN_ (hc: \aACCENT{}%%\a_MAIN_ | bt: \aACCENT{}t\a_MAIN_{})\n",
+	Console->Event(std::format("missed \aACCENT{}\a_MAIN_'s \aACCENT{}\a_MAIN_ due to {}{}\a_MAIN_ (hc: \aACCENT{}%%\a_MAIN_ | bt: \aACCENT{}t\a_MAIN_{})\n",
 		shot->record->player->GetName(),
 		GetDamagegroupName(shot->wanted_damagegroup),
 		miss_color.find(shot->miss_reason)->second,
@@ -382,8 +381,7 @@ void CShotManager::OnNetUpdate() {
 			if (!shot->miss_reason.empty())
 				extra_info += " | mismatch: " + miss_color.find(shot->miss_reason)->second + shot->miss_reason + "\a_MAIN_";
 
-			Console->LambdaTag();
-			Console->Print(std::format("hit \aACCENT{} \a_MAIN_in the {} for {} (hc: \aACCENT{}%%\a_MAIN_ | bt: \aACCENT{}t\a_MAIN_{})\n", 
+			Console->Event(std::format("hit \aACCENT{} \a_MAIN_in the {} for {} (hc: \aACCENT{}%%\a_MAIN_ | bt: \aACCENT{}t\a_MAIN_{})\n",
 				player->GetName(), 
 				hitbox, 
 				damage,

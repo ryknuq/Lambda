@@ -13,6 +13,11 @@
 class CMenuGroupbox;
 class IBaseWidget;
 
+namespace font {
+	extern ImFont* general;
+	extern ImFont* tab;
+}
+
 struct UILuaCallback_t {
 	IBaseWidget* ref;
 	int script_id;
@@ -67,6 +72,7 @@ public:
 	int key = 0;
 	int mode = 2;
 	bool toggled = false;
+	bool hidden = false;
 
 	bool get();
 	void set(bool n) { toggled = n; }; // for toggle mode only

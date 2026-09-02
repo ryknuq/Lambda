@@ -204,6 +204,9 @@
     <ClCompile Include="Features\Visuals\Chams.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
+    <ClCompile Include="Features\Visuals\Elements.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
     <ClCompile Include="Features\Visuals\ESP.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
@@ -513,6 +516,9 @@
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="Features\Visuals\Chams.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="Features\Visuals\Elements.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="Features\Visuals\ESP.h">

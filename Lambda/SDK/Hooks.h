@@ -24,6 +24,7 @@ typedef bool(__fastcall* tShouldSkipAnimationFrame)(void*, void*);
 typedef bool(__fastcall* tShouldInterpolate)(CBasePlayer*, void*);
 typedef void(__fastcall* tDoExtraBoneProcessing)(CBaseEntity*, void*, CStudioHdr*, Vector*, Quaternion*, const matrix3x4_t&, uint8_t*, void*);
 typedef bool(__fastcall* tIsHLTV)(IVEngineClient*, void*);
+typedef float(__fastcall* tGetScreenAspectRatio)(IVEngineClient*, void*, int, int);
 typedef void(__fastcall* tBuildTransformations)(CBaseEntity*, void*, void*, void*, void*, const void*, int, void*);
 typedef bool(__fastcall* tSetupBones)(CBaseEntity*, void*, matrix3x4_t*, int, int, float);
 typedef void(__cdecl* tCL_Move)(float, bool);
