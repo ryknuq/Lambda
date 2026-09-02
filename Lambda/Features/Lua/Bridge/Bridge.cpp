@@ -852,7 +852,7 @@ namespace api {
 		}
 
 		bool is_key_pressed(int key) {
-			return GetAsyncKeyState(key) & 0x8000;
+			return !ctx.text_input && (GetAsyncKeyState(key) & 0x8000);
 		}
 
 		Vector get_mouse_position() {

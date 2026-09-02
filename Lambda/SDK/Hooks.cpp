@@ -50,7 +50,7 @@ LRESULT CALLBACK hkWndProc(HWND Hwnd, UINT Message, WPARAM wParam, LPARAM lParam
 	if (!Render->IsInitialized() || !Menu->IsInitialized())
 		return CallWindowProc(oWndProc, Hwnd, Message, wParam, lParam);
 
-	if (Message == WM_KEYDOWN && !ctx.console_visible) {
+	if (Message == WM_KEYDOWN && !ctx.console_visible && !ctx.text_input) {
 		AntiAim->OnKeyPressed(wParam);
 	}
 
@@ -474,11 +474,21 @@ void __fastcall hkPaintTraverse(IPanel* thisptr, void* edx, unsigned int panel, 
 	static tPaintTraverse oPaintTraverse = (tPaintTraverse)Hooks::PanelVMT->GetOriginal(41);
 	static unsigned int hud_zoom_panel = 0;
 
-	if (!hud_zoom_panel) {
-		std::string panelName = VPanel->GetName(panel);
+	if (!hud_zoom_panel || !ctx.chat_panel) {
+		const char* panel_name = VPanel->GetName(panel);
 
-		if (panelName == "HudZoom")
-			hud_zoom_panel = panel;
+		if (panel_name) {
+			if (!hud_zoom_panel && !strcmp(panel_name, "HudZoom"))
+				hud_zoom_panel = panel;
+
+			if (!ctx.chat_panel && !strcmp(panel_name, "ChatInputLine"))
+				ctx.chat_panel = panel;
+		}
+	}
+
+	if (ctx.chat_panel == panel && VPanel->IsVisible(panel)) {
+		ctx.chat_open = true;
+		ctx.text_input = true;
 	}
 
 	if (hud_zoom_panel == panel && config.visuals.effects.remove_scope->get() > 0)
@@ -547,6 +557,9 @@ void __fastcall hkFrameStageNotify(IBaseClientDLL* thisptr, void* edx, EClientFr
 	case FRAME_RENDER_START: {
 		ctx.active_app = EngineClient->IsActiveApp();
 		ctx.console_visible = EngineClient->Con_IsVisible();
+		ctx.chat_open = ctx.chat_panel != 0 && VPanel->IsVisible(ctx.chat_panel);
+		ctx.text_input = ctx.chat_open
+			|| (Menu && Menu->IsInitialized() && Menu->IsOpened() && ImGui::GetCurrentContext() && ImGui::GetIO().WantTextInput);
 
 		AnimationSystem->RunInterpolation();
 		Chams->UpdateSettings();

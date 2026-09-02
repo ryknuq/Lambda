@@ -24,6 +24,13 @@ struct HooksInfo_t {
 struct Ctx_t {
 	bool active_app = false;
 	bool console_visible = false;
+	bool chat_open = false;
+	bool text_input = false;
+	unsigned int chat_panel = 0;
+
+	bool KeysBlocked() const {
+		return !active_app || console_visible || text_input;
+	}
 
 	Vector camera_postion;
 	CUserCmd* cmd = nullptr;

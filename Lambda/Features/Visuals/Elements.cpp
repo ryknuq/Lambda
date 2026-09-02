@@ -696,7 +696,7 @@ void CElements::DrawKeybinds() {
 			mode = "toggle";
 		}
 		else {
-			active = ctx.active_app && !ctx.console_visible && (GetAsyncKeyState(bind->key) & 0x8000);
+			active = !ctx.KeysBlocked() && (GetAsyncKeyState(bind->key) & 0x8000);
 			mode = "hold";
 		}
 

@@ -270,7 +270,7 @@ int CAntiAim::DesyncFreestand() {
 }
 
 void CAntiAim::SlowWalk() {
-	if (!config.antiaim.misc.slow_walk->get() || !Cheat.LocalPlayer || Cheat.LocalPlayer->m_iHealth() == 0 || !(GetAsyncKeyState(VK_SHIFT) & 0x8000))
+	if (!config.antiaim.misc.slow_walk->get() || !Cheat.LocalPlayer || Cheat.LocalPlayer->m_iHealth() == 0 || ctx.KeysBlocked() || !(GetAsyncKeyState(VK_SHIFT) & 0x8000))
 		return;
 
 	ctx.cmd->buttons &= ~IN_WALK;

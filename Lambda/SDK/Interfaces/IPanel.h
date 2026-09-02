@@ -21,7 +21,7 @@ public:
 	virtual void SetInset(VPANEL vguiPanel, int left, int top, int right, int bottom) = 0;
 	virtual void GetInset(VPANEL vguiPanel, int& left, int& top, int& right, int& bottom) = 0;
 	virtual void SetVisible(VPANEL vguiPanel, bool state) = 0;
-	virtual bool IsVisible(VPANEL vguiPanel) = 0;
+	virtual bool IsVisible(unsigned int vguiPanel) = 0;
 	virtual void SetParent(VPANEL vguiPanel, VPANEL newParent) = 0;
 	virtual int GetChildCount(VPANEL vguiPanel) = 0;
 	virtual VPANEL GetChild(VPANEL vguiPanel, int index) = 0;

@@ -88,7 +88,7 @@ void CMenu::Draw() {
 
     static bool insert_pressed = false;
 
-    if (GetAsyncKeyState(VK_INSERT) & 0x8000 || GetAsyncKeyState(VK_DELETE) & 0x8000) {
+    if (ctx.active_app && !ctx.console_visible && !ctx.chat_open && (GetAsyncKeyState(VK_INSERT) & 0x8000 || GetAsyncKeyState(VK_DELETE) & 0x8000)) {
         if (!insert_pressed) {
             m_bMenuOpened = !m_bMenuOpened;
             insert_pressed = true;
@@ -296,7 +296,7 @@ bool CKeyBind::get() {
     if (mode == 2)
         return true;
 
-    if (!ctx.console_visible && ctx.active_app && GetAsyncKeyState(key) & 0x8000) {
+    if (!ctx.KeysBlocked() && GetAsyncKeyState(key) & 0x8000) {
         if (!pressed_once) {
             pressed_once = true;
             toggled = !toggled;
@@ -310,7 +310,7 @@ bool CKeyBind::get() {
         return toggled;
     }
     else {
-        return ctx.active_app && !ctx.console_visible && (GetAsyncKeyState(key) & 0x8000);
+        return !ctx.KeysBlocked() && (GetAsyncKeyState(key) & 0x8000);
     }
 };
 
